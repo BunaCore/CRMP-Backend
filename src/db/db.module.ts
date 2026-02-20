@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common';
-import { DrizzleService } from './drizzle.service';
+import { DrizzleService } from './db.service';
 
 @Global()
 @Module({

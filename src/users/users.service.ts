@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { DrizzleService } from 'src/drizzle/drizzle.service';
-import { users } from 'src/drizzle/schema/user';
+import { DrizzleService } from 'src/db/db.service';
+import { users } from 'src/db/schema/user';
+import { eq } from 'drizzle-orm';
 
 @Injectable()
 export class UsersService {
@@ -15,9 +16,15 @@ export class UsersService {
   async create(email: string, passwordHash: string) {
     const [user] = await this.drizzle.db
       .insert(users)
-      .values({ email, passwordHash })
+      .values({ email, passwordHash, role: 'student' })
       .returning();
 
     return user;
+  }
+
+  async findById(id: string) {
+    return this.drizzle.db.query.users.findFirst({
+      where: (u, { eq }) => eq(u.id, id),
+    });
   }
 }
