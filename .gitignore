@@ -1,0 +1,27 @@
+# Environment variables
+.env
+.env.local
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Test coverage
+coverage/
+
+# Logs
+*.log
+*.tmp
+
+# OS files
+.DS_Store
+
+# IDE settings
+.idea/
+.vscode/
+
+# Other
+*.rest
