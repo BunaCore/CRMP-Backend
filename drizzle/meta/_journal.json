@@ -8,6 +8,13 @@
       "when": 1771632521038,
       "tag": "0000_fuzzy_pete_wisdom",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1771676111538,
+      "tag": "0001_outgoing_infant_terrible",
+      "breakpoints": true
     }
   ]
 }

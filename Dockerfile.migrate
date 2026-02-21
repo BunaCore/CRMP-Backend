@@ -1,0 +1,27 @@
+# Dockerfile.migrate
+FROM node:20-slim
+
+WORKDIR /app
+
+# Install PNPM globally
+RUN npm install -g pnpm
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+COPY drizzle ./drizzle
+RUN mkdir -p drizzle && [ -f drizzle/_journal.json ] || echo "[]" > drizzle/_journal.json
+
+# Install all dependencies (includes devDependencies)
+RUN pnpm install --frozen-lockfile
+
+# Copy TS source + Drizzle config + TS configs
+COPY src ./src
+COPY drizzle.config.ts ./
+COPY tsconfig.json tsconfig.build.json ./
+COPY .env.docker .env
+
+# Set Node env
+ENV NODE_ENV=development
+
+# Entrypoint: run migrations
+ENTRYPOINT ["pnpm", "exec", "drizzle-kit", "migrate"]
