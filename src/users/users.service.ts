@@ -1,36 +1,35 @@
 import { Injectable } from '@nestjs/common';
-import { DrizzleService } from 'src/db/db.service';
-import { users } from 'src/db/schema/user';
-import { eq } from 'drizzle-orm';
+import { UsersRepository } from './users.repository';
+import { User, CreateUserInput } from 'src/users/types/user';
 
 @Injectable()
 export class UsersService {
-  constructor(private drizzle: DrizzleService) {}
+  constructor(private usersRepository: UsersRepository) {}
 
-  async findByEmail(email: string) {
-    const result = await this.drizzle.db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
-    return result[0] || null;
+  async findByEmail(email: string): Promise<User | null> {
+    return this.usersRepository.findByEmail(email);
   }
 
-  async create(email: string, passwordHash: string) {
-    const [user] = await this.drizzle.db
-      .insert(users)
-      .values({ email, passwordHash, role: 'student' })
-      .returning();
-
-    return user;
+  async findById(id: string): Promise<User | null> {
+    return this.usersRepository.findById(id);
   }
 
-  async findById(id: string) {
-    const result = await this.drizzle.db
-      .select()
-      .from(users)
-      .where(eq(users.id, id))
-      .limit(1);
-    return result[0] || null;
+  async create(input: CreateUserInput): Promise<User> {
+    return this.usersRepository.create(input);
+  }
+
+  async findAll(): Promise<User[]> {
+    return this.usersRepository.findAll();
+  }
+
+  async update(
+    id: string,
+    input: Partial<CreateUserInput>,
+  ): Promise<User | null> {
+    return this.usersRepository.update(id, input);
+  }
+
+  async delete(id: string): Promise<boolean> {
+    return this.usersRepository.delete(id);
   }
 }

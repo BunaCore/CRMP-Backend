@@ -7,4 +7,3 @@ import { DrizzleService } from './db.service';
   exports: [DrizzleService],
 })
 export class DbModule {}
-
