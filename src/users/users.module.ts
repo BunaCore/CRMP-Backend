@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { DrizzleModule } from 'src/db/db.module';
+import { DbModule } from 'src/db/db.module';
 
 @Module({
-  imports: [DrizzleModule],
+  imports: [DbModule],
   providers: [UsersService],
   exports: [UsersService],
 })

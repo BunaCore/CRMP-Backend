@@ -8,9 +8,12 @@ export class UsersService {
   constructor(private drizzle: DrizzleService) {}
 
   async findByEmail(email: string) {
-    return this.drizzle.db.query.users.findFirst({
-      where: (u, { eq }) => eq(u.email, email),
-    });
+    const result = await this.drizzle.db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+    return result[0] || null;
   }
 
   async create(email: string, passwordHash: string) {
@@ -23,8 +26,11 @@ export class UsersService {
   }
 
   async findById(id: string) {
-    return this.drizzle.db.query.users.findFirst({
-      where: (u, { eq }) => eq(u.id, id),
-    });
+    const result = await this.drizzle.db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+    return result[0] || null;
   }
 }

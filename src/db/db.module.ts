@@ -6,4 +6,5 @@ import { DrizzleService } from './db.service';
   providers: [DrizzleService],
   exports: [DrizzleService],
 })
-export class DrizzleModule {}
+export class DbModule {}
+
