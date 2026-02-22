@@ -1,6 +1,6 @@
 # Access Control Module - Usage Guide
 
-The Access Control module provides a **policy-driven authorization system** for the CRMP Backend. It evaluates permissions based on user roles, attributes (department, program), and resource membership.
+The Access Control module provides a **policy-driven authorization system** for the CRMP Backend. It evaluates permissions based on user roles, attributes (department, project program), and resource membership.
 
 ---
 
@@ -28,7 +28,7 @@ Guard calls AccessService.can(user, permissions, context)
     ↓
 AccessService checks:
   1. Does user.role have permission? (RolePermissions mapping)
-  2. Do attributes match? (Department, Program, Membership)
+  2. Do attributes match? (Department, Project Program, Membership)
     ↓
 Grant/Deny access
 ```
@@ -69,11 +69,11 @@ export class ProjectsController {
   }
 
   // Multiple permissions (OR logic - any one grants access)
-  @Post(':id/approve')
-  @RequirePermission([Permission.PROJECT_APPROVE, Permission.ADRPM])
+  @Post(':id/reject')
+  @RequirePermission([Permission.PROJECT_APPROVE, Permission.PROJECT_REJECT])
   @UseGuards(AccessGuard)
-  async approveProject(@Param('id') projectId: string) {
-    // User can access if they have PROJECT_APPROVE OR ADRPM permission
+  async rejectProject(@Param('id') projectId: string) {
+    // User can access if they have PROJECT_APPROVE OR PROJECT_REJECT permission
   }
 }
 ```
@@ -194,15 +194,19 @@ When context is provided, AccessService additionally checks:
 
 1. **Department Match** (`user.department === project.department`)
    - Skipped if either is missing
-   - Ensures users only access projects in their department
+   - Conditional: Enforced unless user's system role is explicitly cross-department (e.g., ADRPM, VPRTT, RA)
+   - Ensures scoped users only access their department's projects
 
-2. **Program Eligibility** (project.projectProgram: UG/PG/GENERAL)
+2. **Project Program Eligibility** (project.projectProgram: UG/PG/GENERAL)
+   - Program is a **project attribute**, not a user attribute
    - GENERAL projects are always accessible
-   - UG/PG programs checked (extensible for future rules)
+   - UG/PG program eligibility checked by AccessService (role-based)
+   - Workflow-specific enrollment rules (e.g., "UG projects only open in Aug-Dec") enforced in domain services
 
-3. **Project Membership** (projectMember.userId === user.id)
+3. **Project Team Membership** (projectMember.userId === user.id)
    - Verifies user is actually a team member
-   - Checks that projectMember.role exists
+   - Checks for project role: PI, EVALUATOR, SUPERVISOR (distinct from system roles)
+   - Note: Project roles are resource-specific; system roles (ADRPM, STUDENT, etc.) are global
 
 ---
 
@@ -270,19 +274,20 @@ async deleteProject(@Param('id') projectId: string, @Req() req: Request) {
 @Post('projects/:id/finalize')
 @RequirePermission([
   Permission.PROJECT_APPROVE,
-  Permission.VPRTT,  // High-level reviewer
+  Permission.BUDGET_APPROVE,
 ])
 @UseGuards(AccessGuard)
 async finalizeProject(@Param('id') projectId: string) {
-  // Access granted if user has PROJECT_APPROVE OR ADRPM
+  // Access granted if user has PROJECT_APPROVE OR BUDGET_APPROVE
+  // Roles are resolved internally via role-permissions.ts
 }
 ```
 
-### Pattern 4: Workflow + Business Rules (Service Layer)
+### Pattern 4: Authorization + Business Rules (Responsibility Separation)
 
 ```typescript
-// access-control checks: role + attributes
-// Service layer checks: workflow + business rules
+// AccessGuard checks: role + attributes (project membership, department)
+// Service layer checks: workflow, state, calendar, business constraints
 
 @Post('projects/:id/submit-for-review')
 @UseGuards(JwtAuthGuard)
@@ -290,24 +295,27 @@ async submitForReview(@Param('id') projectId: string, @Req() req: Request) {
   const user = req.user;
   const project = await this.projectsService.findById(projectId);
 
-  // 1. AccessService: Can user perform actions on this project?
+  // 1. AccessService: Is user authorized to interact with this project?
   const canSubmit = await this.accessService.can(
     user,
     Permission.PROJECT_SUBMIT,
-    { project },
+    { project },  // AccessService checks: role + department + membership
   );
   if (!canSubmit) {
-    throw new ForbiddenException('Cannot submit this project');
+    throw new ForbiddenException('Insufficient permissions');
   }
 
-  // 2. Service layer: Is workflow valid? (not AccessService's job)
+  // 2. Service layer: Is workflow state valid?
+  // AccessService does NOT check business rules - that's the service's job
   if (project.projectStage !== 'Submitted') {
     throw new BadRequestException('Project must be in Submitted stage');
   }
 
-  // 3. Service layer: Is academic calendar open?
-  if (!this.academicCalendarService.isOpen('UG')) {
-    throw new BadRequestException('UG submission window closed');
+  // 3. Service layer: Are calendar/enrollment rules satisfied?
+  if (!this.academicCalendarService.isOpen(project.projectProgram)) {
+    throw new BadRequestException(
+      `Submission window closed for ${project.projectProgram} projects`,
+    );
   }
 
   // Proceed
@@ -384,41 +392,195 @@ export enum Role {
 
 ## Important Notes
 
-### Authorization vs. Business Logic
+### System Roles vs. Project Roles
 
-- **AccessService**: Role + attribute checks (permission-based)
-- **Service Layer**: Workflow, state, calendar rules (business logic)
+**System Roles** (global scope):
 
-Example:
+- `ADRPM`, `VPRTT`, `RA`, `SUPERVISOR`, `DEPARTMENT_HEAD`, `PI`, `STUDENT`
+- Defined in `role.enum.ts`
+- Map to permissions via `role-permissions.ts`
+- User has ONE system role
+
+**Project Roles** (resource-specific scope, in `project_members` table):
+
+- `PI`, `EVALUATOR`, `SUPERVISOR`
+- Different from system roles with the same name
+- A user may have project role `PI` on one project and be a `STUDENT` on another
+- Checked via `projectMember.role` in AccessContext
+
+**Key:** AccessService evaluates both dimensions when context is provided.
+
+---
+
+### Responsibility Boundaries
+
+**AccessService handles** (authorization layer):
+
+- Role → permission mapping
+- Department matching
+- Project membership verification
+- Project-specific role checks (PI, EVALUATOR)
+
+**AccessService does NOT handle** (business logic layer):
+
+- Project state/workflow transitions (e.g., "Submitted" → "Under Review")
+- Academic calendar validation
+- Enrollment period checks
+- Budget approval workflows
+- Multi-level approvals or cascading rules
+
+These belong in domain services (`ProjectService`, `AcademicCalendarService`, etc.)
+
+---
+
+### ⚠️ What AccessService MUST NEVER Do
+
+AccessService is **authorization-only**. It MUST NOT:
+
+- ❌ Query the database directly for supplementary context (use `AccessContext` instead)
+- ❌ Evaluate business logic (workflow state, calendar rules, budget constraints)
+- ❌ Throw exceptions—return `true`/`false` and let the caller decide
+- ❌ Cache decisions or store state
+- ❌ Perform side effects (logging, metrics, notifications)
+- ❌ Infer missing context—require explicit AccessContext parameters
+- ❌ Apply role inheritance or permission inference beyond the static `role-permissions.ts` mapping
+
+**Why?** Keeps authorization logic isolated, testable, and fast. Business rules belong in domain services.
+
+---
+
+### AccessContext Structure
 
 ```typescript
-// AccessService says: User has permission ✓
-// Service must check: Is project workflow valid?
-if (project.stage !== 'APPROVED') {
-  throw new BadRequestException('Cannot proceed');
-}
+type AccessContext = {
+  project?: Project; // Hydrated project entity
+  projectMember?: ProjectMember; // User's role in the project (or null)
+  targetUserId?: string; // For user-level operations
+};
 ```
 
-### Context is Flexible
+**Usage:**
 
-- Pass only what you need
-- Missing fields are skipped (no errors)
-- Example: `{ project }` alone is valid
-- Example: `{ projectMember }` alone is valid
+- Pass only what's needed; missing fields are skipped
+- Example: `{ project }` checks department + program eligibility
+- Example: `{ projectMember }` verifies team membership
+- Example: `{ project, projectMember }` checks both + project role
+- **Controllers must supply hydrated entities** (not just IDs)
 
-### OR Logic for Multiple Permissions
+### Permission Logic (OR Only)
 
-Decorator support multiple permissions with **OR** logic:
+Decorator supports multiple **permissions** with **OR** logic:
 
 ```typescript
-@RequirePermission([Perm.A, Perm.B, Perm.C])
-// User needs ANY ONE of A, B, C
+@RequirePermission([Permission.A, Permission.B, Permission.C])
+// User needs ANY ONE of A, B, C (resolved via their system role)
 
-@RequirePermission(Perm.A)
+@RequirePermission(Permission.A)
 // User must have A
 ```
 
-To enforce **AND** logic, call AccessService directly in your controller.
+**⚠️ HARD RULES - These Are Not Guidance, These Are Requirements:**
+
+- ✅ **ONLY permissions** go in the decorator (e.g., `Permission.PROJECT_APPROVE`)
+- ❌ **NEVER roles** in the decorator (e.g., `Role.ADRPM` is forbidden)
+- ✅ **Multiple permissions use OR logic** (user needs any one)
+- ❌ **NOT AND logic** in the decorator (use AccessService.can() directly if needed)
+- ✅ **Always pair with @UseGuards(AccessGuard)**
+- ❌ **@RequirePermission without AccessGuard has no effect**
+
+**Example violations:**
+
+```typescript
+// ❌ WRONG - Roles in decorator
+@RequirePermission([Role.ADRPM, Role.SUPERVISOR])
+
+// ❌ WRONG - AND logic attempt
+@RequirePermission(Permission.PROJECT_APPROVE)
+@RequirePermission(Permission.TEAM_MANAGE)  // This doesn't AND them
+
+// ✅ CORRECT
+@RequirePermission([Permission.PROJECT_APPROVE, Permission.TEAM_MANAGE])
+@UseGuards(AccessGuard)
+```
+
+Role → permission resolution happens **internally** in AccessService using `role-permissions.ts`.
+
+For **AND** logic (all permissions required), call AccessService directly in your controller.
+
+---
+
+### ⚠️ What AccessGuard MUST/MUST NOT Do
+
+AccessGuard enforces authorization **only**. It MUST:
+
+- ✅ Read permission metadata from `@RequirePermission` decorator
+- ✅ Call `AccessService.can()` to evaluate permissions
+- ✅ Throw `ForbiddenException` if denied
+- ✅ Allow request if granted
+
+AccessGuard MUST NOT:
+
+- ❌ Query the database (no context inference)
+- ❌ Perform fallback logic (e.g., "if ADRPM, grant anyway")
+- ❌ Apply business rules (workflow, state, calendar)
+- ❌ Throw non-authorization exceptions
+- ❌ Modify request state or perform side effects
+
+**Why?** Keeps guards predictable and composable. If you need custom logic, handle it in your controller/service.
+
+---
+
+### When NOT to Use AccessGuard
+
+Use `AccessGuard` + `@RequirePermission()` for:
+
+- ✅ Simple, declarative permission checks
+- ✅ Route-level authorization
+- ✅ Stateless, permission-only decisions
+
+**Do NOT use AccessGuard when:**
+
+- ❌ You need resource-level context (use `AccessService.can()` directly in controller)
+- ❌ You need AND logic for permissions (call AccessService multiple times)
+- ❌ You need to handle missing context (guard expects hydrated entities)
+- ❌ You need custom error messages (guard throws generic ForbiddenException)
+- ❌ You require async business logic before the decision
+
+**Pattern: Direct AccessService Usage (no guard)**
+
+```typescript
+@Post('projects/:id/submit')
+@UseGuards(JwtAuthGuard)  // Just auth, no AccessGuard
+async submitProject(@Param('id') id: string, @Req() req: Request) {
+  const user = req.user;
+  const project = await this.projectsService.findById(id);
+
+  // Custom authorization logic
+  const canSubmit = await this.accessService.can(
+    user,
+    Permission.PROJECT_SUBMIT,
+    { project, projectMember: await this.getProjectMember(id, user.id) }
+  );
+
+  if (!canSubmit) {
+    throw new ForbiddenException('Cannot submit this project');
+  }
+
+  // Then check business rules (state, calendar, etc.)
+  if (project.projectStage !== 'Draft') {
+    throw new BadRequestException('Project not in Draft state');
+  }
+
+  await this.projectsService.submit(id);
+}
+```
+
+This pattern is used when you need:
+
+- Resource context before authorization
+- AND logic for multiple checks
+- Custom error messages
+- Business rule validation alongside authorization
 
 ---
 

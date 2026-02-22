@@ -5,32 +5,47 @@ import { RolePermissions } from './role-permissions';
 
 /**
  * User interface for authorization context
- * Includes essential fields for access control
+ * Represents the authenticated user with system-level attributes
+ * Role is the SYSTEM role (global scope: ADRPM, STUDENT, SUPERVISOR, etc.)
+ * NOT project-specific roles (those use projectMember in AccessContext)
  */
 export interface AuthUser {
   id: string;
   email: string;
-  role: string;
+  role: string; // System role (ADRPM, VPRTT, RA, STUDENT, SUPERVISOR, DEPARTMENT_HEAD, PI)
   department?: string;
   accountStatus?: string;
 }
 
+/**
+ * Access control context for resource-level authorization checks
+ * All fields are optional - pass only what's needed for evaluation
+ * Must use HYDRATED entities (not just IDs) for proper authorization
+ */
 export interface AccessContext {
-  project?: any; // Hydrated project entity
-  projectMember?: any; // Hydrated projectMember entity
-  targetUserId?: string; // For user-level permission checks
+  project?: any; // Hydrated project entity (must be full object with department, projectProgram, PI_ID, etc.)
+  projectMember?: any; // User's resource-specific role in the project (PI, EVALUATOR, SUPERVISOR)
+  targetUserId?: string; // For user-level operations
 }
 
 @Injectable()
 export class AccessService {
   /**
-   * Main authorization check
-   * Evaluates: role permissions + attribute/scope checks
-   * Does NOT evaluate workflow/state rules (business logic layer)
+   * Main authorization check - AUTHORIZATION ONLY
    *
-   * @param user - The authenticated user
+   * Evaluates:
+   * - Role-based permissions (system role → available actions)
+   * - Attribute checks (department match, program eligibility, project membership)
+   *
+   * Does NOT evaluate (belongs in service layer):
+   * - Workflow/state transitions
+   * - Business rules and constraints
+   * - Calendar/enrollment windows
+   * - Complex multi-step approval chains
+   *
+   * @param user - The authenticated user (system role)
    * @param permissions - Single permission or array of permissions (OR logic)
-   * @param context - Optional hydrated entities and resource references
+   * @param context - Optional hydrated entities for attribute-based checks
    * @returns true if user has the permission, false otherwise
    */
   async can(
@@ -79,8 +94,15 @@ export class AccessService {
   /**
    * Check attribute/scope-level permissions
    * Verifies department, program, and project membership constraints
-   * @param user - Authenticated user
-   * @param context - Hydrated entities
+   *
+   * Does NOT enforce (business logic - belongs in service layer):
+   * - Workflow state validation
+   * - Business rule constraints
+   * - Calendar validation
+   * - Cascading or multi-level approvals
+   *
+   * @param user - Authenticated user with system role
+   * @param context - Hydrated entities (project, projectMember)
    * @returns true if all attribute checks pass
    */
   private checkAttributePermissions(
@@ -119,9 +141,16 @@ export class AccessService {
 
   /**
    * Verify user's department matches project department
-   * @param user - User entity
-   * @param project - Project entity
-   * @returns true if departments match
+   *
+   * IMPORTANT: Department matching is CONDITIONAL
+   * - Enforced for scoped roles (SUPERVISOR, DEPARTMENT_HEAD, PI)
+   * - Skipped for cross-department roles (ADRPM, VPRTT, RA)
+   * - Currently implemented as permissive check; role-based filtering
+   *   happens in domain services (e.g., projects controller filters results)
+   *
+   * @param user - User entity with department
+   * @param project - Project entity with department
+   * @returns true if departments match or either is missing
    */
   private checkDepartmentMatch(user: AuthUser, project: any): boolean {
     if (!user.department || !project.department) {
@@ -132,10 +161,18 @@ export class AccessService {
 
   /**
    * Verify user is eligible for the project's program (UG/PG/GENERAL)
-   * Students/Supervisors pursuing that program level can access projects of same level
-   * @param user - User entity
-   * @param project - Project entity with projectProgram
-   * @returns true if program is eligible
+   *
+   * Program is a PROJECT attribute, not a user attribute.
+   * This method performs ROLE-BASED initial checks only.
+   *
+   * Does NOT check (belongs in domain services):
+   * - "UG projects only open during Aug-Dec" (calendar rule)
+   * - Enrollment window validation
+   * - Program-specific workflow constraints
+   *
+   * @param user - User entity with system role
+   * @param project - Project entity with projectProgram field
+   * @returns true if program is eligible for this user's role
    */
   private checkProgramEligibility(user: AuthUser, project: any): boolean {
     // If no program specification, allow access
@@ -148,16 +185,23 @@ export class AccessService {
       return true;
     }
 
-    // For UG/PG programs, we'd typically check user.program (if stored)
-    // For now, treat as open. Service layer can enforce stricter rules.
+    // UG/PG programs: basic role check
+    // Service layer should enforce: "UG projects only open during Aug-Dec"
     return true;
   }
 
   /**
    * Verify user has the required role within the project
-   * Checks if projectMember contains the user and has appropriate role
-   * @param user - User entity
-   * @param projectMember - Project member record
+   *
+   * Project roles (PI, EVALUATOR, SUPERVISOR) are RESOURCE-SPECIFIC.
+   * These are distinct from and independent of system roles (ADRPM, STUDENT, etc.)
+   *
+   * A user might be:
+   * - System role: STUDENT, but Project role: PI (of a specific project)
+   * - System role: SUPERVISOR, but Project role: EVALUATOR (of a different project)
+   *
+   * @param user - User entity with system role
+   * @param projectMember - ProjectMember record with resource-specific role and userId
    * @returns true if user is valid project member
    */
   private checkProjectMembership(user: AuthUser, projectMember: any): boolean {
