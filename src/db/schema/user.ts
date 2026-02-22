@@ -15,7 +15,7 @@ export const users = pgTable('users', {
   phoneNumber: text('phone_number'),
   university: text('university'),
   universityId: text('university_id'),
-  role: text('role').default('student').notNull(),
+  role: text('role').default('user').notNull(),
   accountStatus: AccountStatusEnum('account_status')
     .default('deactive')
     .notNull(),

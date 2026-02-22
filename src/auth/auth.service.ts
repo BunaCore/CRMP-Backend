@@ -7,6 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { UsersService } from 'src/users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { sanitizeUser } from 'src/utils/sanitize';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -23,14 +24,27 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const user = await this.usersService.create(dto.email, passwordHash);
+    const user = await this.usersService.create({
+      email: dto.email,
+      passwordHash,
+      fullName: dto.fullName,
+      department: dto.department,
+      phoneNumber: dto.phoneNumber,
+      university: dto.university,
+      universityId: dto.universityId,
+      role: 'user',
+      accountStatus: 'deactive',
+    });
 
     const access_token = this.jwtService.sign({
       sub: user.id,
       role: user.role,
     });
 
-    return { access_token };
+    return {
+      access_token,
+      user: sanitizeUser(user),
+    };
   }
 
   async login(dto: LoginDto) {
@@ -49,6 +63,9 @@ export class AuthService {
       role: user.role,
     });
 
-    return { access_token };
+    return {
+      access_token,
+      user: sanitizeUser(user),
+    };
   }
 }

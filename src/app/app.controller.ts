@@ -27,7 +27,7 @@ export class AppController {
   getProtected(@CurrentUser() user: AuthenticatedUser) {
     return {
       message: 'This is a protected route',
-      userId: user.userId,
+      userId: user.id,
       role: user.role,
     };
   }
