@@ -25,3 +25,7 @@ coverage/
 
 # Other
 *.rest
+.env.example
+docker-compose.db.yml
+.env.example
+.env.example

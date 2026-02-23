@@ -15,7 +15,7 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-  ) {}
+  ) { }
 
   async register(dto: RegisterDto) {
     const existing = await this.usersService.findByEmail(dto.email);
@@ -32,13 +32,13 @@ export class AuthService {
       phoneNumber: dto.phoneNumber,
       university: dto.university,
       universityId: dto.universityId,
-      role: 'user',
+      role: 'user', // For compatibility in the returned object if needed, though db won't store it
       accountStatus: 'deactive',
     });
 
     const access_token = this.jwtService.sign({
       sub: user.id,
-      role: user.role,
+      role: user.role || (user.roles && user.roles[0]) || 'user',
     });
 
     return {
@@ -60,7 +60,7 @@ export class AuthService {
 
     const access_token = this.jwtService.sign({
       sub: user.id,
-      role: user.role,
+      role: user.role || (user.roles && user.roles[0]) || 'user',
     });
 
     return {
