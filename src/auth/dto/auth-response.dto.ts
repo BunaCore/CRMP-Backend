@@ -8,7 +8,8 @@ export class AuthResponseDto {
     phoneNumber?: string | null;
     university?: string | null;
     universityId?: string | null;
-    role: string;
+    role?: string;
+    roles?: string[];
     accountStatus: string;
     createdAt?: Date | null;
   };

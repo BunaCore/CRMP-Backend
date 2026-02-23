@@ -9,7 +9,9 @@ export interface User {
   phoneNumber?: string | null;
   university?: string | null;
   universityId?: string | null;
-  role: string;
+  roles?: string[];
+  role?: string;
+  isExternal?: boolean | null;
   accountStatus: AccountStatus;
   createdAt?: Date | null;
 }

@@ -6,7 +6,7 @@ import { User, CreateUserInput, FindUserInput } from 'src/users/types/user';
 
 @Injectable()
 export class UsersRepository {
-  constructor(private drizzle: DrizzleService) {}
+  constructor(private drizzle: DrizzleService) { }
 
   async findByEmail(email: string): Promise<User | null> {
     const result = await this.drizzle.db
@@ -47,7 +47,6 @@ export class UsersRepository {
         phoneNumber: input.phoneNumber,
         university: input.university,
         universityId: input.universityId,
-        role: input.role || 'student',
         accountStatus: input.accountStatus || 'deactive',
       })
       .returning();
@@ -65,7 +64,7 @@ export class UsersRepository {
   ): Promise<User | null> {
     const [user] = await this.drizzle.db
       .update(users)
-      .set(input)
+      .set(input as any)
       .where(eq(users.id, id))
       .returning();
 
