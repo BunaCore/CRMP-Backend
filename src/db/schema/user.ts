@@ -1,23 +1,17 @@
-import { pgEnum } from 'drizzle-orm/pg-core';
-import { pgTable, uuid, text, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, pgEnum, uuid, text, boolean, timestamp } from 'drizzle-orm/pg-core';
 
-export const AccountStatusEnum = pgEnum('account_status', [
-  'active',
-  'deactive',
-  'suspended',
-]);
+export const accountStatusEnum = pgEnum('account_status', ['active', 'deactive', 'suspended']);
+
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   fullName: text('full_name'),
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
-  department: text('department'),
+  department: text('department'), // Added for consistency with SQL
   phoneNumber: text('phone_number'),
   university: text('university'),
   universityId: text('university_id'),
-  role: text('role').default('user').notNull(),
-  accountStatus: AccountStatusEnum('account_status')
-    .default('deactive')
-    .notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
+  isExternal: boolean('is_external').default(false),
+  accountStatus: accountStatusEnum('account_status').default('deactive').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
