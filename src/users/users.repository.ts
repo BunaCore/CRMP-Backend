@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { DrizzleService } from 'src/db/db.service';
 import { users } from 'src/db/schema/user';
+import { userRoles } from 'src/db/schema/roles';
 import { User, CreateUserInput, FindUserInput } from 'src/users/types/user';
 
 @Injectable()
@@ -9,21 +10,47 @@ export class UsersRepository {
   constructor(private drizzle: DrizzleService) { }
 
   async findByEmail(email: string): Promise<User | null> {
-    const result = await this.drizzle.db
-      .select()
+    const rows = await this.drizzle.db
+      .select({
+        user: users,
+        role: userRoles.roleName,
+      })
       .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
-    return result[0] || null;
+      .leftJoin(userRoles, eq(users.id, userRoles.userId))
+      .where(eq(users.email, email));
+
+    if (!rows.length) return null;
+
+    const user = rows[0].user;
+    const roles = rows.map((r) => r.role).filter(Boolean) as string[];
+
+    return {
+      ...user,
+      roles,
+      role: roles[0] || '',
+    } as any;
   }
 
   async findById(id: string): Promise<User | null> {
-    const result = await this.drizzle.db
-      .select()
+    const rows = await this.drizzle.db
+      .select({
+        user: users,
+        role: userRoles.roleName,
+      })
       .from(users)
-      .where(eq(users.id, id))
-      .limit(1);
-    return result[0] || null;
+      .leftJoin(userRoles, eq(users.id, userRoles.userId))
+      .where(eq(users.id, id));
+
+    if (!rows.length) return null;
+
+    const user = rows[0].user;
+    const roles = rows.map((r) => r.role).filter(Boolean) as string[];
+
+    return {
+      ...user,
+      roles,
+      role: roles[0] || '',
+    } as any;
   }
 
   async findOne(input: FindUserInput): Promise<User | null> {

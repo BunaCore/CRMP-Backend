@@ -6,6 +6,7 @@ import { DbModule } from './db/db.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { AccessControlModule } from './access-control';
+import { ProposalsModule } from './proposals/proposals.module';
 
 @Module({
   imports: [
@@ -16,8 +17,9 @@ import { AccessControlModule } from './access-control';
     UsersModule,
     AuthModule,
     AccessControlModule,
+    ProposalsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
