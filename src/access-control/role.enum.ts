@@ -1,10 +1,13 @@
 export enum Role {
   STUDENT = 'STUDENT',
-  SUPERVISOR = 'SUPERVISOR',
-  DEPARTMENT_HEAD = 'DEPARTMENT_HEAD',
   PI = 'PI', // Principal Investigator
-  RA = 'RA', // Research Administration
-  ADRPM = 'ADRPM', // Associate Director Research & Post-grad Management
-  VPRTT = 'VPRTT', // Vice President Research Teaching & Training
-
+  SUPERVISOR = 'SUPERVISOR', // Advisor
+  COORDINATOR = 'COORDINATOR', // UG Coordinator
+  DGC_MEMBER = 'DGC_MEMBER', // Department Graduate Committee
+  EVALUATOR = 'EVALUATOR', // Peer Reviewer
+  COLLEGE_OFFICE = 'COLLEGE_OFFICE', // College Representative
+  PG_OFFICE = 'PG_OFFICE', // SGS Dean / PG Office
+  FINANCE = 'FINANCE', // Finance Office
+  RAD = 'RAD', // Research Administration
+  ADMIN = 'ADMIN', // System Administrator
 }

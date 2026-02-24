@@ -252,6 +252,8 @@ CREATE TABLE "proposals" (
   "abstract"              text,
   "proposal_type"         "proposal_type"   NOT NULL,
   "degree_level"          "degree_level"    DEFAULT 'NA',  -- only relevant for Postgraduate
+  "research_area"         varchar(255),
+  "duration_months"       integer,
   "advisor_user_id"       uuid              REFERENCES "users"("id"),
   "current_status"        "proposal_status" DEFAULT 'Draft',
   "submitted_at"          timestamptz,
