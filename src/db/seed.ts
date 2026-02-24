@@ -8,6 +8,27 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const db = drizzle(pool, { schema });
 
 async function seed() {
+    console.log('🧹 Clearing existing data...');
+    await db.delete(schema.auditLogs);
+    await db.delete(schema.notifications);
+    await db.delete(schema.verificationUploads);
+    await db.delete(schema.budgetLedger);
+    await db.delete(schema.budgetInstallments);
+    await db.delete(schema.budgetRequestItems);
+    await db.delete(schema.budgetRequests);
+    await db.delete(schema.proposalComments);
+    await db.delete(schema.proposalStatusHistory);
+    await db.delete(schema.evaluatorAssignments);
+    await db.delete(schema.proposalApprovals);
+    await db.delete(schema.proposalVersions);
+    await db.delete(schema.proposalFiles);
+    await db.delete(schema.proposals);
+    await db.delete(schema.routingRules);
+    await db.delete(schema.projectMembers);
+    await db.delete(schema.projects);
+    await db.delete(schema.userRoles);
+    await db.delete(schema.users);
+
     console.log('🌱 Seeding database...');
 
     // 1. Users
@@ -97,8 +118,8 @@ async function seed() {
         { userId: coordinator.id, roleName: 'COORDINATOR', grantedBy: admin.id },
         { userId: rad.id, roleName: 'RAD', grantedBy: admin.id },
         { userId: finance.id, roleName: 'FINANCE', grantedBy: admin.id },
-        { userId: researcher.id, roleName: 'RESEARCHER', grantedBy: admin.id },
-        { userId: ugStudent.id, roleName: 'RESEARCHER', grantedBy: admin.id },
+        { userId: researcher.id, roleName: 'PI', grantedBy: admin.id },
+        { userId: ugStudent.id, roleName: 'STUDENT', grantedBy: admin.id },
     ]);
 
     console.log('✅ Roles assigned');

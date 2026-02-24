@@ -6,4 +6,5 @@ export enum Role {
   RA = 'RA', // Research Administration
   ADRPM = 'ADRPM', // Associate Director Research & Post-grad Management
   VPRTT = 'VPRTT', // Vice President Research Teaching & Training
+
 }
