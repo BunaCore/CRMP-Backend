@@ -17,6 +17,8 @@ export const proposals = pgTable('proposals', {
     abstract: text('abstract'),
     proposalType: proposalTypeEnum('proposal_type').notNull(),
     degreeLevel: degreeLevelEnum('degree_level').default('NA'),
+    researchArea: varchar('research_area', { length: 255 }),
+    durationMonths: integer('duration_months'),
     advisorUserId: uuid('advisor_user_id').references(() => users.id),
     currentStatus: proposalStatusEnum('current_status').default('Draft'),
     submittedAt: timestamp('submitted_at', { withTimezone: true }),

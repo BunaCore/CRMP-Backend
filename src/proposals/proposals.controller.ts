@@ -42,3 +42,37 @@ export class ProposalsController {
         return this.proposalsService.create(user, createProposalDto, file);
     }
 }
+
+
+// {
+//   "header": {
+//     "Authorization": "Bearer <JWT_TOKEN>"
+//   },
+//   "body": {
+//     /* 1. Proposal Identity (The "proposals" table) */
+//     "title": "Integrated Pest Management for Sustainable Coffee",
+//     "abstract": "This research focuses on biological control methods...",
+//     "proposalType": "Postgraduate",   // Trigger for routing_rules (UG, PG, Funded, etc.)
+//     "degreeLevel": "Master",          // Required ENUM for PG tracks
+//     "researchArea": "Plant Sciences", // For categorization
+//     "durationMonths": 18,             // Required for the 'projects' table later
+
+//     /* 2. Budget Relation (The "budget_requests" & "items" tables) */
+//     "budget": [
+//       { "description": "Laboratory Reagents", "amount": 2500.00 },
+//       { "description": "Field Site Rent", "amount": 1000.00 },
+//       { "description": "Local Transport", "amount": 400.00 },
+//       { "description": "Documentation & VAT", "amount": 150.00 }
+//     ],
+
+//     /* 3. Team Relation (The "collaborators" / "project_members" logic) */
+//     "collaborators": [
+//       "user-uuid-1",
+//       "user-uuid-2",
+//       "user-uuid-3"
+//     ],
+
+//     /* 4. The File (Handled as multipart) */
+//     "file": "proposal_document_binary"
+//   }
+// }
