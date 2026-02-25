@@ -66,6 +66,7 @@ export const proposalApprovals = pgTable('proposal_approvals', {
     decisionAt: timestamp('decision_at', { withTimezone: true }),
     notifiedAt: timestamp('notified_at', { withTimezone: true }),
     versionId: uuid('version_id').references(() => proposalVersions.id),
+    attachmentFileId: uuid('attachment_file_id').references(() => proposalFiles.id),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 

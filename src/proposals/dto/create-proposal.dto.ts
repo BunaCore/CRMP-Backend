@@ -46,6 +46,10 @@ export class CreateProposalDto {
     @IsNotEmpty()
     researchArea: string;
 
+    @IsUUID()
+    @IsOptional()
+    advisorUserId?: string;
+
     @IsNumber()
     @Min(1)
     @Type(() => Number)

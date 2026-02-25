@@ -20,6 +20,7 @@ export class ProposalsService {
                     proposalType: dto.proposalType as any,
                     degreeLevel: (dto.degreeLevel || 'NA') as any,
                     researchArea: dto.researchArea,
+                    advisorUserId: dto.advisorUserId,
                     durationMonths: dto.durationMonths,
                     currentStatus: 'Submitted',
                     submittedAt: new Date(),
