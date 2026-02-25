@@ -10,28 +10,30 @@ The system uses a **Step-Gate** approach to ensure that research proposals move 
 - **`step_order`**: An integer (1, 2, 3...) that defines the absolute sequence.
 - **`approver_role`**: Specifies which role (e.g., `DGC_MEMBER`, `PG_OFFICE`) is authorized for that specific step.
 - **`is_parallel`**: Allows multiple reviewers (like Evaluators) to work simultaneously without blocking each other.
+- **`attachment_file_id`**: Links evaluation feedback or required approval forms directly to the approval decision.
 
 ---
 
 ## 🚀 2. The Official Flows
 
 ### A. Postgraduate (PG) Flow
-The most complex hierarchy, involving 6 distinct gates:
-1.  **Advisor (Supervisor)**: Initial acceptance of responsibility.
-2.  **DGC Initial Review**: Department check & evaluator assignment.
-3.  **Peer Evaluators**: Detailed technical review (Parallel step).
-4.  **DGC Final Sign-off**: Reviewing evaluation feedback.
-5.  **College Office**: Institutional administrative check.
-6.  **SGS Dean (PG Office)**: Final legal/compliance approval.
+The most complex hierarchy, involving 4 distinct gates:
+1.  **Department Initial Review**: DGC checks the proposal, formally assigns the Advisor (if requested or missing), and assigns Peer Evaluators.
+2.  **Peer Evaluators**: Detailed technical review (Parallel step). The peer evaluators conduct the technical evaluation on behalf of the department and attach feedback forms.
+3.  **College Office**: Institutional administrative check / College Representative sign-off.
+4.  **SGS Dean (PG Office)**: Final legal/compliance approval.
 
 ### B. Undergraduate (UG) Flow
 A streamlined path focused on quality and integrity:
-1.  **Coordinator Screening**: Single gate for plagiarism check and technical feasibility.
+1.  **Coordinator Screening**: Single gate. The coordinator checks for plagiarism and technical feasibility, assigns the advisor, and gives Final Approval.
 
 ### C. Funded Projects
 1.  **RAD Pre-screening**: Administrative validity.
 2.  **Finance Review**: Budget integrity and funding availability.
-3.  **VP Research**: High-level authorization.
+3.  **VP Research**: High-level authorization (Final Approval).
+
+### D. Unfunded Projects
+1.  **RAD Final Approval**: Single step authorization from Research Administration.
 
 ---
 

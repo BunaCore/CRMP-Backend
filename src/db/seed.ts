@@ -124,20 +124,26 @@ async function seed() {
     console.log('Seeding routing rules...');
     await db.insert(schema.routingRules).values([
         // --- Postgraduate Flow ---
-        { proposalType: 'Postgraduate', stepOrder: 1, approverRole: Role.SUPERVISOR, stepLabel: 'Advisor Acceptance', isParallel: false, isFinal: false, required: true },
-        { proposalType: 'Postgraduate', stepOrder: 2, approverRole: Role.DGC_MEMBER, stepLabel: 'DGC Initial Review (Assign Evaluators)', isParallel: false, isFinal: false, required: true },
-        { proposalType: 'Postgraduate', stepOrder: 3, approverRole: Role.EVALUATOR, stepLabel: 'Peer Evaluation Review', isParallel: true, isFinal: false, required: true },
-        { proposalType: 'Postgraduate', stepOrder: 4, approverRole: Role.DGC_MEMBER, stepLabel: 'DGC Final Approval', isParallel: false, isFinal: false, required: true },
-        { proposalType: 'Postgraduate', stepOrder: 5, approverRole: Role.COLLEGE_OFFICE, stepLabel: 'College Representative Approval', isParallel: false, isFinal: false, required: true },
-        { proposalType: 'Postgraduate', stepOrder: 6, approverRole: Role.PG_OFFICE, stepLabel: 'SGS Dean (Final Approval)', isParallel: false, isFinal: true, required: true },
+        // 1. DGC assigns evaluators and confirms advisor
+        { proposalType: 'Postgraduate', stepOrder: 1, approverRole: Role.DGC_MEMBER, stepLabel: 'Department Initial Review (Assign Evaluators)', isParallel: false, isFinal: false, required: true },
+        // 2. Evaluators do the technical review and attach feedback forms
+        { proposalType: 'Postgraduate', stepOrder: 2, approverRole: Role.EVALUATOR, stepLabel: 'Peer Evaluation Review', isParallel: true, isFinal: false, required: true },
+        // 3. College Sign-off
+        { proposalType: 'Postgraduate', stepOrder: 3, approverRole: Role.COLLEGE_OFFICE, stepLabel: 'College Representative Approval', isParallel: false, isFinal: false, required: true },
+        // 4. Final SGS Dean Approval
+        { proposalType: 'Postgraduate', stepOrder: 4, approverRole: Role.PG_OFFICE, stepLabel: 'SGS Dean (Final Approval)', isParallel: false, isFinal: true, required: true },
 
         // --- Undergraduate Flow ---
-        { proposalType: 'Undergraduate', stepOrder: 1, approverRole: Role.COORDINATOR, stepLabel: 'Coordinator Screening (Plagiarism Check)', isParallel: false, isFinal: true, required: true },
+        // 1. Coordinator screens, plagiarism check, assigns advisor
+        { proposalType: 'Undergraduate', stepOrder: 1, approverRole: Role.COORDINATOR, stepLabel: 'Coordinator Screening (Final Approval)', isParallel: false, isFinal: true, required: true },
 
         // --- Funded Project Flow ---
         { proposalType: 'Funded_Project', stepOrder: 1, approverRole: Role.RAD, stepLabel: 'RAD Pre-screening', isParallel: false, isFinal: false, required: true },
         { proposalType: 'Funded_Project', stepOrder: 2, approverRole: Role.FINANCE, stepLabel: 'Finance Budget Integrity Check', isParallel: false, isFinal: false, required: true },
         { proposalType: 'Funded_Project', stepOrder: 3, approverRole: Role.ADMIN, stepLabel: 'VP Research Final Authorization', isParallel: false, isFinal: true, required: true },
+
+        // --- Unfunded Project Flow ---
+        { proposalType: 'Unfunded_Project', stepOrder: 1, approverRole: Role.RAD, stepLabel: 'RAD Final Approval', isParallel: false, isFinal: true, required: true },
     ]);
 
     console.log('✨ Seeding complete!');

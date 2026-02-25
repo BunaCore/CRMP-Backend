@@ -55,6 +55,7 @@ export class ProposalsController {
 //     "proposalType": "Postgraduate",   // Trigger for routing_rules (UG, PG, Funded, etc.)
 //     "degreeLevel": "Master",          // Required ENUM for PG tracks
 //     "researchArea": "Plant Sciences", // For categorization
+//     "advisorUserId": "optional-uuid", // Optional requested advisor
 //     "durationMonths": 18,             // Required for the 'projects' table later
 
 //     /* 2. Budget Relation (The "budget_requests" & "items" tables) */
