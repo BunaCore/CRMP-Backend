@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { AccessControlModule } from './access-control';
 import { ProposalsModule } from './proposals/proposals.module';
+import { UndergradModule } from './undergrad/undergrad.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ProposalsModule } from './proposals/proposals.module';
     AuthModule,
     AccessControlModule,
     ProposalsModule,
+    UndergradModule,
   ],
   controllers: [AppController],
   providers: [AppService],

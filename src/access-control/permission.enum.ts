@@ -33,4 +33,11 @@ export enum Permission {
   // View permissions
   PROJECT_VIEW = 'PROJECT_VIEW',
   USER_VIEW = 'USER_VIEW',
+
+  // ── Coordinator-exclusive permissions (UG track) ──────────────
+  // Only the COORDINATOR role receives these — no other role can access
+  // undergrad routes even if they share common permissions like PROJECT_VIEW
+  COORDINATOR_PROPOSALS_VIEW = 'COORDINATOR_PROPOSALS_VIEW', // list + detail + advisors
+  COORDINATOR_DECIDE = 'COORDINATOR_DECIDE',                 // accept / reject / revision
+  COORDINATOR_ASSIGN = 'COORDINATOR_ASSIGN',                 // assign advisor to proposal
 }
