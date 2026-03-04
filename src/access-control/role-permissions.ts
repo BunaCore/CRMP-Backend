@@ -36,6 +36,10 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.PROJECT_REJECT,
     Permission.USER_VIEW,
     Permission.EVALUATOR_ASSIGN,
+    // ── Coordinator-exclusive (UG track) ───────
+    Permission.COORDINATOR_PROPOSALS_VIEW,
+    Permission.COORDINATOR_DECIDE,
+    Permission.COORDINATOR_ASSIGN,
   ],
 
   [Role.DGC_MEMBER]: [
