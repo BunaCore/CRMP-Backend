@@ -106,6 +106,34 @@ async function seed() {
         accountStatus: 'active',
     }).returning();
 
+    const [radUser] = await db.insert(schema.users).values({
+        fullName: 'Director of RAD',
+        email: 'rad@crmp.edu',
+        passwordHash: hash('Rad@1234'),
+        accountStatus: 'active',
+    }).returning();
+
+    const [financeUser] = await db.insert(schema.users).values({
+        fullName: 'Finance Officer',
+        email: 'finance@crmp.edu',
+        passwordHash: hash('Finance@1234'),
+        accountStatus: 'active',
+    }).returning();
+
+    const [vprttUser] = await db.insert(schema.users).values({
+        fullName: 'VP of RTT',
+        email: 'vprtt@crmp.edu',
+        passwordHash: hash('Vprtt@1234'),
+        accountStatus: 'active',
+    }).returning();
+
+    const [acUser] = await db.insert(schema.users).values({
+        fullName: 'Academic Council Rep',
+        email: 'ac@crmp.edu',
+        passwordHash: hash('Ac@1234'),
+        accountStatus: 'active',
+    }).returning();
+
     // 2. Assign Roles
     console.log('Assigning roles...');
     await db.insert(schema.userRoles).values([
@@ -118,6 +146,10 @@ async function seed() {
         { userId: coordinatorUser.id, roleName: Role.COORDINATOR, grantedBy: adminUser.id },
         { userId: piUser.id, roleName: Role.PI, grantedBy: adminUser.id },
         { userId: studentUser.id, roleName: Role.STUDENT, grantedBy: adminUser.id },
+        { userId: radUser.id, roleName: Role.RAD, grantedBy: adminUser.id },
+        { userId: financeUser.id, roleName: Role.FINANCE, grantedBy: adminUser.id },
+        { userId: vprttUser.id, roleName: Role.VPRTT, grantedBy: adminUser.id },
+        { userId: acUser.id, roleName: Role.AC, grantedBy: adminUser.id },
     ]);
 
     // 3. Routing Rules (The "Real Flow")
@@ -138,9 +170,11 @@ async function seed() {
         { proposalType: 'Undergraduate', stepOrder: 1, approverRole: Role.COORDINATOR, stepLabel: 'Coordinator Screening (Final Approval)', isParallel: false, isFinal: true, required: true },
 
         // --- Funded Project Flow ---
-        { proposalType: 'Funded_Project', stepOrder: 1, approverRole: Role.RAD, stepLabel: 'RAD Pre-screening', isParallel: false, isFinal: false, required: true },
-        { proposalType: 'Funded_Project', stepOrder: 2, approverRole: Role.FINANCE, stepLabel: 'Finance Budget Integrity Check', isParallel: false, isFinal: false, required: true },
-        { proposalType: 'Funded_Project', stepOrder: 3, approverRole: Role.ADMIN, stepLabel: 'VP Research Final Authorization', isParallel: false, isFinal: true, required: true },
+        { proposalType: 'Funded_Project', stepOrder: 1, approverRole: Role.RAD, stepLabel: 'RAD Pre-screening & Assignment', isParallel: false, isFinal: false, required: true },
+        { proposalType: 'Funded_Project', stepOrder: 2, approverRole: Role.EVALUATOR, stepLabel: 'Peer Evaluation Review', isParallel: true, isFinal: false, required: true },
+        { proposalType: 'Funded_Project', stepOrder: 3, approverRole: Role.FINANCE, stepLabel: 'Finance Budget Integrity Check', isParallel: false, isFinal: false, required: true },
+        { proposalType: 'Funded_Project', stepOrder: 4, approverRole: Role.VPRTT, stepLabel: 'VP Research Final Authorization', isParallel: false, isFinal: false, required: true },
+        { proposalType: 'Funded_Project', stepOrder: 5, approverRole: Role.AC, stepLabel: 'Academic Council Approval (>500k)', isParallel: false, isFinal: true, required: true },
 
         // --- Unfunded Project Flow ---
         { proposalType: 'Unfunded_Project', stepOrder: 1, approverRole: Role.RAD, stepLabel: 'RAD Final Approval', isParallel: false, isFinal: true, required: true },
