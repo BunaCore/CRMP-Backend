@@ -1,5 +1,5 @@
 import { Injectable, ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
-import { DbService } from '../../db/db.service';
+import { DrizzleService } from '../../db/db.service';
 import * as schema from '../../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { FundedRoutingRepository } from '../repositories/funded-routing.repository';
@@ -10,7 +10,7 @@ import { SubmitFundedDto } from '../dto/submit-funded.dto';
 @Injectable()
 export class FundedWorkflowService {
     constructor(
-        private readonly dbService: DbService,
+        private readonly dbService: DrizzleService,
         private readonly routingRepo: FundedRoutingRepository,
         private readonly proposalRepo: FundedProposalRepository,
     ) { }

@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { DbService } from '../../db/db.service';
+import { DrizzleService } from '../../db/db.service';
 import * as schema from '../../db/schema';
 import { eq, and, asc } from 'drizzle-orm';
 
 @Injectable()
 export class FundedRoutingRepository {
-    constructor(private readonly dbService: DbService) { }
+    constructor(private readonly dbService: DrizzleService) { }
 
     /**
      * Fetch the routing rules specifically for Funded Projects

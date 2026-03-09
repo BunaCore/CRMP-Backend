@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DbService } from '../../db/db.service';
+import { DrizzleService } from '../../db/db.service';
 import * as schema from '../../db/schema';
 import { eq } from 'drizzle-orm';
 import { FundedProposalRepository } from '../repositories/funded-proposal.repository';
@@ -9,7 +9,7 @@ import { AssignEvaluatorsDto } from '../dto/assign-evaluators.dto';
 @Injectable()
 export class AssignmentService {
     constructor(
-        private readonly dbService: DbService,
+        private readonly dbService: DrizzleService,
         private readonly proposalRepo: FundedProposalRepository,
     ) { }
 

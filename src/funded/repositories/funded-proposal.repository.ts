@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { e } from '../../db/db.type'; // Assuming standard type/injection
-import { DbService } from '../../db/db.service';
+import { DrizzleService } from '../../db/db.service';
 import * as schema from '../../db/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { SubmitFundedDto } from '../dto/submit-funded.dto';
@@ -8,7 +7,7 @@ import { ReviewFundedDto } from '../dto/review-funded.dto';
 
 @Injectable()
 export class FundedProposalRepository {
-    constructor(private readonly dbService: DbService) { }
+    constructor(private readonly dbService: DrizzleService) { }
 
     /**
      * Submit a new Funded Project Proposal
@@ -134,14 +133,16 @@ export class FundedProposalRepository {
     async activateFundedProject(proposalId: string, approverUserId: string) {
         return await this.dbService.db.transaction(async (tx) => {
             // Fetch full proposal context
-            const proposal = await tx.query.proposals.findFirst({
-                where: eq(schema.proposals.id, proposalId),
-                with: {
-                    budgetRequests: true,
-                }
-            });
+            const [proposal] = await tx.select()
+                .from(schema.proposals)
+                .where(eq(schema.proposals.id, proposalId))
+                .limit(1);
 
             if (!proposal) throw new NotFoundException('Proposal not found');
+
+            const budgetReqs = await tx.select()
+                .from(schema.budgetRequests)
+                .where(eq(schema.budgetRequests.proposalId, proposalId));
 
             // Create the live project
             const [project] = await tx.insert(schema.projects)
@@ -149,9 +150,9 @@ export class FundedProposalRepository {
                     projectTitle: proposal.title,
                     projectType: 'Funded',
                     projectStage: 'Approved',
-                    submissionDate: proposal.submittedAt ? proposal.submittedAt.toISOString() : new Date().toISOString(),
+                    submissionDate: (proposal.submittedAt ? proposal.submittedAt.toISOString() : new Date().toISOString()).split('T')[0],
                     durationMonths: proposal.durationMonths || 12, // Default if null
-                    piId: proposal.createdBy,
+                    PI_ID: proposal.createdBy,
                     ethicalClearanceStatus: 'Pending', // Defaults
                     researchArea: proposal.researchArea,
                 })
@@ -184,10 +185,10 @@ export class FundedProposalRepository {
             });
 
             // Update Budget Requests to link project id
-            if (proposal.budgetRequests && proposal.budgetRequests.length > 0) {
+            if (budgetReqs && budgetReqs.length > 0) {
                 await tx.update(schema.budgetRequests)
                     .set({ projectId: project.projectId })
-                    .where(eq(schema.budgetRequests.id, proposal.budgetRequests[0].id));
+                    .where(eq(schema.budgetRequests.id, budgetReqs[0].id));
             }
 
             return project;
