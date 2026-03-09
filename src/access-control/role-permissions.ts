@@ -20,6 +20,9 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.TEAM_MANAGE,
     Permission.TEAM_VIEW,
     Permission.BUDGET_VIEW,
+    // ── Funded Project (PI) ───────
+    Permission.FUNDED_SUBMIT,
+    Permission.FUNDED_VIEW,
   ],
 
   [Role.SUPERVISOR]: [
@@ -54,6 +57,10 @@ export const RolePermissions: Record<Role, Permission[]> = {
   [Role.EVALUATOR]: [
     Permission.PROJECT_VIEW,
     Permission.PROJECT_REVIEW,
+    // ── Funded Project (Evaluator) ───────
+    Permission.FUNDED_EVALUATOR_ACCESS,
+    Permission.FUNDED_VIEW,
+    Permission.FUNDED_DECIDE,
   ],
 
   [Role.COLLEGE_OFFICE]: [
@@ -77,6 +84,10 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.BUDGET_VIEW,
     Permission.BUDGET_APPROVE,
     Permission.BUDGET_REJECT,
+    // ── Funded Project (Finance) ───────
+    Permission.FUNDED_APPROVER_ACCESS,
+    Permission.FUNDED_VIEW,
+    Permission.FUNDED_DECIDE,
   ],
 
   [Role.RAD]: [
@@ -85,6 +96,11 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.PROJECT_APPROVE,
     Permission.PROJECT_REJECT,
     Permission.ADMIN_VIEW,
+    // ── Funded Project (RAD) ───────
+    Permission.FUNDED_RAD_ACCESS,
+    Permission.FUNDED_VIEW,
+    Permission.FUNDED_ASSIGN,
+    Permission.FUNDED_DECIDE,
   ],
 
   [Role.ADMIN]: [
@@ -92,5 +108,21 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.ADMIN_EDIT,
     Permission.USER_VIEW,
     Permission.PROJECT_VIEW,
+  ],
+  [Role.VPRTT]: [
+    Permission.PROJECT_VIEW,
+    Permission.BUDGET_VIEW,
+    // ── Funded Project (VPRTT) ───────
+    Permission.FUNDED_APPROVER_ACCESS,
+    Permission.FUNDED_VIEW,
+    Permission.FUNDED_DECIDE,
+  ],
+  [Role.AC]: [
+    Permission.PROJECT_VIEW,
+    Permission.BUDGET_VIEW,
+    // ── Funded Project (AC) ───────
+    Permission.FUNDED_APPROVER_ACCESS,
+    Permission.FUNDED_VIEW,
+    Permission.FUNDED_DECIDE,
   ],
 };

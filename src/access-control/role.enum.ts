@@ -10,4 +10,6 @@ export enum Role {
   FINANCE = 'FINANCE', // Finance Office
   RAD = 'RAD', // Research Administration
   ADMIN = 'ADMIN', // System Administrator
+  VPRTT = 'VPRTT', // VP Research Teaching & Training
+  AC = 'AC', // Academic Council
 }
