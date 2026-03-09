@@ -10,10 +10,13 @@ import { IsUUID, IsOptional, IsDateString } from 'class-validator';
  *   dueDate       — optional ISO date string for the advisor's review deadline
  */
 export class AssignAdvisorDto {
-    @IsUUID('4', { message: 'advisorUserId must be a valid UUID' })
-    advisorUserId: string;
+  @IsUUID('4', { message: 'advisorUserId must be a valid UUID' })
+  advisorUserId: string;
 
-    @IsDateString({}, { message: 'dueDate must be a valid ISO date string (e.g. 2026-04-15)' })
-    @IsOptional()
-    dueDate?: string;
+  @IsDateString(
+    {},
+    { message: 'dueDate must be a valid ISO date string (e.g. 2026-04-15)' },
+  )
+  @IsOptional()
+  dueDate?: string;
 }

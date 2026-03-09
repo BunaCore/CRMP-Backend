@@ -38,15 +38,15 @@ export enum Permission {
   // Only the COORDINATOR role receives these — no other role can access
   // undergrad routes even if they share common permissions like PROJECT_VIEW
   COORDINATOR_PROPOSALS_VIEW = 'COORDINATOR_PROPOSALS_VIEW', // list + detail + advisors
-  COORDINATOR_DECIDE = 'COORDINATOR_DECIDE',                 // accept / reject / revision
-  COORDINATOR_ASSIGN = 'COORDINATOR_ASSIGN',                 // assign advisor to proposal
+  COORDINATOR_DECIDE = 'COORDINATOR_DECIDE', // accept / reject / revision
+  COORDINATOR_ASSIGN = 'COORDINATOR_ASSIGN', // assign advisor to proposal
 
   // ── Funded-exclusive permissions (Funded track) ──────────────
-  FUNDED_SUBMIT = 'FUNDED_SUBMIT',                           // PI submission
-  FUNDED_VIEW = 'FUNDED_VIEW',                               // View list and detail
-  FUNDED_RAD_ACCESS = 'FUNDED_RAD_ACCESS',                   // RAD triage and assignment
-  FUNDED_EVALUATOR_ACCESS = 'FUNDED_EVALUATOR_ACCESS',       // Peer reviewers
-  FUNDED_APPROVER_ACCESS = 'FUNDED_APPROVER_ACCESS',         // RA/Finance/VPRTT/AC
-  FUNDED_DECIDE = 'FUNDED_DECIDE',                           // General review decision
-  FUNDED_ASSIGN = 'FUNDED_ASSIGN',                           // RAD assignment of evaluators/advisors
+  FUNDED_SUBMIT = 'FUNDED_SUBMIT', // PI submission
+  FUNDED_VIEW = 'FUNDED_VIEW', // View list and detail
+  FUNDED_RAD_ACCESS = 'FUNDED_RAD_ACCESS', // RAD triage and assignment
+  FUNDED_EVALUATOR_ACCESS = 'FUNDED_EVALUATOR_ACCESS', // Peer reviewers
+  FUNDED_APPROVER_ACCESS = 'FUNDED_APPROVER_ACCESS', // RA/Finance/VPRTT/AC
+  FUNDED_DECIDE = 'FUNDED_DECIDE', // General review decision
+  FUNDED_ASSIGN = 'FUNDED_ASSIGN', // RAD assignment of evaluators/advisors
 }

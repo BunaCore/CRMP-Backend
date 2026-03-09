@@ -15,7 +15,7 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-  ) { }
+  ) {}
 
   async register(dto: RegisterDto) {
     const existing = await this.usersService.findByEmail(dto.email);

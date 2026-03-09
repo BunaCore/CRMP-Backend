@@ -15,16 +15,17 @@ async function bootstrap() {
         enableImplicitConversion: true,
       },
       exceptionFactory: (errors) => {
-        const messages = errors
-          .map(
-            (error) =>
-              `${error.property}: ${Object.values(error.constraints || {}).join(', ')}`,
-          )
-          .join('; ');
+        const structured = errors.map((error) => ({
+          field: error.property,
+          errors: error.constraints,
+          errorStr: error.constraints
+            ? Object.values(error.constraints)[0]
+            : null, // Get the first error message
+        }));
         return new BadRequestException({
           statusCode: 400,
           message: 'Validation failed',
-          errors: messages,
+          errors: structured,
         });
       },
     }),
