@@ -19,7 +19,7 @@ export class AccessGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private accessService: AccessService,
-  ) { }
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // Get required permissions from decorator metadata

@@ -7,7 +7,7 @@ import { User, CreateUserInput, FindUserInput } from 'src/users/types/user';
 
 @Injectable()
 export class UsersRepository {
-  constructor(private drizzle: DrizzleService) { }
+  constructor(private drizzle: DrizzleService) {}
 
   async findByEmail(email: string): Promise<User | null> {
     const rows = await this.drizzle.db

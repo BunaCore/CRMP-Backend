@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { AccessControlModule } from './access-control';
 import { ProposalsModule } from './proposals/proposals.module';
 import { UndergradModule } from './undergrad/undergrad.module';
+import { PgModule } from './pg/pg.module';
 
 @Module({
   imports: [
@@ -20,8 +21,9 @@ import { UndergradModule } from './undergrad/undergrad.module';
     AccessControlModule,
     ProposalsModule,
     UndergradModule,
+    PgModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

@@ -5,8 +5,8 @@ import { AccessControlModule } from 'src/access-control/access-control.module';
 import { DbModule } from 'src/db/db.module';
 
 @Module({
-    imports: [AccessControlModule, DbModule],
-    controllers: [ProposalsController],
-    providers: [ProposalsService],
+  imports: [AccessControlModule, DbModule],
+  controllers: [ProposalsController],
+  providers: [ProposalsService],
 })
-export class ProposalsModule { }
+export class ProposalsModule {}

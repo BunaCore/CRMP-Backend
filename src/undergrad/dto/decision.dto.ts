@@ -1,13 +1,20 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 
 /**
  * Valid decisions the coordinator can make on a UG proposal.
  * Mirrors the approval_decision ENUM in the database.
  */
 export enum CoordinatorDecision {
-    Accepted = 'Accepted',
-    Rejected = 'Rejected',
-    Needs_Revision = 'Needs_Revision',
+  Accepted = 'Accepted',
+  Rejected = 'Rejected',
+  Needs_Revision = 'Needs_Revision',
 }
 
 /**
@@ -26,18 +33,18 @@ export enum CoordinatorDecision {
  *                      of an existing proposal_files row.
  */
 export class DecisionDto {
-    @IsEnum(CoordinatorDecision, {
-        message: `decision must be one of: Accepted, Rejected, Needs_Revision`,
-    })
-    @IsNotEmpty()
-    decision: CoordinatorDecision;
+  @IsEnum(CoordinatorDecision, {
+    message: `decision must be one of: Accepted, Rejected, Needs_Revision`,
+  })
+  @IsNotEmpty()
+  decision: CoordinatorDecision;
 
-    @IsString()
-    @IsOptional()
-    @MaxLength(1000, { message: 'Comment cannot exceed 1000 characters' })
-    comment?: string;
+  @IsString()
+  @IsOptional()
+  @MaxLength(1000, { message: 'Comment cannot exceed 1000 characters' })
+  comment?: string;
 
-    @IsUUID('4', { message: 'attachmentFileId must be a valid UUID' })
-    @IsOptional()
-    attachmentFileId?: string;
+  @IsUUID('4', { message: 'attachmentFileId must be a valid UUID' })
+  @IsOptional()
+  attachmentFileId?: string;
 }

@@ -16,12 +16,12 @@ import { DbModule } from 'src/db/db.module';
  *   duplication, full reusability.
  */
 @Module({
-    imports: [
-        DbModule,             // provides DrizzleService to the repository
-        AccessControlModule,  // provides AccessGuard + AccessService to the controller
-    ],
-    controllers: [UndergradController],
-    providers: [UndergradService, UndergradRepository],
-    exports: [UndergradRepository], // ← reusable by any future module
+  imports: [
+    DbModule, // provides DrizzleService to the repository
+    AccessControlModule, // provides AccessGuard + AccessService to the controller
+  ],
+  controllers: [UndergradController],
+  providers: [UndergradService, UndergradRepository],
+  exports: [UndergradRepository], // ← reusable by any future module
 })
-export class UndergradModule { }
+export class UndergradModule {}
