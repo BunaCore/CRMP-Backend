@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   UseGuards,
   UseInterceptors,
@@ -22,6 +23,26 @@ import { Permission } from 'src/access-control/permission.enum';
 @UseGuards(JwtAuthGuard, AccessGuard) // 🛡️ Execution order: 1. Auth, 2. Permissions
 export class ProposalsController {
   constructor(private readonly proposalsService: ProposalsService) {}
+
+  /**
+   * GET /proposals/my
+   * Fetch all proposals created by the authenticated user
+   * Simple ownership-based query
+   */
+  @Get('my')
+  async getMyProposals(@CurrentUser() user: any) {
+    return this.proposalsService.getMyProposals(user.id);
+  }
+
+  /**
+   * GET /proposals/pending-approvals
+   * Fetch proposals pending user's approval based on workflow role
+   * Dynamic workflow-based query with role resolution
+   */
+  @Get('pending-approvals')
+  async getPendingApprovals(@CurrentUser() user: any) {
+    return this.proposalsService.getPendingApprovals(user);
+  }
 
   @Post()
   @RequirePermission(Permission.PROJECT_CREATE) // 🔒 Only roles with this permission can enter
