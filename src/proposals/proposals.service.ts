@@ -201,14 +201,12 @@ export class ProposalsService {
         continue;
       }
 
-      // Get current step (next pending approval in workflow)
-      const pendingApproval = await this.repository.findPendingApprovalAtStep(
-        proposal.id,
-        proposal.currentStatus === 'Submitted' ? 1 : 2, // Simplified: assume step 1 for Submitted, step 2 for Under_Review
-      );
+      // Get FIRST pending approval (earliest step, dynamic regardless of status)
+      const pendingApproval =
+        await this.repository.findFirstPendingApprovalForProposal(proposal.id);
 
       if (!pendingApproval) {
-        continue; // No pending approval at expected step
+        continue; // No pending steps = workflow complete
       }
 
       // Check if user matches the approver role requirements

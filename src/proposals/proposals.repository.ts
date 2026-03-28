@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DrizzleService } from 'src/db/db.service';
 import * as schema from 'src/db/schema';
-import { eq, and, inArray, ne, isNotNull, desc } from 'drizzle-orm';
+import { eq, and, inArray, ne, isNotNull, desc, asc } from 'drizzle-orm';
 
 @Injectable()
 export class ProposalsRepository {
@@ -122,6 +122,27 @@ export class ProposalsRepository {
           eq(schema.proposalApprovals.decision, 'Pending'),
         ),
       );
+
+    return approval || null;
+  }
+
+  /**
+   * Find FIRST pending approval for a proposal (earliest step)
+   * Works for any number of workflow steps
+   * Returns the earliest stepOrder where decision is still 'Pending'
+   */
+  async findFirstPendingApprovalForProposal(proposalId: string) {
+    const [approval] = await this.drizzle.db
+      .select()
+      .from(schema.proposalApprovals)
+      .where(
+        and(
+          eq(schema.proposalApprovals.proposalId, proposalId),
+          eq(schema.proposalApprovals.decision, 'Pending'),
+        ),
+      )
+      .orderBy(asc(schema.proposalApprovals.stepOrder))
+      .limit(1);
 
     return approval || null;
   }
