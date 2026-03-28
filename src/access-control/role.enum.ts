@@ -1,5 +1,6 @@
 export enum Role {
   STUDENT = 'STUDENT',
+  FACULTY = 'FACULTY', // base role for academic staff
   PI = 'PI', // Principal Investigator
   SUPERVISOR = 'SUPERVISOR', // Advisor
   COORDINATOR = 'COORDINATOR', // UG Coordinator

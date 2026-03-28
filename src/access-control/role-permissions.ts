@@ -125,4 +125,5 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.FUNDED_VIEW,
     Permission.FUNDED_DECIDE,
   ],
+  [Role.FACULTY]: [],
 };

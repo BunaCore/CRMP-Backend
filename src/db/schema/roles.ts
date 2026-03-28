@@ -10,3 +10,8 @@ export const userRoles = pgTable('user_roles', {
   grantedAt: timestamp('granted_at', { withTimezone: true }).defaultNow(),
   grantedBy: uuid('granted_by').references(() => users.id),
 });
+
+export const roles = pgTable('roles', {
+  name: varchar('name', { length: 50 }).primaryKey(),
+  description: varchar('description', { length: 255 }),
+});

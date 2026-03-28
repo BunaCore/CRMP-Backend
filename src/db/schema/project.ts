@@ -8,6 +8,7 @@ import {
   primaryKey,
   timestamp,
 } from 'drizzle-orm/pg-core';
+import { departments } from './department';
 
 export const ProjectTypeEnum = pgEnum('project_type', [
   'Funded',
@@ -52,10 +53,11 @@ export const projects = pgTable('projects', {
   proposalFile: text('proposal_file'), // store file path or URL
   researchArea: text('research_area'),
   projectProgram: ProjectProgramEnum('project_program'),
-  department: text('department'), // Department for scope checking
+  department: text('department'), // TODO: left for backward compatablity @depricated
+  departmentId: uuid('department_id').references(() => departments.id),
   durationMonths: integer('duration_months').notNull(),
   PI_ID: uuid('pi_id').notNull(), // Principal Investigator (userId)
-  assignedEvaluator: uuid('assigned_evaluator'), // userId of examiner
+  // assignedEvaluator: uuid('assigned_evaluator'), // userId of examiner
   ethicalClearanceStatus: EthicalClearanceStatusEnum(
     'ethical_clearance_status',
   ).notNull(),
