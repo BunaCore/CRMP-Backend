@@ -6,354 +6,281 @@ import * as schema from './schema';
 import 'dotenv/config';
 import { Role } from '../access-control/role.enum';
 
+if (process.env.NODE_ENV === 'production') {
+  throw new Error('❌ Seeder is disabled in production environments.');
+}
+
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const db = drizzle(pool, { schema });
 
+type SeedUserConfig = {
+  name: string;
+  email: string;
+  password: string;
+  role: Role;
+};
+
+const UNIVERSAL_PASSWORD = 'Password@1234';
+
+const USERS: SeedUserConfig[] = [
+  {
+    name: 'System Admin',
+    email: 'admin@crmp.edu',
+    password: UNIVERSAL_PASSWORD,
+    role: Role.ADMIN,
+  },
+  {
+    name: 'Dr. Advisor (Supervisor)',
+    email: 'advisor@crmp.edu',
+    password: UNIVERSAL_PASSWORD,
+    role: Role.SUPERVISOR,
+  },
+  {
+    name: 'DGC Member (Dept Head)',
+    email: 'dgc@crmp.edu',
+    password: UNIVERSAL_PASSWORD,
+    role: Role.DGC_MEMBER,
+  },
+  {
+    name: 'Peer Evaluator',
+    email: 'evaluator@crmp.edu',
+    password: UNIVERSAL_PASSWORD,
+    role: Role.EVALUATOR,
+  },
+  {
+    name: 'College Dean (ADRPM)',
+    email: 'college@crmp.edu',
+    password: UNIVERSAL_PASSWORD,
+    role: Role.COLLEGE_OFFICE,
+  },
+  {
+    name: 'SGS Dean (PG Office)',
+    email: 'pgoffice@crmp.edu',
+    password: UNIVERSAL_PASSWORD,
+    role: Role.PG_OFFICE,
+  },
+  {
+    name: 'UG Coordinator',
+    email: 'coordinator@crmp.edu',
+    password: UNIVERSAL_PASSWORD,
+    role: Role.COORDINATOR,
+  },
+  {
+    name: 'Dr. Principal Investigator',
+    email: 'pi@crmp.edu',
+    password: UNIVERSAL_PASSWORD,
+    role: Role.PI,
+  },
+  {
+    name: 'Samuel Student',
+    email: 'student@crmp.edu',
+    password: UNIVERSAL_PASSWORD,
+    role: Role.STUDENT,
+  },
+  {
+    name: 'Director of RAD',
+    email: 'rad@crmp.edu',
+    password: UNIVERSAL_PASSWORD,
+    role: Role.RAD,
+  },
+  {
+    name: 'Finance Officer',
+    email: 'finance@crmp.edu',
+    password: UNIVERSAL_PASSWORD,
+    role: Role.FINANCE,
+  },
+  {
+    name: 'VP of RTT',
+    email: 'vprtt@crmp.edu',
+    password: UNIVERSAL_PASSWORD,
+    role: Role.VPRTT,
+  },
+  {
+    name: 'Academic Council Rep',
+    email: 'ac@crmp.edu',
+    password: UNIVERSAL_PASSWORD,
+    role: Role.AC,
+  },
+];
+
+const ADMIN_EMAIL = 'admin@crmp.edu';
+
 async function seed() {
-  console.log('🧹 Clearing existing data...');
-
-  // 1. Break circular references if they exist
-  try {
-    await db.execute(sql`UPDATE proposals SET current_version_id = NULL`);
-  } catch (e) {
-    // Table might not exist or be empty
-  }
-
-  // 2. Delete in reverse order of dependencies
-  await db.delete(schema.auditLogs);
-  await db.delete(schema.notifications);
-  await db.delete(schema.verificationUploads);
-  await db.delete(schema.budgetLedger);
-  await db.delete(schema.budgetInstallments);
-  await db.delete(schema.budgetRequestItems);
-  await db.delete(schema.budgetRequests);
-  await db.delete(schema.proposalComments);
-  await db.delete(schema.evaluatorAssignments);
-  await db.delete(schema.proposalApprovals);
-  await db.delete(schema.proposalVersions);
-  await db.delete(schema.proposalFiles);
-  await db.delete(schema.proposals);
-  await db.delete(schema.routingRules);
-  await db.delete(schema.userRoles);
-  await db.delete(schema.users);
-
-  console.log('🌱 Seeding database...');
-
   const hash = (pw: string) => bcrypt.hashSync(pw, 10);
+  await db.transaction(async (tx) => {
+    console.log('🧹 Clearing existing data...');
 
-  // 1. Core Users
-  console.log('Creating users...');
-  const [adminUser] = await db
-    .insert(schema.users)
-    .values({
-      fullName: 'System Admin',
-      email: 'admin@crmp.edu',
-      passwordHash: hash('Admin@1234'),
-      accountStatus: 'active',
-    })
-    .returning();
+    await tx.execute(sql`
+      DO $$
+      DECLARE
+        table_names text;
+      BEGIN
+        SELECT string_agg(format('%I.%I', schemaname, tablename), ', ')
+        INTO table_names
+        FROM pg_tables
+        WHERE schemaname = 'public'
+          AND tablename NOT IN ('__drizzle_migrations', '_drizzle_migrations');
 
-  const [advisorUser] = await db
-    .insert(schema.users)
-    .values({
-      fullName: 'Dr. Advisor (Supervisor)',
-      email: 'advisor@crmp.edu',
-      passwordHash: hash('Advisor@1234'),
-      accountStatus: 'active',
-    })
-    .returning();
+        IF table_names IS NOT NULL THEN
+          EXECUTE 'TRUNCATE TABLE ' || table_names || ' RESTART IDENTITY CASCADE';
+        END IF;
+      END $$;
+    `);
 
-  const [dgcUser] = await db
-    .insert(schema.users)
-    .values({
-      fullName: 'DGC Member (Dept Head)',
-      email: 'dgc@crmp.edu',
-      passwordHash: hash('DGC@1234'),
-      accountStatus: 'active',
-    })
-    .returning();
+    console.log('🌱 Seeding database...');
 
-  const [evaluatorUser] = await db
-    .insert(schema.users)
-    .values({
-      fullName: 'Peer Evaluator',
-      email: 'evaluator@crmp.edu',
-      passwordHash: hash('Eval@1234'),
-      accountStatus: 'active',
-    })
-    .returning();
+    console.log('Creating users...');
+    const createdUsers = new Map<string, typeof schema.users.$inferSelect>();
 
-  const [collegeUser] = await db
-    .insert(schema.users)
-    .values({
-      fullName: 'College Dean (ADRPM)',
-      email: 'college@crmp.edu',
-      passwordHash: hash('College@1234'),
-      accountStatus: 'active',
-    })
-    .returning();
+    for (const userConfig of USERS) {
+      const [user] = await tx
+        .insert(schema.users)
+        .values({
+          fullName: userConfig.name,
+          email: userConfig.email,
+          passwordHash: hash(userConfig.password),
+          accountStatus: 'active',
+        })
+        .returning();
 
-  const [pgOfficeUser] = await db
-    .insert(schema.users)
-    .values({
-      fullName: 'SGS Dean (PG Office)',
-      email: 'pgoffice@crmp.edu',
-      passwordHash: hash('PGOffice@1234'),
-      accountStatus: 'active',
-    })
-    .returning();
+      createdUsers.set(userConfig.email, user);
+    }
 
-  const [coordinatorUser] = await db
-    .insert(schema.users)
-    .values({
-      fullName: 'UG Coordinator',
-      email: 'coordinator@crmp.edu',
-      passwordHash: hash('Coord@1234'),
-      accountStatus: 'active',
-    })
-    .returning();
+    const adminUser = createdUsers.get(ADMIN_EMAIL);
+    if (!adminUser) {
+      throw new Error(`Missing admin user (${ADMIN_EMAIL}) in USERS config.`);
+    }
 
-  const [piUser] = await db
-    .insert(schema.users)
-    .values({
-      fullName: 'Dr. Principal Investigator',
-      email: 'pi@crmp.edu',
-      passwordHash: hash('PI@1234'),
-      accountStatus: 'active',
-    })
-    .returning();
+    console.log('Assigning roles...');
+    const roleAssignments = USERS.map((userConfig) => {
+      const user = createdUsers.get(userConfig.email);
+      if (!user) {
+        throw new Error(`Missing created user for ${userConfig.email}.`);
+      }
 
-  const [studentUser] = await db
-    .insert(schema.users)
-    .values({
-      fullName: 'Samuel Student',
-      email: 'student@crmp.edu',
-      passwordHash: hash('Student@1234'),
-      accountStatus: 'active',
-    })
-    .returning();
+      return {
+        userId: user.id,
+        roleName: userConfig.role,
+        grantedBy: adminUser.id,
+      };
+    });
 
-  const [radUser] = await db
-    .insert(schema.users)
-    .values({
-      fullName: 'Director of RAD',
-      email: 'rad@crmp.edu',
-      passwordHash: hash('Rad@1234'),
-      accountStatus: 'active',
-    })
-    .returning();
+    await tx.insert(schema.userRoles).values(roleAssignments);
 
-  const [financeUser] = await db
-    .insert(schema.users)
-    .values({
-      fullName: 'Finance Officer',
-      email: 'finance@crmp.edu',
-      passwordHash: hash('Finance@1234'),
-      accountStatus: 'active',
-    })
-    .returning();
+    // 3. Routing Rules (The "Real Flow")
+    console.log('Seeding routing rules...');
+    await tx.insert(schema.routingRules).values([
+      // --- Postgraduate Flow ---
+      // 1. Department review
+      {
+        proposalType: 'Postgraduate',
+        currentStatus: 'Submitted',
+        nextRole: Role.PG_OFFICE,
+        stepOrder: 1,
+        approverRole: Role.DGC_MEMBER,
+        stepLabel: 'Department Initial Review',
+        isParallel: false,
+        isFinal: false,
+        required: true,
+      },
+      // 2. PG Office final approval
+      {
+        proposalType: 'Postgraduate',
+        currentStatus: 'Under_Review',
+        nextRole: null,
+        stepOrder: 2,
+        approverRole: Role.PG_OFFICE,
+        stepLabel: 'PG Office Final Approval',
+        isParallel: false,
+        isFinal: true,
+        required: true,
+      },
 
-  const [vprttUser] = await db
-    .insert(schema.users)
-    .values({
-      fullName: 'VP of RTT',
-      email: 'vprtt@crmp.edu',
-      passwordHash: hash('Vprtt@1234'),
-      accountStatus: 'active',
-    })
-    .returning();
+      // --- Undergraduate Flow ---
+      // 1. Coordinator screens, plagiarism check, assigns advisor
+      {
+        proposalType: 'Undergraduate',
+        currentStatus: 'Submitted',
+        nextRole: null,
+        stepOrder: 1,
+        approverRole: Role.COORDINATOR,
+        stepLabel: 'Coordinator Screening (Final Approval)',
+        isParallel: false,
+        isFinal: true,
+        required: true,
+      },
 
-  const [acUser] = await db
-    .insert(schema.users)
-    .values({
-      fullName: 'Academic Council Rep',
-      email: 'ac@crmp.edu',
-      passwordHash: hash('Ac@1234'),
-      accountStatus: 'active',
-    })
-    .returning();
+      // --- Funded Project Flow ---
+      {
+        proposalType: 'Funded_Project',
+        stepOrder: 1,
+        approverRole: Role.RAD,
+        stepLabel: 'RAD Pre-screening & Assignment',
+        isParallel: false,
+        isFinal: false,
+        required: true,
+      },
+      {
+        proposalType: 'Funded_Project',
+        stepOrder: 2,
+        approverRole: Role.EVALUATOR,
+        stepLabel: 'Peer Evaluation Review',
+        isParallel: true,
+        isFinal: false,
+        required: true,
+      },
+      {
+        proposalType: 'Funded_Project',
+        stepOrder: 3,
+        approverRole: Role.FINANCE,
+        stepLabel: 'Finance Budget Integrity Check',
+        isParallel: false,
+        isFinal: false,
+        required: true,
+      },
+      {
+        proposalType: 'Funded_Project',
+        stepOrder: 4,
+        approverRole: Role.VPRTT,
+        stepLabel: 'VP Research Final Authorization',
+        isParallel: false,
+        isFinal: false,
+        required: true,
+      },
+      {
+        proposalType: 'Funded_Project',
+        stepOrder: 5,
+        approverRole: Role.AC,
+        stepLabel: 'Academic Council Approval (>500k)',
+        isParallel: false,
+        isFinal: true,
+        required: true,
+      },
 
-  // 2. Assign Roles
-  console.log('Assigning roles...');
-  await db.insert(schema.userRoles).values([
-    { userId: adminUser.id, roleName: Role.ADMIN, grantedBy: adminUser.id },
-    {
-      userId: advisorUser.id,
-      roleName: Role.SUPERVISOR,
-      grantedBy: adminUser.id,
-    },
-    { userId: dgcUser.id, roleName: Role.DGC_MEMBER, grantedBy: adminUser.id },
-    {
-      userId: evaluatorUser.id,
-      roleName: Role.EVALUATOR,
-      grantedBy: adminUser.id,
-    },
-    {
-      userId: collegeUser.id,
-      roleName: Role.COLLEGE_OFFICE,
-      grantedBy: adminUser.id,
-    },
-    {
-      userId: pgOfficeUser.id,
-      roleName: Role.PG_OFFICE,
-      grantedBy: adminUser.id,
-    },
-    {
-      userId: coordinatorUser.id,
-      roleName: Role.COORDINATOR,
-      grantedBy: adminUser.id,
-    },
-    { userId: piUser.id, roleName: Role.PI, grantedBy: adminUser.id },
-    { userId: studentUser.id, roleName: Role.STUDENT, grantedBy: adminUser.id },
-    { userId: radUser.id, roleName: Role.RAD, grantedBy: adminUser.id },
-    { userId: financeUser.id, roleName: Role.FINANCE, grantedBy: adminUser.id },
-    { userId: vprttUser.id, roleName: Role.VPRTT, grantedBy: adminUser.id },
-    { userId: acUser.id, roleName: Role.AC, grantedBy: adminUser.id },
-  ]);
-  // 2. Assign Roles
-  console.log('Assigning roles...');
-  await db.insert(schema.userRoles).values([
-    { userId: adminUser.id, roleName: Role.ADMIN, grantedBy: adminUser.id },
-    {
-      userId: advisorUser.id,
-      roleName: Role.SUPERVISOR,
-      grantedBy: adminUser.id,
-    },
-    { userId: dgcUser.id, roleName: Role.DGC_MEMBER, grantedBy: adminUser.id },
-    {
-      userId: evaluatorUser.id,
-      roleName: Role.EVALUATOR,
-      grantedBy: adminUser.id,
-    },
-    {
-      userId: collegeUser.id,
-      roleName: Role.COLLEGE_OFFICE,
-      grantedBy: adminUser.id,
-    },
-    {
-      userId: pgOfficeUser.id,
-      roleName: Role.PG_OFFICE,
-      grantedBy: adminUser.id,
-    },
-    {
-      userId: coordinatorUser.id,
-      roleName: Role.COORDINATOR,
-      grantedBy: adminUser.id,
-    },
-    { userId: piUser.id, roleName: Role.PI, grantedBy: adminUser.id },
-    { userId: studentUser.id, roleName: Role.STUDENT, grantedBy: adminUser.id },
-  ]);
-
-  // 3. Routing Rules (The "Real Flow")
-  console.log('Seeding routing rules...');
-  await db.insert(schema.routingRules).values([
-    // --- Postgraduate Flow ---
-    // 1. Department review
-    {
-      proposalType: 'Postgraduate',
-      currentStatus: 'Submitted',
-      nextRole: Role.PG_OFFICE,
-      stepOrder: 1,
-      approverRole: Role.DGC_MEMBER,
-      stepLabel: 'Department Initial Review',
-      isParallel: false,
-      isFinal: false,
-      required: true,
-    },
-    // 2. PG Office final approval
-    {
-      proposalType: 'Postgraduate',
-      currentStatus: 'Under_Review',
-      nextRole: null,
-      stepOrder: 2,
-      approverRole: Role.PG_OFFICE,
-      stepLabel: 'PG Office Final Approval',
-      isParallel: false,
-      isFinal: true,
-      required: true,
-    },
-
-    // --- Undergraduate Flow ---
-    // 1. Coordinator screens, plagiarism check, assigns advisor
-    {
-      proposalType: 'Undergraduate',
-      currentStatus: 'Submitted',
-      nextRole: null,
-      stepOrder: 1,
-      approverRole: Role.COORDINATOR,
-      stepLabel: 'Coordinator Screening (Final Approval)',
-      isParallel: false,
-      isFinal: true,
-      required: true,
-    },
-
-    // --- Funded Project Flow ---
-    {
-      proposalType: 'Funded_Project',
-      stepOrder: 1,
-      approverRole: Role.RAD,
-      stepLabel: 'RAD Pre-screening & Assignment',
-      isParallel: false,
-      isFinal: false,
-      required: true,
-    },
-    {
-      proposalType: 'Funded_Project',
-      stepOrder: 2,
-      approverRole: Role.EVALUATOR,
-      stepLabel: 'Peer Evaluation Review',
-      isParallel: true,
-      isFinal: false,
-      required: true,
-    },
-    {
-      proposalType: 'Funded_Project',
-      stepOrder: 3,
-      approverRole: Role.FINANCE,
-      stepLabel: 'Finance Budget Integrity Check',
-      isParallel: false,
-      isFinal: false,
-      required: true,
-    },
-    {
-      proposalType: 'Funded_Project',
-      stepOrder: 4,
-      approverRole: Role.VPRTT,
-      stepLabel: 'VP Research Final Authorization',
-      isParallel: false,
-      isFinal: false,
-      required: true,
-    },
-    {
-      proposalType: 'Funded_Project',
-      stepOrder: 5,
-      approverRole: Role.AC,
-      stepLabel: 'Academic Council Approval (>500k)',
-      isParallel: false,
-      isFinal: true,
-      required: true,
-    },
-
-    // --- Unfunded Project Flow ---
-    {
-      proposalType: 'Unfunded_Project',
-      currentStatus: 'Submitted',
-      nextRole: null,
-      stepOrder: 1,
-      approverRole: Role.RAD,
-      stepLabel: 'RAD Final Approval',
-      isParallel: false,
-      isFinal: true,
-      required: true,
-    },
-  ]);
+      // --- Unfunded Project Flow ---
+      {
+        proposalType: 'Unfunded_Project',
+        currentStatus: 'Submitted',
+        nextRole: null,
+        stepOrder: 1,
+        approverRole: Role.RAD,
+        stepLabel: 'RAD Final Approval',
+        isParallel: false,
+        isFinal: true,
+        required: true,
+      },
+    ]);
+  });
 
   console.log('✨ Seeding complete!');
-  process.exit(0);
 }
 
-seed().catch((err) => {
-  console.error('❌ Seeding failed:');
-  console.error(err);
-  process.exit(1);
-});
+seed()
+  .catch((err) => {
+    console.error('❌ Seeding failed:');
+    console.error(err);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await pool.end();
+  });

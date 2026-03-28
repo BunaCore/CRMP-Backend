@@ -15,6 +15,13 @@
       "when": 1772794250921,
       "tag": "0001_regular_kat_farrell",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774713264883,
+      "tag": "0002_soft_blacklash",
+      "breakpoints": true
     }
   ]
 }
