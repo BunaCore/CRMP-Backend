@@ -315,70 +315,23 @@ async function seed() {
       });
     }
 
-    // 6. Seed Test Projects
-    console.log('Seeding test projects...');
+    // 6. Seed Test Proposals
     const studentUser = createdUsers.get('student@crmp.edu');
     if (!studentUser) {
       throw new Error('Student user not found');
     }
-
-    const [testProject1] = await tx
-      .insert(schema.projects)
-      .values({
-        projectTitle: 'AI Research Initiative',
-        isFunded: true,
-        projectStage: 'Submitted',
-        projectDescription: 'Research on machine learning applications',
-        submissionDate: '2024-01-15',
-        researchArea: 'Artificial Intelligence',
-        projectProgram: 'PG',
-        departmentId: createdDepartments[0].id,
-        durationMonths: 24,
-        ethicalClearanceStatus: 'Pending',
-      })
-      .returning();
-
-    const [testProject2] = await tx
-      .insert(schema.projects)
-      .values({
-        projectTitle: 'Advanced Mathematics Study',
-        isFunded: false,
-        projectStage: 'Under Review',
-        projectDescription: 'Study of pure mathematics',
-        submissionDate: '2024-02-01',
-        researchArea: 'Pure Mathematics',
-        projectProgram: 'PG',
-        departmentId: createdDepartments[1].id,
-        durationMonths: 12,
-        ethicalClearanceStatus: 'Pending',
-      })
-      .returning();
-
-    const [testProject3] = await tx
-      .insert(schema.projects)
-      .values({
-        projectTitle: 'Undergraduate Physics Project',
-        isFunded: false,
-        projectStage: 'Submitted',
-        projectDescription: 'UG level physics experiment',
-        submissionDate: '2024-03-10',
-        researchArea: 'Physics',
-        projectProgram: 'UG',
-        departmentId: createdDepartments[2].id,
-        durationMonths: 6,
-        ethicalClearanceStatus: 'Pending',
-      })
-      .returning();
-
-    const projectIds = [
-      testProject1.projectId,
-      testProject2.projectId,
-      testProject3.projectId,
-    ];
-
-    // 7. Seed Test Proposals
     console.log('Seeding test proposals...');
-    const advisorUserObj = createdUsers.get('advisor@crmp.edu');
+
+    const departmentByProgram = {
+      UG: createdDepartments[2],
+      PG: createdDepartments[0],
+      GENERAL: createdDepartments[3],
+    } as const;
+
+    const toDateString = (dateValue: Date | null | undefined) => {
+      if (!dateValue) return new Date().toISOString().slice(0, 10);
+      return dateValue.toISOString().slice(0, 10);
+    };
 
     const proposalConfigs = [
       {
@@ -387,12 +340,17 @@ async function seed() {
         isFunded: false,
         currentStatus: 'Draft' as const,
         createdBy: studentUser?.id || adminUser.id,
-        projectId: projectIds[2],
+        projectId: null,
+        promoteToProject: false,
         abstract:
           'This is a test undergraduate proposal for development and testing purposes.',
         submittedAt: new Date('2024-03-15'),
         durationMonths: 12,
         degreeLevel: 'NA' as const,
+        members: [
+          { email: 'student@crmp.edu', role: 'PI' as const },
+          { email: 'advisor@crmp.edu', role: 'ADVISOR' as const },
+        ],
       },
       {
         title: 'Postgraduate Thesis Proposal',
@@ -400,12 +358,17 @@ async function seed() {
         isFunded: false,
         currentStatus: 'Under_Review' as const,
         createdBy: studentUser.id,
-        projectId: projectIds[0],
+        projectId: null,
+        promoteToProject: true,
         abstract:
           'This is a test postgraduate proposal for development and testing purposes.',
         submittedAt: new Date('2024-03-15'),
         durationMonths: 24,
         degreeLevel: 'Master' as const,
+        members: [
+          { email: 'student@crmp.edu', role: 'PI' as const },
+          { email: 'advisor@crmp.edu', role: 'ADVISOR' as const },
+        ],
       },
       {
         title: 'Funded Research Project',
@@ -413,12 +376,17 @@ async function seed() {
         isFunded: true,
         currentStatus: 'Draft' as const,
         createdBy: studentUser.id,
-        projectId: projectIds[0],
+        projectId: null,
+        promoteToProject: true,
         abstract:
           'This is a test funded project proposal for development and testing purposes.',
         submittedAt: new Date('2024-03-15'),
         durationMonths: 36,
         degreeLevel: 'NA' as const,
+        members: [
+          { email: 'student@crmp.edu', role: 'PI' as const },
+          { email: 'evaluator@crmp.edu', role: 'EVALUATOR' as const },
+        ],
       },
       {
         title: 'Unfunded Research Plan',
@@ -426,12 +394,17 @@ async function seed() {
         isFunded: false,
         currentStatus: 'Draft' as const,
         createdBy: studentUser.id,
-        projectId: projectIds[2],
+        projectId: null,
+        promoteToProject: false,
         abstract:
           'This is a test unfunded project proposal for development and testing purposes.',
         submittedAt: null,
         durationMonths: 12,
         degreeLevel: 'NA' as const,
+        members: [
+          { email: 'student@crmp.edu', role: 'PI' as const },
+          { email: 'advisor@crmp.edu', role: 'ADVISOR' as const },
+        ],
       },
       {
         title: 'Second Postgraduate Proposal',
@@ -439,31 +412,58 @@ async function seed() {
         isFunded: false,
         currentStatus: 'Draft' as const,
         createdBy: studentUser.id,
-        projectId: projectIds[1],
+        projectId: null,
+        promoteToProject: false,
         abstract:
           'This is a test postgraduate draft proposal for development and testing purposes.',
         submittedAt: null,
         durationMonths: 18,
         degreeLevel: 'PhD' as const,
+        members: [{ email: 'student@crmp.edu', role: 'PI' as const }],
       },
     ];
 
-    const createdProposals: (typeof schema.proposals.$inferSelect)[] = [];
-    for (const config of proposalConfigs) {
-      const [proposal] = await tx
-        .insert(schema.proposals)
-        .values(config)
-        .returning();
-      createdProposals.push(proposal);
-    }
-
-    // 8. Prepopulate Proposal Approvals from routing workflow
-    console.log('Prepopulating proposal approvals...');
     const routingRules = await tx.select().from(schema.routingRules);
-
     const approvalsToInsert: (typeof schema.proposalApprovals.$inferInsert)[] =
       [];
-    for (const proposal of createdProposals) {
+    const proposalStepUpdates: { id: string; currentStepOrder: number }[] = [];
+    const seededProposals: {
+      proposal: typeof schema.proposals.$inferSelect;
+      members: (typeof schema.proposalMembers.$inferInsert)[];
+      promoteToProject: boolean;
+    }[] = [];
+
+    for (const config of proposalConfigs) {
+      const { members, promoteToProject, ...proposalData } = config;
+      const [proposal] = await tx
+        .insert(schema.proposals)
+        .values(proposalData)
+        .returning();
+
+      const proposalMembers = members
+        .map((member) => {
+          const user = createdUsers.get(member.email);
+          if (!user) return null;
+          return {
+            proposalId: proposal.id,
+            userId: user.id,
+            role: member.role,
+          };
+        })
+        .filter(
+          (member): member is NonNullable<typeof member> => member !== null,
+        );
+
+      if (proposalMembers.length > 0) {
+        await tx.insert(schema.proposalMembers).values(proposalMembers);
+      }
+
+      seededProposals.push({
+        proposal,
+        members: proposalMembers,
+        promoteToProject,
+      });
+
       const matchingRules = routingRules
         .filter(
           (rule) =>
@@ -473,6 +473,18 @@ async function seed() {
         )
         .sort((a, b) => a.stepOrder - b.stepOrder);
 
+      if (matchingRules.length === 0) {
+        throw new Error(
+          `No routing rules found for proposal "${proposal.title}" (${proposal.proposalProgram}, ${proposal.currentStatus}).`,
+        );
+      }
+
+      const activeStepOrder = matchingRules[0].stepOrder;
+      proposalStepUpdates.push({
+        id: proposal.id,
+        currentStepOrder: activeStepOrder,
+      });
+
       for (const rule of matchingRules) {
         approvalsToInsert.push({
           proposalId: proposal.id,
@@ -480,12 +492,103 @@ async function seed() {
           stepOrder: rule.stepOrder,
           approverRole: rule.approverRole,
           decision: 'Pending',
+          isActive: rule.stepOrder === activeStepOrder,
         });
       }
     }
 
+    for (const update of proposalStepUpdates) {
+      await tx
+        .update(schema.proposals)
+        .set({ currentStepOrder: update.currentStepOrder })
+        .where(sql`${schema.proposals.id} = ${update.id}`);
+    }
+
     if (approvalsToInsert.length > 0) {
       await tx.insert(schema.proposalApprovals).values(approvalsToInsert);
+    }
+
+    // 7. Only proposals with fully accepted steps are promoted to projects
+    console.log('Promoting approved proposals to projects...');
+    for (const seeded of seededProposals) {
+      if (!seeded.promoteToProject) continue;
+
+      const proposalApprovals = approvalsToInsert.filter(
+        (approval) => approval.proposalId === seeded.proposal.id,
+      );
+
+      if (proposalApprovals.length === 0) continue;
+
+      await tx
+        .update(schema.proposalApprovals)
+        .set({
+          decision: 'Accepted',
+          approverUserId: adminUser.id,
+          decisionAt: new Date(),
+          isActive: false,
+        })
+        .where(
+          sql`${schema.proposalApprovals.proposalId} = ${seeded.proposal.id}`,
+        );
+
+      const nonAcceptedApprovals = await tx
+        .select({ id: schema.proposalApprovals.id })
+        .from(schema.proposalApprovals)
+        .where(
+          sql`${schema.proposalApprovals.proposalId} = ${seeded.proposal.id} AND ${schema.proposalApprovals.decision} <> 'Accepted'`,
+        );
+
+      if (nonAcceptedApprovals.length > 0) {
+        continue;
+      }
+
+      const department =
+        seeded.proposal.proposalProgram === 'UG'
+          ? departmentByProgram.UG
+          : seeded.proposal.proposalProgram === 'PG'
+            ? departmentByProgram.PG
+            : departmentByProgram.GENERAL;
+
+      const [project] = await tx
+        .insert(schema.projects)
+        .values({
+          projectTitle: seeded.proposal.title,
+          isFunded: seeded.proposal.isFunded,
+          projectStage: 'Approved',
+          projectDescription: seeded.proposal.abstract,
+          submissionDate: toDateString(seeded.proposal.submittedAt),
+          researchArea: seeded.proposal.researchArea,
+          projectProgram: seeded.proposal.proposalProgram,
+          departmentId: department.id,
+          durationMonths: seeded.proposal.durationMonths ?? 12,
+          ethicalClearanceStatus: 'Pending',
+        })
+        .returning();
+
+      const projectMembers = seeded.members.map((member) => ({
+        projectId: project.projectId,
+        userId: member.userId,
+        role: member.role,
+      }));
+
+      if (projectMembers.length > 0) {
+        await tx.insert(schema.projectMembers).values(projectMembers);
+      }
+
+      const finalStepOrder = proposalApprovals.reduce(
+        (maxStep, approval) =>
+          approval.stepOrder > maxStep ? approval.stepOrder : maxStep,
+        0,
+      );
+
+      await tx
+        .update(schema.proposals)
+        .set({
+          projectId: project.projectId,
+          currentStatus: 'Approved',
+          currentStepOrder: finalStepOrder,
+        })
+        .where(sql`${schema.proposals.id} = ${seeded.proposal.id}`);
     }
   });
 
