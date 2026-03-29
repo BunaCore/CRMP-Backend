@@ -103,7 +103,10 @@ export class ProposalsService {
 
         // --- Prompt 3: Workflow Logic (Retained for completeness) ---
         const rules = await tx.query.routingRules.findMany({
-          where: eq(schema.routingRules.proposalProgram, dto.proposalProgram as any),
+          where: eq(
+            schema.routingRules.proposalProgram,
+            dto.proposalProgram as any,
+          ),
           orderBy: (rules, { asc }) => [asc(rules.stepOrder)],
         });
 
@@ -126,7 +129,10 @@ export class ProposalsService {
           action: 'CREATED',
           entityType: 'proposals',
           entityId: proposal.id,
-          metadata: { title: proposal.title, program: proposal.proposalProgram },
+          metadata: {
+            title: proposal.title,
+            program: proposal.proposalProgram,
+          },
         });
 
         return {
@@ -150,12 +156,12 @@ export class ProposalsService {
    */
   async getMyProposals(userId: string): Promise<ProposalListItemDto[]> {
     // 1. Fetch proposals by creator
-    const createdProposals = await this.repository.findProposalsByCreator(userId);
+    const createdProposals =
+      await this.repository.findProposalsByCreator(userId);
 
     // 2. Fetch proposals by membership
-    const membershipRecords = await this.repository.findProposalsByMembership(
-      userId,
-    );
+    const membershipRecords =
+      await this.repository.findProposalsByMembership(userId);
     const memberProposals = membershipRecords.map((r: any) => r.proposal);
 
     // 3. Deduplicate (if user is both creator and member, show once)
@@ -174,8 +180,9 @@ export class ProposalsService {
         const creator = await this.usersService.findOne(proposal.createdBy);
 
         // Get active step if exists
-        const activeStep =
-          await this.repository.getActiveStepForProposal(proposal.id);
+        const activeStep = await this.repository.getActiveStepForProposal(
+          proposal.id,
+        );
 
         // Get user's role (if member)
         let userRole: string | undefined = undefined;
@@ -196,7 +203,8 @@ export class ProposalsService {
           isFunded: proposal.isFunded,
           currentStatus: proposal.currentStatus,
           submittedAt: proposal.submittedAt?.toISOString(),
-          createdAt: proposal.createdAt?.toISOString() || new Date().toISOString(),
+          createdAt:
+            proposal.createdAt?.toISOString() || new Date().toISOString(),
           createdBy: proposal.createdBy,
           createdByName: creator?.fullName,
           currentStepOrder: activeStep?.stepOrder,
@@ -260,7 +268,8 @@ export class ProposalsService {
         isFunded: proposal.isFunded ?? false,
         currentStatus: proposal.currentStatus || 'Under_Review',
         submittedAt: proposal.submittedAt?.toISOString(),
-        createdAt: proposal.createdAt?.toISOString() || new Date().toISOString(),
+        createdAt:
+          proposal.createdAt?.toISOString() || new Date().toISOString(),
         createdBy: proposal.createdBy,
         currentStepOrder: activeStep.stepOrder,
         currentApproverRole: activeStep.approverRole,
@@ -270,8 +279,9 @@ export class ProposalsService {
 
       // Enrich with department name if COORDINATOR role and project exists
       if (activeStep.approverRole === 'COORDINATOR' && proposal.projectId) {
-        const projectCtx =
-          await this.repository.findProjectWithDepartment(proposal.projectId);
+        const projectCtx = await this.repository.findProjectWithDepartment(
+          proposal.projectId,
+        );
         if (projectCtx?.department) {
           dto.departmentName = projectCtx.department.name;
         }
