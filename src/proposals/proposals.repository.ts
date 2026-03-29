@@ -146,4 +146,75 @@ export class ProposalsRepository {
 
     return approval || null;
   }
+
+  /**
+   * NEW: Find active pending approval per proposal
+   * Aligned with workflow engine: is_active = true AND decision = 'Pending'
+   * Returns proposals with their single active step info
+   */
+  async findProposalsWithActivePendingSteps() {
+    return this.drizzle.db
+      .select({
+        proposal: schema.proposals,
+        activeStep: schema.proposalApprovals,
+      })
+      .from(schema.proposals)
+      .innerJoin(
+        schema.proposalApprovals,
+        and(
+          eq(schema.proposalApprovals.proposalId, schema.proposals.id),
+          eq(schema.proposalApprovals.isActive, true),
+          eq(schema.proposalApprovals.decision, 'Pending'),
+        ),
+      );
+  }
+
+  /**
+   * NEW: Get proposals created by user
+   */
+  async findProposalsByCreator(userId: string) {
+    return this.drizzle.db
+      .select()
+      .from(schema.proposals)
+      .where(eq(schema.proposals.createdBy, userId))
+      .orderBy(desc(schema.proposals.createdAt));
+  }
+
+  /**
+   * NEW: Get proposals where user is a member
+   */
+  async findProposalsByMembership(userId: string) {
+    return this.drizzle.db
+      .select({
+        proposal: schema.proposals,
+        membership: schema.proposalMembers,
+      })
+      .from(schema.proposals)
+      .innerJoin(
+        schema.proposalMembers,
+        and(
+          eq(schema.proposalMembers.proposalId, schema.proposals.id),
+          eq(schema.proposalMembers.userId, userId),
+        ),
+      )
+      .orderBy(desc(schema.proposals.createdAt));
+  }
+
+  /**
+   * NEW: Get active step for a proposal
+   * Returns single active step or null
+   */
+  async getActiveStepForProposal(proposalId: string) {
+    const [activeStep] = await this.drizzle.db
+      .select()
+      .from(schema.proposalApprovals)
+      .where(
+        and(
+          eq(schema.proposalApprovals.proposalId, proposalId),
+          eq(schema.proposalApprovals.isActive, true),
+        ),
+      );
+
+    return activeStep || null;
+  }
 }

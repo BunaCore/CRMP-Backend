@@ -145,27 +145,63 @@ export class ProposalsService {
   }
 
   /**
-   * Get all proposals created by the authenticated user
-   * Simple ownership-based query
+   * Get proposals where user is involved (creator or member)
+   * Includes current active step and user's role if applicable
    */
   async getMyProposals(userId: string): Promise<ProposalListItemDto[]> {
-    const proposals = await this.repository.findByCreatedBy(userId);
+    // 1. Fetch proposals by creator
+    const createdProposals = await this.repository.findProposalsByCreator(userId);
 
-    // Hydrate with creator name
+    // 2. Fetch proposals by membership
+    const membershipRecords = await this.repository.findProposalsByMembership(
+      userId,
+    );
+    const memberProposals = membershipRecords.map((r: any) => r.proposal);
+
+    // 3. Deduplicate (if user is both creator and member, show once)
+    const proposalMap = new Map();
+    createdProposals.forEach((p: any) => proposalMap.set(p.id, p));
+    memberProposals.forEach((p: any) => {
+      if (!proposalMap.has(p.id)) {
+        proposalMap.set(p.id, p);
+      }
+    });
+
+    // 4. Enrich each proposal with active step and user role
     const enriched = await Promise.all(
-      proposals.map(async (p) => {
-        const creator = await this.usersService.findOne(p.createdBy);
+      Array.from(proposalMap.values()).map(async (proposal: any) => {
+        // Get creator info
+        const creator = await this.usersService.findOne(proposal.createdBy);
+
+        // Get active step if exists
+        const activeStep =
+          await this.repository.getActiveStepForProposal(proposal.id);
+
+        // Get user's role (if member)
+        let userRole: string | undefined = undefined;
+        if (proposal.createdBy !== userId) {
+          const memberRecords = membershipRecords.find(
+            (r: any) => r.proposal.id === proposal.id,
+          );
+          if (memberRecords?.membership) {
+            userRole = memberRecords.membership.role;
+          }
+        }
+
         return {
-          id: p.id,
-          title: p.title,
-          abstract: p.abstract,
-          proposalProgram: p.proposalProgram,
-          isFunded: p.isFunded,
-          currentStatus: p.currentStatus,
-          submittedAt: p.submittedAt?.toISOString(),
-          createdAt: p.createdAt?.toISOString(),
-          createdBy: p.createdBy,
+          id: proposal.id,
+          title: proposal.title,
+          abstract: proposal.abstract,
+          proposalProgram: proposal.proposalProgram,
+          isFunded: proposal.isFunded,
+          currentStatus: proposal.currentStatus,
+          submittedAt: proposal.submittedAt?.toISOString(),
+          createdAt: proposal.createdAt?.toISOString() || new Date().toISOString(),
+          createdBy: proposal.createdBy,
           createdByName: creator?.fullName,
+          currentStepOrder: activeStep?.stepOrder,
+          currentApproverRole: activeStep?.approverRole,
+          userRole: userRole || undefined,
         } as ProposalListItemDto;
       }),
     );
@@ -174,81 +210,68 @@ export class ProposalsService {
   }
 
   /**
-   * Get proposals pending user's approval based on workflow role
-   * Dynamic workflow-based query with application-layer filtering
+   * Get proposals pending user's approval (actionable items)
+   * Query ONLY active pending steps: is_active = true AND decision = 'Pending'
+   * Trust is_active as source of truth
    */
   async getPendingApprovals(user: any): Promise<PendingApprovalDto[]> {
-    // 1. Fetch proposals in active workflow states
-    const inProgressProposals = await this.repository.findInProgressProposals();
+    // 1. Fetch all proposals with active pending approval steps
+    const proposalsWithSteps =
+      await this.repository.findProposalsWithActivePendingSteps();
 
-    if (inProgressProposals.length === 0) {
+    if (proposalsWithSteps.length === 0) {
       return [];
     }
 
-    // 2. Fetch user's roles for matching against approverRole
+    // 2. Get user's roles
     const userRoles = await this.usersService.getUserRoles(user.id);
     const roleNames = userRoles.map((ur) => ur.roleName);
 
-    // 3. For each proposal, check if user can approve
+    // 3. Filter: only proposals where user can approve
     const pendingForUser: PendingApprovalDto[] = [];
 
-    for (const proposal of inProgressProposals) {
-      // Skip if user already approved this proposal
-      const hasApproved = await this.repository.hasUserAlreadyApproved(
-        proposal.id,
-        user.id,
-      );
-      if (hasApproved) {
+    for (const item of proposalsWithSteps) {
+      const proposal = item.proposal;
+      const activeStep = item.activeStep;
+
+      // Skip if user already made a decision on this step (shouldn't happen, but safe check)
+      if (activeStep.approverUserId === user.id) {
         continue;
       }
 
-      // Get FIRST pending approval (earliest step, dynamic regardless of status)
-      const pendingApproval =
-        await this.repository.findFirstPendingApprovalForProposal(proposal.id);
-
-      if (!pendingApproval) {
-        continue; // No pending steps = workflow complete
-      }
-
-      // Check if user matches the approver role requirements
+      // Check if user can approve this step
       const resolution = await this.resolveApprover(
         user,
         proposal,
-        {
-          approverRole: pendingApproval.approverRole,
-          stepLabel: 'Review Step',
-          stepOrder: pendingApproval.stepOrder,
-        },
+        activeStep.approverRole,
         roleNames,
       );
 
       if (!resolution.canApprove) {
-        continue; // User cannot approve this at this step
+        continue;
       }
 
-      // 4. Map to DTO and include department context
+      // 4. Build DTO for actionable proposal
       const dto: PendingApprovalDto = {
         id: proposal.id,
         title: proposal.title,
         abstract: proposal.abstract || undefined,
         proposalProgram: proposal.proposalProgram,
         isFunded: proposal.isFunded ?? false,
-        currentStatus: proposal.currentStatus || 'Draft',
+        currentStatus: proposal.currentStatus || 'Under_Review',
         submittedAt: proposal.submittedAt?.toISOString(),
-        createdAt:
-          proposal.createdAt?.toISOString() || new Date().toISOString(),
+        createdAt: proposal.createdAt?.toISOString() || new Date().toISOString(),
         createdBy: proposal.createdBy,
-        currentStepOrder: pendingApproval.stepOrder,
-        currentApproverRole: pendingApproval.approverRole,
-        stepLabel: 'Review Step',
+        currentStepOrder: activeStep.stepOrder,
+        currentApproverRole: activeStep.approverRole,
+        stepLabel: `Step ${activeStep.stepOrder}`,
         projectId: proposal.projectId || undefined,
       };
 
-      // Enrich with department if proposal has project
-      if (proposal.projectId) {
-        const projectCtx = await this.repository.findProjectWithDepartment(
-          proposal.projectId,
-        );
+      // Enrich with department name if COORDINATOR role and project exists
+      if (activeStep.approverRole === 'COORDINATOR' && proposal.projectId) {
+        const projectCtx =
+          await this.repository.findProjectWithDepartment(proposal.projectId);
         if (projectCtx?.department) {
           dto.departmentName = projectCtx.department.name;
         }
@@ -261,31 +284,29 @@ export class ProposalsService {
   }
 
   /**
-   * Helper: Resolve if user can approve a proposal at current step
-   * Handles role matching with department context for COORDINATOR
+   * Helper: Resolve if user can approve at current step
+   * Centralized role validation with department context for COORDINATOR
    */
   private async resolveApprover(
     user: any,
     proposal: any,
-    rule: { approverRole: string; stepLabel?: string; stepOrder?: number },
-    userRoleNames: string[],
+    requiredRole: string,
+    userRoles: string[],
   ): Promise<ApproverResolution> {
-    const { approverRole } = rule;
-
     // Check if user has the required role
-    if (!userRoleNames.includes(approverRole)) {
+    if (!userRoles.includes(requiredRole)) {
       return {
         canApprove: false,
-        reason: `User does not have role: ${approverRole}`,
+        reason: `User does not have required role: ${requiredRole}`,
       };
     }
 
-    // Special handling for COORDINATOR: must belong to proposal's department
-    if (approverRole === 'COORDINATOR') {
+    // COORDINATOR requires department verification
+    if (requiredRole === 'COORDINATOR') {
       if (!proposal.projectId) {
         return {
           canApprove: false,
-          reason: 'Proposal has no project associated',
+          reason: 'Proposal not linked to project',
         };
       }
 
@@ -300,22 +321,19 @@ export class ProposalsService {
         };
       }
 
-      // Check if user is a coordinator of this department
-      const isCoordinatorOfDept =
-        await this.usersService.isCoordinatorOfDepartment(
-          user.id,
-          projectCtx.departmentId,
-        );
+      const isCoord = await this.usersService.isCoordinatorOfDepartment(
+        user.id,
+        projectCtx.departmentId,
+      );
 
-      if (!isCoordinatorOfDept) {
+      if (!isCoord) {
         return {
           canApprove: false,
-          reason: `User is not coordinator of department: ${projectCtx.department?.name}`,
+          reason: `User is not coordinator of department: ${projectCtx.department?.name || 'unknown'}`,
         };
       }
     }
 
-    // DGC_MEMBER, RAD, etc. - no department restriction, just role
     return { canApprove: true };
   }
 }

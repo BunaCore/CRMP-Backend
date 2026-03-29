@@ -9,8 +9,8 @@ import {
 } from 'class-validator';
 
 /**
- * Lean proposal info with current step metadata
- * Used for both /my and /pending-approvals endpoints
+ * Proposal representation for list endpoints
+ * Supports both /my and /pending-approvals with optional workflow fields
  */
 export class ProposalListItemDto {
   @IsUUID()
@@ -44,24 +44,28 @@ export class ProposalListItemDto {
   createdBy: string;
 
   @IsString()
+  @IsOptional()
   createdByName?: string;
-}
 
-/**
- * Extended proposal info for pending approvals
- * Includes workflow context needed for reviewers
- */
-export class PendingApprovalDto extends ProposalListItemDto {
+  // Workflow context (for pending approvals)
   @IsNumber()
-  currentStepOrder: number;
+  @IsOptional()
+  currentStepOrder?: number;
 
   @IsString()
-  currentApproverRole: string;
+  @IsOptional()
+  currentApproverRole?: string;
 
   @IsString()
   @IsOptional()
   stepLabel?: string;
 
+  // User context
+  @IsString()
+  @IsOptional()
+  userRole?: string;
+
+  // Project context
   @IsUUID()
   @IsOptional()
   projectId?: string;
@@ -70,3 +74,9 @@ export class PendingApprovalDto extends ProposalListItemDto {
   @IsOptional()
   departmentName?: string;
 }
+
+/**
+ * Extended pending approval DTO (inherits from ProposalListItemDto)
+ * Used for /pending-approvals endpoint
+ */
+export class PendingApprovalDto extends ProposalListItemDto {}
