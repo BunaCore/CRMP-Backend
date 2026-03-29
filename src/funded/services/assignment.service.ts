@@ -22,12 +22,12 @@ export class AssignmentService {
     data: AssignAdvisorDto,
   ) {
     return await this.dbService.db
-      .update(schema.proposals)
-      .set({
-        advisorUserId: data.advisorId,
-        updatedAt: new Date(),
+      .insert(schema.proposalMembers)
+      .values({
+        proposalId,
+        userId: data.advisorId,
+        role: 'ADVISOR',
       })
-      .where(eq(schema.proposals.id, proposalId))
       .returning();
   }
 

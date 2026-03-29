@@ -16,7 +16,7 @@ export class PgRepository {
         id: schema.proposals.id,
         title: schema.proposals.title,
         abstract: schema.proposals.abstract,
-        proposalType: schema.proposals.proposalType,
+        proposalProgram: schema.proposals.proposalProgram,
         degreeLevel: schema.proposals.degreeLevel,
         researchArea: schema.proposals.researchArea,
         durationMonths: schema.proposals.durationMonths,
@@ -52,7 +52,7 @@ export class PgRepository {
       )
       .where(
         and(
-          eq(schema.proposals.proposalType, 'Postgraduate'),
+          eq(schema.proposals.proposalProgram, 'PG'),
           filters.status
             ? eq(schema.proposals.currentStatus, filters.status as any)
             : undefined,
@@ -102,7 +102,7 @@ export class PgRepository {
         id: schema.proposals.id,
         title: schema.proposals.title,
         abstract: schema.proposals.abstract,
-        proposalType: schema.proposals.proposalType,
+        proposalProgram: schema.proposals.proposalProgram,
         degreeLevel: schema.proposals.degreeLevel,
         researchArea: schema.proposals.researchArea,
         durationMonths: schema.proposals.durationMonths,
@@ -124,7 +124,7 @@ export class PgRepository {
       .where(
         and(
           eq(schema.proposals.id, proposalId),
-          eq(schema.proposals.proposalType, 'Postgraduate'),
+          eq(schema.proposals.proposalProgram, 'PG'),
         ),
       );
 
@@ -216,13 +216,14 @@ export class PgRepository {
         id: schema.proposals.id,
         title: schema.proposals.title,
         currentStatus: schema.proposals.currentStatus,
+        proposalProgram: schema.proposals.proposalProgram,
         createdBy: schema.proposals.createdBy,
       })
       .from(schema.proposals)
       .where(
         and(
           eq(schema.proposals.id, proposalId),
-          eq(schema.proposals.proposalType, 'Postgraduate'),
+          eq(schema.proposals.proposalProgram, 'PG'),
         ),
       );
     return row ?? null;
@@ -243,7 +244,7 @@ export class PgRepository {
   }
 
   async findNextRole(data: {
-    proposalType: string;
+    proposalProgram: string;
     currentStatus: string;
     actorRole: string;
   }) {
@@ -252,7 +253,7 @@ export class PgRepository {
       .from(schema.routingRules)
       .where(
         and(
-          eq(schema.routingRules.proposalType, data.proposalType as any),
+          eq(schema.routingRules.proposalProgram, data.proposalProgram as any),
           eq(schema.routingRules.currentStatus, data.currentStatus as any),
           eq(schema.routingRules.approverRole, data.actorRole),
         ),

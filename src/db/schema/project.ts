@@ -7,14 +7,10 @@ import {
   pgEnum,
   primaryKey,
   timestamp,
+  boolean,
 } from 'drizzle-orm/pg-core';
 import { departments } from './department';
-
-export const ProjectTypeEnum = pgEnum('project_type', [
-  'Funded',
-  'Non-Funded',
-  'Undergraduate',
-]);
+import { users } from './user';
 
 export const ProjectStageEnum = pgEnum('project_stage', [
   'Submitted',
@@ -35,6 +31,7 @@ export const projectRoleEnum = pgEnum('project_role', [
   'PI',
   'SUPERVISOR',
   'EVALUATOR',
+  'ADVISOR',
 ]);
 
 export const ProjectProgramEnum = pgEnum('project_program', [
@@ -46,7 +43,7 @@ export const ProjectProgramEnum = pgEnum('project_program', [
 export const projects = pgTable('projects', {
   projectId: uuid('project_id').primaryKey().defaultRandom(),
   projectTitle: text('project_title').notNull(),
-  projectType: ProjectTypeEnum('project_type').notNull(),
+  isFunded: boolean('is_funded').default(false),
   projectStage: ProjectStageEnum('project_stage').notNull(),
   projectDescription: text('project_description'),
   submissionDate: date('submission_date').notNull(),
@@ -56,8 +53,7 @@ export const projects = pgTable('projects', {
   department: text('department'), // TODO: left for backward compatablity @depricated
   departmentId: uuid('department_id').references(() => departments.id),
   durationMonths: integer('duration_months').notNull(),
-  PI_ID: uuid('pi_id').notNull(), // Principal Investigator (userId)
-  // assignedEvaluator: uuid('assigned_evaluator'), // userId of examiner
+  // PI is now derived from project_members where role = 'PI'
   ethicalClearanceStatus: EthicalClearanceStatusEnum(
     'ethical_clearance_status',
   ).notNull(),
@@ -70,9 +66,12 @@ export const projectMembers = pgTable(
   {
     projectId: uuid('project_id')
       .notNull()
-      .references(() => projects.projectId),
-    role: projectRoleEnum('role'),
-    userId: uuid('user_id').notNull(), // references userId
+      .references(() => projects.projectId, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: projectRoleEnum('role').notNull(),
+    addedAt: timestamp('added_at').defaultNow(),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.projectId, t.userId] }),

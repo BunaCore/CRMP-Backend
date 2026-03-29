@@ -28,20 +28,20 @@ export class ProposalsRepository {
       .from(schema.proposals)
       .where(
         inArray(schema.proposals.currentStatus, [
-          'Submitted',
+          'Draft',
           'Under_Review',
-          'Partially_Approved',
+          'Needs_Revision',
         ]),
       );
   }
 
   /**
    * Find routing rule for next approver
-   * Input: proposalType, currentStatus, stepOrder
+   * Input: proposalProgram, currentStatus, stepOrder
    * Returns the rule that defines who approves next
    */
   async findRoutingRule(
-    proposalType: string,
+    proposalProgram: string,
     currentStatus: string,
     stepOrder: number,
   ) {
@@ -50,7 +50,7 @@ export class ProposalsRepository {
       .from(schema.routingRules)
       .where(
         and(
-          eq(schema.routingRules.proposalType, proposalType as any),
+          eq(schema.routingRules.proposalProgram, proposalProgram as any),
           eq(schema.routingRules.currentStatus, currentStatus as any),
           eq(schema.routingRules.stepOrder, stepOrder),
         ),

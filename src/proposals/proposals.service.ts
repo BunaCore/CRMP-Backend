@@ -30,12 +30,12 @@ export class ProposalsService {
             createdBy: user.id,
             title: dto.title,
             abstract: dto.abstract,
-            proposalType: dto.proposalType as any,
+            proposalProgram: dto.proposalProgram as any,
+            isFunded: dto.isFunded || false,
             degreeLevel: (dto.degreeLevel || 'NA') as any,
             researchArea: dto.researchArea,
-            advisorUserId: dto.advisorUserId,
             durationMonths: dto.durationMonths,
-            currentStatus: 'Submitted',
+            currentStatus: 'Draft',
             submittedAt: new Date(),
           })
           .returning();
@@ -103,7 +103,7 @@ export class ProposalsService {
 
         // --- Prompt 3: Workflow Logic (Retained for completeness) ---
         const rules = await tx.query.routingRules.findMany({
-          where: eq(schema.routingRules.proposalType, dto.proposalType as any),
+          where: eq(schema.routingRules.proposalProgram, dto.proposalProgram as any),
           orderBy: (rules, { asc }) => [asc(rules.stepOrder)],
         });
 
@@ -126,7 +126,7 @@ export class ProposalsService {
           action: 'CREATED',
           entityType: 'proposals',
           entityId: proposal.id,
-          metadata: { title: proposal.title, type: proposal.proposalType },
+          metadata: { title: proposal.title, program: proposal.proposalProgram },
         });
 
         return {
@@ -159,7 +159,8 @@ export class ProposalsService {
           id: p.id,
           title: p.title,
           abstract: p.abstract,
-          proposalType: p.proposalType,
+          proposalProgram: p.proposalProgram,
+          isFunded: p.isFunded,
           currentStatus: p.currentStatus,
           submittedAt: p.submittedAt?.toISOString(),
           createdAt: p.createdAt?.toISOString(),
@@ -230,7 +231,8 @@ export class ProposalsService {
         id: proposal.id,
         title: proposal.title,
         abstract: proposal.abstract || undefined,
-        proposalType: proposal.proposalType,
+        proposalProgram: proposal.proposalProgram,
+        isFunded: proposal.isFunded ?? false,
         currentStatus: proposal.currentStatus || 'Draft',
         submittedAt: proposal.submittedAt?.toISOString(),
         createdAt:

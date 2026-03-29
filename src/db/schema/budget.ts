@@ -29,7 +29,7 @@ export const budgetRequests = pgTable('budget_requests', {
   }),
   projectId: uuid('project_id').references(() => projects.projectId),
   requestedBy: uuid('requested_by').references(() => users.id),
-  currentStatus: proposalStatusEnum('current_status').default('Submitted'),
+  currentStatus: proposalStatusEnum('current_status').default('Draft'),
   totalAmount: numeric('total_amount', { precision: 15, scale: 2 }),
   approvedAmount: numeric('approved_amount', { precision: 15, scale: 2 }),
   financeApprovedBy: uuid('finance_approved_by').references(() => users.id),

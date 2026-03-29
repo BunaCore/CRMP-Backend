@@ -12,7 +12,7 @@ export class FundedRoutingRepository {
    */
   async getFundedRoutingRules() {
     return await this.dbService.db.query.routingRules.findMany({
-      where: eq(schema.routingRules.proposalType, 'Funded_Project'),
+      where: eq(schema.routingRules.proposalProgram, 'GENERAL'),
       orderBy: [asc(schema.routingRules.stepOrder)],
     });
   }
@@ -26,7 +26,7 @@ export class FundedRoutingRepository {
       const rules = await tx
         .select()
         .from(schema.routingRules)
-        .where(eq(schema.routingRules.proposalType, 'Funded_Project'))
+        .where(eq(schema.routingRules.proposalProgram, 'GENERAL'))
         .orderBy(asc(schema.routingRules.stepOrder));
 
       if (!rules || rules.length === 0) {
@@ -68,7 +68,7 @@ export class FundedRoutingRepository {
         .from(schema.routingRules)
         .where(
           and(
-            eq(schema.routingRules.proposalType, 'Funded_Project'),
+            eq(schema.routingRules.proposalProgram, 'GENERAL'),
             eq(schema.routingRules.stepOrder, nextStepOrder),
           ),
         )

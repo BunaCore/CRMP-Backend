@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsISO8601,
+  IsBoolean,
 } from 'class-validator';
 
 /**
@@ -22,24 +23,14 @@ export class ProposalListItemDto {
   @IsOptional()
   abstract?: string;
 
-  @IsEnum([
-    'Undergraduate',
-    'Postgraduate',
-    'Funded_Project',
-    'Unfunded_Project',
-  ])
-  proposalType: string;
+  @IsEnum(['UG', 'PG', 'GENERAL'])
+  proposalProgram: string | null;
 
-  @IsEnum([
-    'Draft',
-    'Submitted',
-    'Under_Review',
-    'Partially_Approved',
-    'Approved',
-    'Rejected',
-    'Needs_Revision',
-    'Cancelled',
-  ])
+  @IsBoolean()
+  @IsOptional()
+  isFunded?: boolean;
+
+  @IsEnum(['Draft', 'Under_Review', 'Needs_Revision', 'Approved', 'Rejected'])
   currentStatus: string;
 
   @IsISO8601()

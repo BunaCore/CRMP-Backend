@@ -167,11 +167,11 @@ async function seed() {
       // --- Postgraduate Flow ---
       // 1. Department review
       {
-        proposalType: 'Postgraduate',
-        currentStatus: 'Submitted',
-        nextRole: Role.PG_OFFICE,
+        proposalProgram: 'PG',
+        currentStatus: 'Under_Review',
+        nextRole: 'PG_OFFICE',
         stepOrder: 1,
-        approverRole: Role.DGC_MEMBER,
+        approverRole: 'DGC_MEMBER',
         stepLabel: 'Department Initial Review',
         isParallel: false,
         isFinal: false,
@@ -179,11 +179,11 @@ async function seed() {
       },
       // 2. PG Office final approval
       {
-        proposalType: 'Postgraduate',
+        proposalProgram: 'PG',
         currentStatus: 'Under_Review',
         nextRole: null,
         stepOrder: 2,
-        approverRole: Role.PG_OFFICE,
+        approverRole: 'PG_OFFICE',
         stepLabel: 'PG Office Final Approval',
         isParallel: false,
         isFinal: true,
@@ -193,11 +193,11 @@ async function seed() {
       // --- Undergraduate Flow ---
       // 1. Coordinator screens, plagiarism check, assigns advisor
       {
-        proposalType: 'Undergraduate',
-        currentStatus: 'Submitted',
+        proposalProgram: 'UG',
+        currentStatus: 'Draft',
         nextRole: null,
         stepOrder: 1,
-        approverRole: Role.COORDINATOR,
+        approverRole: 'COORDINATOR',
         stepLabel: 'Coordinator Screening (Final Approval)',
         isParallel: false,
         isFinal: true,
@@ -206,45 +206,55 @@ async function seed() {
 
       // --- Funded Project Flow ---
       {
-        proposalType: 'Funded_Project',
+        proposalProgram: 'GENERAL',
+        currentStatus: 'Draft',
+        nextRole: null,
         stepOrder: 1,
-        approverRole: Role.RAD,
+        approverRole: 'RAD',
         stepLabel: 'RAD Pre-screening & Assignment',
         isParallel: false,
         isFinal: false,
         required: true,
       },
       {
-        proposalType: 'Funded_Project',
+        proposalProgram: 'GENERAL',
+        currentStatus: 'Draft',
+        nextRole: null,
         stepOrder: 2,
-        approverRole: Role.EVALUATOR,
+        approverRole: 'EVALUATOR',
         stepLabel: 'Peer Evaluation Review',
         isParallel: true,
         isFinal: false,
         required: true,
       },
       {
-        proposalType: 'Funded_Project',
+        proposalProgram: 'GENERAL',
+        currentStatus: 'Draft',
+        nextRole: null,
         stepOrder: 3,
-        approverRole: Role.FINANCE,
+        approverRole: 'FINANCE',
         stepLabel: 'Finance Budget Integrity Check',
         isParallel: false,
         isFinal: false,
         required: true,
       },
       {
-        proposalType: 'Funded_Project',
+        proposalProgram: 'GENERAL',
+        currentStatus: 'Draft',
+        nextRole: null,
         stepOrder: 4,
-        approverRole: Role.VPRTT,
+        approverRole: 'VPRTT',
         stepLabel: 'VP Research Final Authorization',
         isParallel: false,
         isFinal: false,
         required: true,
       },
       {
-        proposalType: 'Funded_Project',
+        proposalProgram: 'GENERAL',
+        currentStatus: 'Draft',
+        nextRole: null,
         stepOrder: 5,
-        approverRole: Role.AC,
+        approverRole: 'AC',
         stepLabel: 'Academic Council Approval (>500k)',
         isParallel: false,
         isFinal: true,
@@ -253,11 +263,11 @@ async function seed() {
 
       // --- Unfunded Project Flow ---
       {
-        proposalType: 'Unfunded_Project',
-        currentStatus: 'Submitted',
+        proposalProgram: 'GENERAL',
+        currentStatus: 'Draft',
         nextRole: null,
         stepOrder: 1,
-        approverRole: Role.RAD,
+        approverRole: 'RAD',
         stepLabel: 'RAD Final Approval',
         isParallel: false,
         isFinal: true,
@@ -316,7 +326,7 @@ async function seed() {
       .insert(schema.projects)
       .values({
         projectTitle: 'AI Research Initiative',
-        projectType: 'Funded',
+        isFunded: true,
         projectStage: 'Submitted',
         projectDescription: 'Research on machine learning applications',
         submissionDate: '2024-01-15',
@@ -324,7 +334,6 @@ async function seed() {
         projectProgram: 'PG',
         departmentId: createdDepartments[0].id,
         durationMonths: 24,
-        PI_ID: studentUser.id,
         ethicalClearanceStatus: 'Pending',
       })
       .returning();
@@ -333,7 +342,7 @@ async function seed() {
       .insert(schema.projects)
       .values({
         projectTitle: 'Advanced Mathematics Study',
-        projectType: 'Non-Funded',
+        isFunded: false,
         projectStage: 'Under Review',
         projectDescription: 'Study of pure mathematics',
         submissionDate: '2024-02-01',
@@ -341,7 +350,6 @@ async function seed() {
         projectProgram: 'PG',
         departmentId: createdDepartments[1].id,
         durationMonths: 12,
-        PI_ID: studentUser.id,
         ethicalClearanceStatus: 'Pending',
       })
       .returning();
@@ -350,7 +358,7 @@ async function seed() {
       .insert(schema.projects)
       .values({
         projectTitle: 'Undergraduate Physics Project',
-        projectType: 'Undergraduate',
+        isFunded: false,
         projectStage: 'Submitted',
         projectDescription: 'UG level physics experiment',
         submissionDate: '2024-03-10',
@@ -358,7 +366,6 @@ async function seed() {
         projectProgram: 'UG',
         departmentId: createdDepartments[2].id,
         durationMonths: 6,
-        PI_ID: studentUser.id,
         ethicalClearanceStatus: 'Pending',
       })
       .returning();
@@ -376,10 +383,10 @@ async function seed() {
     const proposalConfigs = [
       {
         title: 'Undergraduate Research Proposal 1',
-        proposalType: 'Undergraduate' as const,
-        currentStatus: 'Submitted' as const,
+        proposalProgram: 'UG' as const,
+        isFunded: false,
+        currentStatus: 'Draft' as const,
         createdBy: studentUser?.id || adminUser.id,
-        advisorUserId: advisorUserObj?.id,
         projectId: projectIds[2],
         abstract:
           'This is a test undergraduate proposal for development and testing purposes.',
@@ -389,10 +396,10 @@ async function seed() {
       },
       {
         title: 'Postgraduate Thesis Proposal',
-        proposalType: 'Postgraduate' as const,
+        proposalProgram: 'PG' as const,
+        isFunded: false,
         currentStatus: 'Under_Review' as const,
         createdBy: studentUser.id,
-        advisorUserId: advisorUserObj?.id,
         projectId: projectIds[0],
         abstract:
           'This is a test postgraduate proposal for development and testing purposes.',
@@ -402,10 +409,10 @@ async function seed() {
       },
       {
         title: 'Funded Research Project',
-        proposalType: 'Funded_Project' as const,
-        currentStatus: 'Submitted' as const,
+        proposalProgram: 'GENERAL' as const,
+        isFunded: true,
+        currentStatus: 'Draft' as const,
         createdBy: studentUser.id,
-        advisorUserId: null,
         projectId: projectIds[0],
         abstract:
           'This is a test funded project proposal for development and testing purposes.',
@@ -415,10 +422,10 @@ async function seed() {
       },
       {
         title: 'Unfunded Research Plan',
-        proposalType: 'Unfunded_Project' as const,
+        proposalProgram: 'GENERAL' as const,
+        isFunded: false,
         currentStatus: 'Draft' as const,
         createdBy: studentUser.id,
-        advisorUserId: null,
         projectId: projectIds[2],
         abstract:
           'This is a test unfunded project proposal for development and testing purposes.',
@@ -428,10 +435,10 @@ async function seed() {
       },
       {
         title: 'Second Postgraduate Proposal',
-        proposalType: 'Postgraduate' as const,
+        proposalProgram: 'PG' as const,
+        isFunded: false,
         currentStatus: 'Draft' as const,
         createdBy: studentUser.id,
-        advisorUserId: advisorUserObj?.id,
         projectId: projectIds[1],
         abstract:
           'This is a test postgraduate draft proposal for development and testing purposes.',
@@ -460,7 +467,7 @@ async function seed() {
       const matchingRules = routingRules
         .filter(
           (rule) =>
-            rule.proposalType === proposal.proposalType &&
+            rule.proposalProgram === proposal.proposalProgram &&
             (rule.currentStatus === proposal.currentStatus ||
               rule.currentStatus === null),
         )

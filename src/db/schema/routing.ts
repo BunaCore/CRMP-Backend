@@ -7,15 +7,12 @@ import {
   timestamp,
 } from 'drizzle-orm/pg-core';
 import { users } from './user';
-import {
-  proposalApprovals,
-  proposalStatusEnum,
-  proposalTypeEnum,
-} from './proposals';
+import { proposalApprovals, proposalStatusEnum } from './proposals';
+import { ProjectProgramEnum } from './project';
 
 export const routingRules = pgTable('routing_rules', {
   id: uuid('id').primaryKey().defaultRandom(),
-  proposalType: proposalTypeEnum('proposal_type').notNull(),
+  proposalProgram: ProjectProgramEnum('proposal_program'),
   currentStatus: proposalStatusEnum('current_status'),
   stepOrder: integer('step_order').notNull(),
   approverRole: varchar('approver_role', { length: 50 }).notNull(),

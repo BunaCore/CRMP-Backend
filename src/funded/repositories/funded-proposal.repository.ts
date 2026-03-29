@@ -22,10 +22,11 @@ export class FundedProposalRepository {
           createdBy: userId,
           title: data.title,
           abstract: data.abstract,
-          proposalType: 'Funded_Project',
+          proposalProgram: 'GENERAL',
+          isFunded: true,
           researchArea: data.researchArea,
           durationMonths: data.durationMonths,
-          currentStatus: 'Submitted',
+          currentStatus: 'Draft',
           submittedAt: new Date(),
         })
         .returning();
@@ -100,7 +101,7 @@ export class FundedProposalRepository {
         and(
           eq(schema.proposalApprovals.approverRole, roleName),
           eq(schema.proposalApprovals.decision, 'Pending'),
-          eq(schema.proposals.proposalType, 'Funded_Project'),
+          eq(schema.proposals.isFunded, true),
         ),
       );
     return pendingQuery;
@@ -176,15 +177,14 @@ export class FundedProposalRepository {
         .insert(schema.projects)
         .values({
           projectTitle: proposal.title,
-          projectType: 'Funded',
+          isFunded: true,
           projectStage: 'Approved',
           submissionDate: (proposal.submittedAt
             ? proposal.submittedAt.toISOString()
             : new Date().toISOString()
           ).split('T')[0],
-          durationMonths: proposal.durationMonths || 12, // Default if null
-          PI_ID: proposal.createdBy,
-          ethicalClearanceStatus: 'Pending', // Defaults
+          durationMonths: proposal.durationMonths || 12,
+          ethicalClearanceStatus: 'Pending',
           researchArea: proposal.researchArea,
         })
         .returning();

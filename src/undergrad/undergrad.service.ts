@@ -271,10 +271,9 @@ export class UndergradService {
       dueDate: dto.dueDate,
     });
 
-    // ── Write 2: Stamp advisor_user_id on the proposal itself ────────
-    // This is what makes the advisor visible in every proposal read
-    // (the proposals table has an advisor_user_id FK to users)
-    await this.repo.updateProposalAdvisor(proposalId, dto.advisorUserId);
+    // ── Write 2: Add advisor to proposal members ────────────────────────
+    // This makes the advisor visible in every proposal read via proposal_members
+    await this.repo.addProposalMember(proposalId, dto.advisorUserId, 'ADVISOR');
 
     // ── Write 3: Notify the advisor ──────────────────────────────────
     const notificationBody = dto.dueDate
