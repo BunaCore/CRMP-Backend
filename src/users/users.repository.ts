@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { DrizzleService } from 'src/db/db.service';
 import { users } from 'src/db/schema/user';
 import { userRoles } from 'src/db/schema/roles';
+import { departmentCoordinators } from 'src/db/schema/department';
 import { User, CreateUserInput, FindUserInput } from 'src/users/types/user';
 
 @Injectable()
@@ -102,5 +103,39 @@ export class UsersRepository {
     const result = await this.drizzle.db.delete(users).where(eq(users.id, id));
 
     return !!result.rowCount;
+  }
+
+  /**
+   * Get all roles assigned to a user
+   */
+  async getUserRoles(userId: string) {
+    return this.drizzle.db
+      .select({
+        id: userRoles.id,
+        roleName: userRoles.roleName,
+        grantedAt: userRoles.grantedAt,
+      })
+      .from(userRoles)
+      .where(eq(userRoles.userId, userId));
+  }
+
+  /**
+   * Check if user is a coordinator of a specific department
+   */
+  async isCoordinatorOfDepartment(
+    userId: string,
+    departmentId: string,
+  ): Promise<boolean> {
+    const [coordinator] = await this.drizzle.db
+      .select()
+      .from(departmentCoordinators)
+      .where(
+        and(
+          eq(departmentCoordinators.userId, userId),
+          eq(departmentCoordinators.departmentId, departmentId),
+        ),
+      );
+
+    return !!coordinator;
   }
 }

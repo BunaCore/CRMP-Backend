@@ -61,9 +61,9 @@ export class PgService {
     }
 
     const decision = dto.decision;
-    const currentStatus = proposal.currentStatus ?? 'Submitted';
+    const currentStatus = proposal.currentStatus ?? 'Draft';
     const nextRole = await this.repo.findNextRole({
-      proposalType: 'Postgraduate',
+      proposalProgram: proposal.proposalProgram || 'PG',
       currentStatus,
       actorRole: actor.role,
     });

@@ -6,3 +6,4 @@ export * from './budget';
 export * from './notifications';
 export * from './verification';
 export * from './project';
+export * from './department';

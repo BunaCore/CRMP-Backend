@@ -10,11 +10,11 @@ import { SubmitFundedDto } from '../dto/submit-funded.dto';
 @UseGuards(JwtAuthGuard, AccessGuard)
 @RequirePermission(Permission.FUNDED_SUBMIT) // Strictly isolated
 export class PiController {
-    constructor(private readonly workflowService: FundedWorkflowService) { }
+  constructor(private readonly workflowService: FundedWorkflowService) {}
 
-    @Post('submit')
-    async submitProposal(@Req() req, @Body() data: SubmitFundedDto) {
-        const userId = req.user.id;
-        return await this.workflowService.submitProposal(userId, data);
-    }
+  @Post('submit')
+  async submitProposal(@Req() req, @Body() data: SubmitFundedDto) {
+    const userId = req.user.id;
+    return await this.workflowService.submitProposal(userId, data);
+  }
 }

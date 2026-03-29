@@ -40,7 +40,8 @@ export class UndergradRepository {
         id: schema.proposals.id,
         title: schema.proposals.title,
         abstract: schema.proposals.abstract,
-        proposalType: schema.proposals.proposalType,
+        proposalProgram: schema.proposals.proposalProgram,
+        isFunded: schema.proposals.isFunded,
         degreeLevel: schema.proposals.degreeLevel,
         researchArea: schema.proposals.researchArea,
         durationMonths: schema.proposals.durationMonths,
@@ -82,7 +83,7 @@ export class UndergradRepository {
       // Only UG proposals reach this coordinator
       .where(
         and(
-          eq(schema.proposals.proposalType, 'Undergraduate'),
+          eq(schema.proposals.proposalProgram, 'UG'),
           // Optional status filter
           filters.status
             ? eq(schema.proposals.currentStatus, filters.status as any)
@@ -117,7 +118,8 @@ export class UndergradRepository {
         id: schema.proposals.id,
         title: schema.proposals.title,
         abstract: schema.proposals.abstract,
-        proposalType: schema.proposals.proposalType,
+        proposalProgram: schema.proposals.proposalProgram,
+        isFunded: schema.proposals.isFunded,
         degreeLevel: schema.proposals.degreeLevel,
         researchArea: schema.proposals.researchArea,
         durationMonths: schema.proposals.durationMonths,
@@ -140,7 +142,7 @@ export class UndergradRepository {
       .where(
         and(
           eq(schema.proposals.id, proposalId),
-          eq(schema.proposals.proposalType, 'Undergraduate'),
+          eq(schema.proposals.proposalProgram, 'UG'),
         ),
       );
 
@@ -289,7 +291,7 @@ export class UndergradRepository {
       .where(
         and(
           eq(schema.proposals.id, proposalId),
-          eq(schema.proposals.proposalType, 'Undergraduate'),
+          eq(schema.proposals.proposalProgram, 'UG'),
         ),
       );
     return row ?? null;
@@ -510,17 +512,31 @@ export class UndergradRepository {
   }
 
   /**
-   * Stamp proposals.advisor_user_id so the advisor is formally linked
-   * to the proposal record itself — visible in every proposal read.
+   * Add a member to the proposal with a specific role
+   */
+  async addProposalMember(
+    proposalId: string,
+    userId: string,
+    role: 'PI' | 'ADVISOR' | 'MEMBER' | 'SUPERVISOR' | 'EVALUATOR',
+  ) {
+    return await this.drizzle.db
+      .insert(schema.proposalMembers)
+      .values({
+        proposalId,
+        userId,
+        role,
+      })
+      .onConflictDoNothing()
+      .returning();
+  }
+
+  /**
+   * @deprecated Use addProposalMember instead
+   * Advisors should be added to proposal_members table with role='ADVISOR'
    */
   async updateProposalAdvisor(proposalId: string, advisorUserId: string) {
-    await this.drizzle.db
-      .update(schema.proposals)
-      .set({
-        advisorUserId,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.proposals.id, proposalId));
+    // Add advisor as a proposal member instead
+    return this.addProposalMember(proposalId, advisorUserId, 'ADVISOR');
   }
 
   /**

@@ -15,6 +15,27 @@
       "when": 1772794250921,
       "tag": "0001_regular_kat_farrell",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774713264883,
+      "tag": "0002_soft_blacklash",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1774786238333,
+      "tag": "0003_nifty_husk",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1774791951941,
+      "tag": "0004_lethal_phalanx",
+      "breakpoints": true
     }
   ]
 }

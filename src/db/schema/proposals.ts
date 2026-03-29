@@ -9,26 +9,20 @@ import {
   integer,
   bigint,
   timestamp,
+  numeric,
+  primaryKey,
+  unique,
 } from 'drizzle-orm/pg-core';
 import { users } from './user';
 import { projects } from './project';
-
-export const proposalTypeEnum = pgEnum('proposal_type', [
-  'Undergraduate',
-  'Postgraduate',
-  'Funded_Project',
-  'Unfunded_Project',
-]);
+import { ProjectProgramEnum, projectRoleEnum } from './project';
 export const degreeLevelEnum = pgEnum('degree_level', ['Master', 'PhD', 'NA']);
 export const proposalStatusEnum = pgEnum('proposal_status', [
   'Draft',
-  'Submitted',
   'Under_Review',
-  'Partially_Approved',
+  'Needs_Revision',
   'Approved',
   'Rejected',
-  'Needs_Revision',
-  'Cancelled',
 ]);
 export const approvalDecisionEnum = pgEnum('approval_decision', [
   'Pending',
@@ -44,21 +38,38 @@ export const proposals = pgTable('proposals', {
     .references(() => users.id),
   title: varchar('title', { length: 255 }).notNull(),
   abstract: text('abstract'),
-  proposalType: proposalTypeEnum('proposal_type').notNull(),
+  proposalProgram: ProjectProgramEnum('proposal_program'),
+  isFunded: boolean('is_funded').default(false),
   degreeLevel: degreeLevelEnum('degree_level').default('NA'),
   researchArea: varchar('research_area', { length: 255 }),
   durationMonths: integer('duration_months'),
-  advisorUserId: uuid('advisor_user_id').references(() => users.id),
+  budgetAmount: numeric('budget_amount', { precision: 12, scale: 2 }).default(
+    '0.00',
+  ),
   currentStatus: proposalStatusEnum('current_status').default('Draft'),
-  submittedAt: timestamp('submitted_at', { withTimezone: true }),
-  currentVersionId: uuid('current_version_id'),
-  projectId: uuid('project_id').references(() => projects.projectId),
+  isEditable: boolean('is_editable').default(true),
   workspaceUnlocked: boolean('workspace_unlocked').default(false),
   workspaceUnlockedAt: timestamp('workspace_unlocked_at', {
     withTimezone: true,
   }),
+  currentStepOrder: integer('current_step_order').default(0),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }),
+  currentVersionId: uuid('current_version_id'),
+  projectId: uuid('project_id').references(() => projects.projectId),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }),
+});
+
+export const proposalMembers = pgTable('proposal_members', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  proposalId: uuid('proposal_id')
+    .notNull()
+    .references(() => proposals.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  role: projectRoleEnum('role').notNull(),
+  addedAt: timestamp('added_at', { withTimezone: true }).defaultNow(),
 });
 
 export const proposalFiles = pgTable('proposal_files', {
@@ -99,6 +110,7 @@ export const proposalApprovals = pgTable('proposal_approvals', {
   approverRole: varchar('approver_role', { length: 50 }).notNull(),
   approverUserId: uuid('approver_user_id').references(() => users.id),
   decision: approvalDecisionEnum('decision').default('Pending'),
+  isActive: boolean('is_active').default(false),
   comment: text('comment'),
   decisionAt: timestamp('decision_at', { withTimezone: true }),
   notifiedAt: timestamp('notified_at', { withTimezone: true }),

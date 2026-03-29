@@ -6,6 +6,7 @@ import {
   boolean,
   timestamp,
 } from 'drizzle-orm/pg-core';
+import { departments } from './department';
 
 export const accountStatusEnum = pgEnum('account_status', [
   'active',
@@ -19,6 +20,7 @@ export const users = pgTable('users', {
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   department: text('department'), // Added for consistency with SQL
+  departmentId: uuid('department_id').references(() => departments.id),
   phoneNumber: text('phone_number'),
   university: text('university'),
   universityId: text('university_id'),

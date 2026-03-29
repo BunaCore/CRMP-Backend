@@ -9,17 +9,17 @@ import { FundedProposalRepository } from './repositories/funded-proposal.reposit
 import { FundedRoutingRepository } from './repositories/funded-routing.repository';
 
 @Module({
-    controllers: [
-        RadController,
-        EvaluatorController,
-        ApproverController,
-        PiController,
-    ],
-    providers: [
-        FundedWorkflowService,
-        AssignmentService,
-        FundedProposalRepository,
-        FundedRoutingRepository,
-    ],
+  controllers: [
+    RadController,
+    EvaluatorController,
+    ApproverController,
+    PiController,
+  ],
+  providers: [
+    FundedWorkflowService,
+    AssignmentService,
+    FundedProposalRepository,
+    FundedRoutingRepository,
+  ],
 })
-export class FundedModule { }
+export class FundedModule {}

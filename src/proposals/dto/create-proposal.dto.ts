@@ -8,14 +8,14 @@ import {
   ValidateNested,
   IsUUID,
   Min,
+  IsBoolean,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
-export enum ProposalType {
-  Undergraduate = 'Undergraduate',
-  Postgraduate = 'Postgraduate',
-  Funded_Project = 'Funded_Project',
-  Unfunded_Project = 'Unfunded_Project',
+export enum ProposalProgram {
+  UG = 'UG',
+  PG = 'PG',
+  GENERAL = 'GENERAL',
 }
 
 export enum DegreeLevel {
@@ -44,9 +44,13 @@ export class CreateProposalDto {
   @IsOptional()
   abstract?: string;
 
-  @IsEnum(ProposalType)
+  @IsEnum(ProposalProgram)
   @IsNotEmpty()
-  proposalType: ProposalType;
+  proposalProgram: ProposalProgram;
+
+  @IsBoolean()
+  @IsOptional()
+  isFunded?: boolean = false;
 
   @IsEnum(DegreeLevel)
   @IsOptional()

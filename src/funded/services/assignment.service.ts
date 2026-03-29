@@ -8,28 +8,41 @@ import { AssignEvaluatorsDto } from '../dto/assign-evaluators.dto';
 
 @Injectable()
 export class AssignmentService {
-    constructor(
-        private readonly dbService: DrizzleService,
-        private readonly proposalRepo: FundedProposalRepository,
-    ) { }
+  constructor(
+    private readonly dbService: DrizzleService,
+    private readonly proposalRepo: FundedProposalRepository,
+  ) {}
 
-    /**
-     * RAD dynamically attaches an Advisor to the proposal.
-     */
-    async assignAdvisor(proposalId: string, assignedById: string, data: AssignAdvisorDto) {
-        return await this.dbService.db.update(schema.proposals)
-            .set({
-                advisorUserId: data.advisorId,
-                updatedAt: new Date()
-            })
-            .where(eq(schema.proposals.id, proposalId))
-            .returning();
-    }
+  /**
+   * RAD dynamically attaches an Advisor to the proposal.
+   */
+  async assignAdvisor(
+    proposalId: string,
+    assignedById: string,
+    data: AssignAdvisorDto,
+  ) {
+    return await this.dbService.db
+      .insert(schema.proposalMembers)
+      .values({
+        proposalId,
+        userId: data.advisorId,
+        role: 'ADVISOR',
+      })
+      .returning();
+  }
 
-    /**
-     * RAD maps Evaluators to the proposal. Usually, this means making evaluatorAssignment rows.
-     */
-    async assignEvaluators(proposalId: string, assignedById: string, data: AssignEvaluatorsDto) {
-        return await this.proposalRepo.assignEvaluators(proposalId, assignedById, data.evaluatorIds);
-    }
+  /**
+   * RAD maps Evaluators to the proposal. Usually, this means making evaluatorAssignment rows.
+   */
+  async assignEvaluators(
+    proposalId: string,
+    assignedById: string,
+    data: AssignEvaluatorsDto,
+  ) {
+    return await this.proposalRepo.assignEvaluators(
+      proposalId,
+      assignedById,
+      data.evaluatorIds,
+    );
+  }
 }

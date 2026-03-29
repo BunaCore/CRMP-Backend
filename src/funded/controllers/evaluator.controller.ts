@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Param, Body, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Body,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt.guard';
 import { AccessGuard } from '../../access-control/access.guard';
 import { RequirePermission } from '../../access-control/require-permission.decorator';
@@ -11,26 +19,32 @@ import { ReviewFundedDto } from '../dto/review-funded.dto';
 @UseGuards(JwtAuthGuard, AccessGuard)
 @RequirePermission(Permission.FUNDED_EVALUATOR_ACCESS)
 export class EvaluatorController {
-    constructor(
-        private readonly workflowService: FundedWorkflowService,
-        private readonly proposalRepo: FundedProposalRepository,
-    ) { }
+  constructor(
+    private readonly workflowService: FundedWorkflowService,
+    private readonly proposalRepo: FundedProposalRepository,
+  ) {}
 
-    @Get('pending')
-    async getPendingEvaluations() {
-        return await this.proposalRepo.getPendingProposalsForRole('EVALUATOR');
-    }
+  @Get('pending')
+  async getPendingEvaluations() {
+    return await this.proposalRepo.getPendingProposalsForRole('EVALUATOR');
+  }
 
-    @Post(':proposalId/review/:approvalId')
-    @RequirePermission(Permission.FUNDED_DECIDE)
-    async submitEvaluation(
-        @Param('proposalId') proposalId: string,
-        @Param('approvalId') approvalId: string,
-        @Req() req,
-        @Body() data: ReviewFundedDto
-    ) {
-        const userId = req.user.id;
-        // user.role is enforced as 'EVALUATOR' by the architecture
-        return await this.workflowService.processReview(proposalId, approvalId, userId, 'EVALUATOR', data);
-    }
+  @Post(':proposalId/review/:approvalId')
+  @RequirePermission(Permission.FUNDED_DECIDE)
+  async submitEvaluation(
+    @Param('proposalId') proposalId: string,
+    @Param('approvalId') approvalId: string,
+    @Req() req,
+    @Body() data: ReviewFundedDto,
+  ) {
+    const userId = req.user.id;
+    // user.role is enforced as 'EVALUATOR' by the architecture
+    return await this.workflowService.processReview(
+      proposalId,
+      approvalId,
+      userId,
+      'EVALUATOR',
+      data,
+    );
+  }
 }
