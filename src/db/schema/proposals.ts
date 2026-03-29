@@ -52,6 +52,7 @@ export const proposals = pgTable('proposals', {
   workspaceUnlockedAt: timestamp('workspace_unlocked_at', {
     withTimezone: true,
   }),
+  currentStepOrder: integer('current_step_order').default(0),
   submittedAt: timestamp('submitted_at', { withTimezone: true }),
   currentVersionId: uuid('current_version_id'),
   projectId: uuid('project_id').references(() => projects.projectId),
@@ -109,6 +110,7 @@ export const proposalApprovals = pgTable('proposal_approvals', {
   approverRole: varchar('approver_role', { length: 50 }).notNull(),
   approverUserId: uuid('approver_user_id').references(() => users.id),
   decision: approvalDecisionEnum('decision').default('Pending'),
+  isActive: boolean('is_active').default(false),
   comment: text('comment'),
   decisionAt: timestamp('decision_at', { withTimezone: true }),
   notifiedAt: timestamp('notified_at', { withTimezone: true }),
