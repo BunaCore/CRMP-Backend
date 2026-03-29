@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DrizzleService } from 'src/db/db.service';
+import { DB } from 'src/db/db.type';
 import * as schema from 'src/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { ProposalsRepository } from './proposals.repository';
@@ -265,7 +266,7 @@ export class WorkflowService {
    * Reduces repeated DB queries across methods
    */
   private async getProposalWithActiveStep(
-    tx: any,
+    tx: DB,
     proposalId: string,
   ): Promise<{ proposal: any; activeStep: any }> {
     const proposal = await tx.query.proposals.findFirst({
@@ -366,12 +367,13 @@ export class WorkflowService {
    * Checks role match and department context for COORDINATOR
    */
   private async validateApproverAuthority(
-    tx: any,
+    tx: DB,
     userId: string,
     proposal: any,
     activeStep: any,
   ): Promise<void> {
-    const user = await this.usersService.findOne(userId);
+    const user = await this.usersService.findById(userId);
+
     const userRoles = await this.usersService.getUserRoles(userId);
     const roleNames = userRoles.map((ur) => ur.roleName);
 
@@ -395,7 +397,7 @@ export class WorkflowService {
    * COORDINATOR must belong to proposal's department; others just need role match
    */
   private async resolveApprover(
-    tx: any,
+    tx: DB,
     user: any,
     proposal: any,
     requiredRole: string,
@@ -427,7 +429,7 @@ export class WorkflowService {
           reason: 'Project or department not found',
         };
       }
-
+      console.log('user:', user);
       const isCoord = await this.usersService.isCoordinatorOfDepartment(
         user.id,
         projectCtx.departmentId,
@@ -448,7 +450,7 @@ export class WorkflowService {
    * Helper: Generate all approval steps from routing_rules on first submission
    */
   private async generateApprovalStepsFromRules(
-    tx: any,
+    tx: DB,
     proposalId: string,
     proposal: any,
   ): Promise<void> {
@@ -486,7 +488,7 @@ export class WorkflowService {
    * Keeps all previous approvals intact for audit trail
    */
   private async resumeWorkflowFromLastIncompleteStep(
-    tx: any,
+    tx: DB,
     proposalId: string,
     existingApprovals: any[],
   ): Promise<void> {
@@ -499,7 +501,9 @@ export class WorkflowService {
     );
 
     if (!incompleteStep) {
-      throw new BadRequestException('No incomplete steps found for resubmission');
+      throw new BadRequestException(
+        'No incomplete steps found for resubmission',
+      );
     }
 
     // Reset this step's decision to Pending and make it active
@@ -531,7 +535,7 @@ export class WorkflowService {
    * Migrate proposal_members to project_members and unlock workspace
    */
   private async createProjectFromApprovedProposal(
-    tx: any,
+    tx: DB,
     proposal: any,
     approverUserId: string,
   ): Promise<void> {
@@ -546,12 +550,11 @@ export class WorkflowService {
           isFunded: proposal.isFunded,
           durationMonths: proposal.durationMonths,
           researchArea: proposal.researchArea,
-          projectStage: 'Active' as any,
-          submissionDate: new Date(),
-          ethicalClearanceStatus: 'Not_Required' as any,
+          projectStage: 'Approved',
+          submissionDate: new Date().toDateString(),
+          ethicalClearanceStatus: 'Approved' as any,
         })
         .returning();
-
       // 2. Migrate proposal members to project members
       const proposalMembers = await tx.query.proposalMembers.findMany({
         where: eq(schema.proposalMembers.proposalId, proposal.id),
@@ -560,7 +563,7 @@ export class WorkflowService {
       if (proposalMembers.length > 0) {
         await tx.insert(schema.projectMembers).values(
           proposalMembers.map((m) => ({
-            projectId: project.id,
+            projectId: project.projectId,
             userId: m.userId,
             role: m.role,
             addedAt: new Date(),
@@ -569,17 +572,18 @@ export class WorkflowService {
       }
 
       // 3. Link project to proposal
+      console.log('Linking proposal to project:', proposal.id, project);
       await tx
         .update(schema.proposals)
-        .set({ projectId: project.id })
+        .set({ projectId: project.projectId })
         .where(eq(schema.proposals.id, proposal.id));
 
       // 4. Audit log
       await tx.insert(schema.auditLogs).values({
         actorUserId: approverUserId,
-        action: 'PROJECT_CREATED',
+        action: 'CREATED',
         entityType: 'projects',
-        entityId: project.id,
+        entityId: project.projectId,
         metadata: {
           fromProposal: proposal.id,
           title: project.projectTitle,
