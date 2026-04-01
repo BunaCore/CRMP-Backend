@@ -6,6 +6,7 @@ export {
   type AccessContext,
 } from './access.service';
 export { AccessGuard } from './access.guard';
+export { AbilityFactory } from './ability.factory';
 export { RequirePermission } from './require-permission.decorator';
 export { Permission } from './permission.enum';
 export { Role } from './role.enum';

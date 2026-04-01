@@ -1,8 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import { DrizzleService } from 'src/db/db.service';
 import { users } from 'src/db/schema/user';
-import { userRoles } from 'src/db/schema/roles';
+import {
+  userRoles,
+  rolePermissions,
+  permissions,
+  roles,
+} from 'src/db/schema/roles';
 import { departmentCoordinators } from 'src/db/schema/department';
 import { User, CreateUserInput, FindUserInput } from 'src/users/types/user';
 
@@ -14,21 +19,24 @@ export class UsersRepository {
     const rows = await this.drizzle.db
       .select({
         user: users,
-        role: userRoles.roleName,
+        roleName: roles.name,
       })
       .from(users)
       .leftJoin(userRoles, eq(users.id, userRoles.userId))
+      .leftJoin(roles, eq(userRoles.roleId, roles.id))
       .where(eq(users.email, email));
 
     if (!rows.length) return null;
 
     const user = rows[0].user;
-    const roles = rows.map((r) => r.role).filter(Boolean) as string[];
+    const rolesList = rows
+      .filter((r) => r.roleName)
+      .map((r) => r.roleName as string);
 
     return {
       ...user,
-      roles,
-      role: roles[0] || '',
+      roles: rolesList,
+      role: rolesList[0] || '',
     } as any;
   }
 
@@ -36,21 +44,24 @@ export class UsersRepository {
     const rows = await this.drizzle.db
       .select({
         user: users,
-        role: userRoles.roleName,
+        roleName: roles.name,
       })
       .from(users)
       .leftJoin(userRoles, eq(users.id, userRoles.userId))
+      .leftJoin(roles, eq(userRoles.roleId, roles.id))
       .where(eq(users.id, id));
 
     if (!rows.length) return null;
 
     const user = rows[0].user;
-    const roles = rows.map((r) => r.role).filter(Boolean) as string[];
+    const rolesList = rows
+      .filter((r) => r.roleName)
+      .map((r) => r.roleName as string);
 
     return {
       ...user,
-      roles,
-      role: roles[0] || '',
+      roles: rolesList,
+      role: rolesList[0] || '',
     } as any;
   }
 
@@ -106,17 +117,22 @@ export class UsersRepository {
   }
 
   /**
-   * Get all roles assigned to a user
+   * Get all roles assigned to a user (non-null roles only)
    */
   async getUserRoles(userId: string) {
-    return this.drizzle.db
+    const results = await this.drizzle.db
       .select({
         id: userRoles.id,
-        roleName: userRoles.roleName,
+        roleId: userRoles.roleId,
+        roleName: roles.name,
         grantedAt: userRoles.grantedAt,
       })
       .from(userRoles)
+      .leftJoin(roles, eq(userRoles.roleId, roles.id))
       .where(eq(userRoles.userId, userId));
+
+    // Filter out null roleName values to ensure only valid roles are returned
+    return results.filter((r) => r.roleName !== null);
   }
 
   /**
@@ -137,5 +153,42 @@ export class UsersRepository {
       );
 
     return !!coordinator;
+  }
+
+  /**
+   * Get all permission keys a user has via role → permission mapping
+   */
+  async getUserPermissions(userId: string): Promise<string[]> {
+    // 1. Get user's roles and their role IDs
+    const userRoleRecords = await this.drizzle.db
+      .select({ roleId: userRoles.roleId })
+      .from(userRoles)
+      .where(eq(userRoles.userId, userId));
+
+    const roleIds = userRoleRecords.map((ur) => ur.roleId);
+
+    if (roleIds.length === 0) {
+      return [];
+    }
+
+    // 2. Get role → permission mappings for these roles
+    const rolePerm = await this.drizzle.db
+      .select({ permissionId: rolePermissions.permissionId })
+      .from(rolePermissions)
+      .where(inArray(rolePermissions.roleId, roleIds));
+
+    const permissionIds = rolePerm.map((rp) => rp.permissionId);
+
+    if (permissionIds.length === 0) {
+      return [];
+    }
+
+    // 3. Get permission keys
+    const perms = await this.drizzle.db
+      .select({ key: permissions.key })
+      .from(permissions)
+      .where(inArray(permissions.id, permissionIds));
+
+    return perms.map((p) => p.key).filter(Boolean) as string[];
   }
 }

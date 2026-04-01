@@ -145,6 +145,25 @@ async function seed() {
       throw new Error(`Missing admin user (${ADMIN_EMAIL}) in USERS config.`);
     }
 
+    console.log('Seeding roles...');
+    // Insert all roles from the Role enum
+    const roleValues = Object.values(Role);
+    const insertedRoles = await tx
+      .insert(schema.roles)
+      .values(
+        roleValues.map((roleName) => ({
+          name: roleName,
+          description: `Role: ${roleName}`,
+        })),
+      )
+      .returning();
+
+    // Create mapping of role name to ID
+    const roleNameToId = new Map<string, string>();
+    insertedRoles.forEach((role) => {
+      roleNameToId.set(role.name, role.id);
+    });
+
     console.log('Assigning roles...');
     const roleAssignments = USERS.flatMap((userConfig) => {
       const user = createdUsers.get(userConfig.email);
@@ -152,11 +171,17 @@ async function seed() {
         throw new Error(`Missing created user for ${userConfig.email}.`);
       }
 
-      return userConfig.roles.map((roleName) => ({
-        userId: user.id,
-        roleName,
-        grantedBy: adminUser.id,
-      }));
+      return userConfig.roles.map((roleName) => {
+        const roleId = roleNameToId.get(roleName);
+        if (!roleId) {
+          throw new Error(`Role ${roleName} not found in database.`);
+        }
+        return {
+          userId: user.id,
+          roleId,
+          grantedBy: adminUser.id,
+        };
+      });
     });
 
     await tx.insert(schema.userRoles).values(roleAssignments);

@@ -438,9 +438,10 @@ export class UndergradRepository {
       })
       .from(schema.users)
       .innerJoin(schema.userRoles, eq(schema.userRoles.userId, schema.users.id))
+      .innerJoin(schema.roles, eq(schema.userRoles.roleId, schema.roles.id))
       .where(
         and(
-          eq(schema.userRoles.roleName, 'ADVISOR'),
+          eq(schema.roles.name, 'ADVISOR'),
           eq(schema.users.accountStatus, 'active'),
         ),
       )
@@ -462,10 +463,11 @@ export class UndergradRepository {
       })
       .from(schema.users)
       .innerJoin(schema.userRoles, eq(schema.userRoles.userId, schema.users.id))
+      .innerJoin(schema.roles, eq(schema.userRoles.roleId, schema.roles.id))
       .where(
         and(
           eq(schema.users.id, userId),
-          eq(schema.userRoles.roleName, 'ADVISOR'),
+          eq(schema.roles.name, 'ADVISOR'),
           eq(schema.users.accountStatus, 'active'),
         ),
       );

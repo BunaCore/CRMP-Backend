@@ -375,7 +375,9 @@ export class WorkflowService {
     const user = await this.usersService.findById(userId);
 
     const userRoles = await this.usersService.getUserRoles(userId);
-    const roleNames = userRoles.map((ur) => ur.roleName);
+    const roleNames = userRoles
+      .map((ur) => ur.roleName)
+      .filter((r): r is string => r !== null);
 
     const resolution = await this.resolveApprover(
       tx,

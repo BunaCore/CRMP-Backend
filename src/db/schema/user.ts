@@ -19,7 +19,7 @@ export const users = pgTable('users', {
   fullName: text('full_name'),
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
-  department: text('department'), // Added for consistency with SQL
+  department: text('department'),
   departmentId: uuid('department_id').references(() => departments.id),
   phoneNumber: text('phone_number'),
   university: text('university'),

@@ -231,9 +231,11 @@ export class ProposalsService {
       return [];
     }
 
-    // 2. Get user's roles
+    // 2. Get user's roles (guaranteed non-null from repository)
     const userRoles = await this.usersService.getUserRoles(user.id);
-    const roleNames = userRoles.map((ur) => ur.roleName);
+    const roleNames = userRoles
+      .map((ur) => ur.roleName)
+      .filter((r): r is string => r !== null);
 
     // 3. Filter: only proposals where user can approve
     const pendingForUser: PendingApprovalDto[] = [];
