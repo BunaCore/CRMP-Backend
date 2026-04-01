@@ -64,6 +64,10 @@ export class CreateProposalDto {
   @IsOptional()
   advisorUserId?: string;
 
+  @IsUUID()
+  @IsOptional()
+  departmentId?: string;
+
   @IsNumber()
   @Min(1)
   @Type(() => Number)

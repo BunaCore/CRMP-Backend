@@ -5,6 +5,8 @@ import * as bcrypt from 'bcrypt';
 import * as schema from './schema';
 import 'dotenv/config';
 import { Role } from '../access-control/role.enum';
+import { Permission } from '../access-control/permission.enum';
+import { RolePermissions } from '../access-control/role-permissions';
 
 if (process.env.NODE_ENV === 'production') {
   throw new Error('❌ Seeder is disabled in production environments.');
@@ -185,6 +187,52 @@ async function seed() {
     });
 
     await tx.insert(schema.userRoles).values(roleAssignments);
+
+    // 3. Seed Permissions
+    console.log('Seeding permissions...');
+    const permissionValues = Object.values(Permission);
+    const insertedPermissions = await tx
+      .insert(schema.permissions)
+      .values(
+        permissionValues.map((permKey) => ({
+          key: permKey,
+          description: `Permission: ${permKey}`,
+        })),
+      )
+      .returning();
+
+    // Create mapping of permission key to ID
+    const permKeyToId = new Map<string, string>();
+    insertedPermissions.forEach((perm) => {
+      permKeyToId.set(perm.key, perm.id);
+    });
+
+    // 3a. Map roles to permissions
+    console.log('Mapping roles to permissions...');
+    const rolePermissionsToInsert: (typeof schema.rolePermissions.$inferInsert)[] =
+      [];
+    for (const [roleName, permissions] of Object.entries(RolePermissions)) {
+      const roleId = roleNameToId.get(roleName);
+      if (!roleId) {
+        throw new Error(`Role ${roleName} not found in database.`);
+      }
+
+      for (const permKey of permissions) {
+        const permId = permKeyToId.get(permKey);
+        if (!permId) {
+          throw new Error(`Permission ${permKey} not found in database.`);
+        }
+
+        rolePermissionsToInsert.push({
+          roleId,
+          permissionId: permId,
+        });
+      }
+    }
+
+    if (rolePermissionsToInsert.length > 0) {
+      await tx.insert(schema.rolePermissions).values(rolePermissionsToInsert);
+    }
 
     // 3. Routing Rules (The "Real Flow")
     console.log('Seeding routing rules...');
@@ -435,7 +483,7 @@ async function seed() {
         title: 'Second Postgraduate Proposal',
         proposalProgram: 'PG' as const,
         isFunded: false,
-        currentStatus: 'Draft' as const,
+        currentStatus: 'Under_Review' as const,
         createdBy: studentUser.id,
         projectId: null,
         promoteToProject: false,
@@ -460,9 +508,19 @@ async function seed() {
 
     for (const config of proposalConfigs) {
       const { members, promoteToProject, ...proposalData } = config;
+      
+      // Add departmentId for UG and PG proposals only
+      let proposalValues: any  = proposalData;
+      if (config.proposalProgram === 'UG') {
+        proposalValues = { ...proposalData, departmentId: departmentByProgram.UG.id };
+      } else if (config.proposalProgram === 'PG') {
+        proposalValues = { ...proposalData, departmentId: departmentByProgram.PG.id };
+      }
+      // GENERAL proposals have no departmentId
+      
       const [proposal] = await tx
         .insert(schema.proposals)
-        .values(proposalData)
+        .values(proposalValues)
         .returning();
 
       const proposalMembers = members

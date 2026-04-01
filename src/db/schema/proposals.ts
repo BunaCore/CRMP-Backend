@@ -15,6 +15,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { users } from './user';
 import { projects } from './project';
+import { departments } from './department';
 import { ProjectProgramEnum, projectRoleEnum } from './project';
 export const degreeLevelEnum = pgEnum('degree_level', ['Master', 'PhD', 'NA']);
 export const proposalStatusEnum = pgEnum('proposal_status', [
@@ -56,6 +57,7 @@ export const proposals = pgTable('proposals', {
   submittedAt: timestamp('submitted_at', { withTimezone: true }),
   currentVersionId: uuid('current_version_id'),
   projectId: uuid('project_id').references(() => projects.projectId),
+  departmentId: uuid('department_id').references(() => departments.id),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }),
 });

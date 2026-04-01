@@ -35,6 +35,7 @@ export class ProposalsService {
             degreeLevel: (dto.degreeLevel || 'NA') as any,
             researchArea: dto.researchArea,
             durationMonths: dto.durationMonths,
+            departmentId: dto.departmentId,
             currentStatus: 'Draft',
             submittedAt: new Date(),
           })
@@ -227,6 +228,8 @@ export class ProposalsService {
     const proposalsWithSteps =
       await this.repository.findProposalsWithActivePendingSteps();
 
+    console.log(proposalsWithSteps);
+
     if (proposalsWithSteps.length === 0) {
       return [];
     }
@@ -256,6 +259,7 @@ export class ProposalsService {
         activeStep.approverRole,
         roleNames,
       );
+      console.log(resolution);
 
       if (!resolution.canApprove) {
         continue;
@@ -278,16 +282,6 @@ export class ProposalsService {
         stepLabel: `Step ${activeStep.stepOrder}`,
         projectId: proposal.projectId || undefined,
       };
-
-      // Enrich with department name if COORDINATOR role and project exists
-      if (activeStep.approverRole === 'COORDINATOR' && proposal.projectId) {
-        const projectCtx = await this.repository.findProjectWithDepartment(
-          proposal.projectId,
-        );
-        if (projectCtx?.department) {
-          dto.departmentName = projectCtx.department.name;
-        }
-      }
 
       pendingForUser.push(dto);
     }
@@ -315,33 +309,24 @@ export class ProposalsService {
 
     // COORDINATOR requires department verification
     if (requiredRole === 'COORDINATOR') {
-      if (!proposal.projectId) {
+      // GENERAL proposals (no department) cannot be approved by COORDINATOR
+      if (!proposal.departmentId) {
         return {
           canApprove: false,
-          reason: 'Proposal not linked to project',
-        };
-      }
-
-      const projectCtx = await this.repository.findProjectWithDepartment(
-        proposal.projectId,
-      );
-
-      if (!projectCtx) {
-        return {
-          canApprove: false,
-          reason: 'Project or department not found',
+          reason:
+            'Proposal not linked to a department (GENERAL proposals cannot be approved by COORDINATOR)',
         };
       }
 
       const isCoord = await this.usersService.isCoordinatorOfDepartment(
         user.id,
-        projectCtx.departmentId,
+        proposal.departmentId,
       );
 
       if (!isCoord) {
         return {
           canApprove: false,
-          reason: `User is not coordinator of department: ${projectCtx.department?.name || 'unknown'}`,
+          reason: 'User is not coordinator of this department',
         };
       }
     }
