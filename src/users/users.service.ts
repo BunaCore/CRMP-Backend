@@ -53,4 +53,11 @@ export class UsersService {
   ): Promise<boolean> {
     return this.usersRepository.isCoordinatorOfDepartment(userId, departmentId);
   }
+
+  /**
+   * Get all permission keys for a user
+   */
+  async getUserPermissions(userId: string): Promise<string[]> {
+    return this.usersRepository.getUserPermissions(userId);
+  }
 }
