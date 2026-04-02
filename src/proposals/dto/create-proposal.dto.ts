@@ -9,6 +9,7 @@ import {
   IsUUID,
   Min,
   IsBoolean,
+  ValidateIf,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
@@ -63,6 +64,10 @@ export class CreateProposalDto {
   @IsUUID()
   @IsOptional()
   advisorUserId?: string;
+
+  @IsUUID()
+  @IsNotEmpty({ message: 'departmentId is required for proposals' })
+  departmentId?: string;
 
   @IsNumber()
   @Min(1)

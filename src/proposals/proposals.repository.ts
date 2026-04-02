@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DrizzleService } from 'src/db/db.service';
 import * as schema from 'src/db/schema';
 import { eq, and, inArray, ne, isNotNull, desc, asc } from 'drizzle-orm';
+import { DB } from 'src/db/db.type';
 
 @Injectable()
 export class ProposalsRepository {
@@ -79,6 +80,19 @@ export class ProposalsRepository {
       );
 
     return !!record;
+  }
+
+  /**
+   * Check if a department exists by ID
+   * Used to validate departmentId before creating UG/PG proposals
+   */
+  async departmentExists(departmentId: string): Promise<boolean> {
+    const [department] = await this.drizzle.db
+      .select()
+      .from(schema.departments)
+      .where(eq(schema.departments.id, departmentId));
+
+    return !!department;
   }
 
   /**
@@ -216,5 +230,198 @@ export class ProposalsRepository {
       );
 
     return activeStep || null;
+  }
+
+  /**
+   * Create master proposal record
+   * Used within a transaction context
+   */
+  async createProposal(
+    tx: any,
+    data: {
+      createdBy: string;
+      title: string;
+      abstract?: string;
+      proposalProgram: string;
+      isFunded: boolean;
+      degreeLevel: string;
+      researchArea?: string;
+      durationMonths?: number;
+      departmentId?: string;
+    },
+  ) {
+    const [proposal] = await tx
+      .insert(schema.proposals)
+      .values({
+        ...data,
+        currentStatus: 'Draft',
+        submittedAt: new Date(),
+      })
+      .returning();
+
+    return proposal;
+  }
+
+  /**
+   * Create proposal file record
+   */
+  async createProposalFile(
+    tx: DB,
+    data: {
+      proposalId: string;
+      uploadedBy: string;
+      fileName: string;
+      filePath: string;
+      fileType: string;
+      fileSize: number;
+    },
+  ) {
+    const [file] = await tx
+      .insert(schema.proposalFiles)
+      .values(data)
+      .returning();
+
+    return file;
+  }
+
+  /**
+   * Create proposal version and link to proposal
+   */
+  async createProposalVersion(
+    tx: DB,
+    data: {
+      proposalId: string;
+      createdBy: string;
+      fileId: string;
+      collaborators?: string[];
+    },
+  ) {
+    const [version] = await tx
+      .insert(schema.proposalVersions)
+      .values({
+        proposalId: data.proposalId,
+        createdBy: data.createdBy,
+        versionNumber: 1,
+        isCurrent: true,
+        fileId: data.fileId,
+        contentJson: { collaborators: data.collaborators || [] },
+        changeSummary: 'Initial Submission',
+      })
+      .returning();
+
+    // Link version back to proposal
+    await tx
+      .update(schema.proposals)
+      .set({ currentVersionId: version.id })
+      .where(eq(schema.proposals.id, data.proposalId));
+
+    return version;
+  }
+
+  /**
+   * Create budget request and items
+   */
+  async createBudgetRequest(
+    tx: DB,
+    data: {
+      proposalId: string;
+      requestedBy: string;
+      items: Array<{ description: string; amount: number }>;
+    },
+  ) {
+    const totalAmount = data.items.reduce(
+      (sum, item) => sum + Number(item.amount),
+      0,
+    );
+
+    const [budgetRequest] = await tx
+      .insert(schema.budgetRequests)
+      .values({
+        proposalId: data.proposalId,
+        requestedBy: data.requestedBy,
+        currentStatus: 'Draft',
+        totalAmount: totalAmount.toString(),
+      })
+      .returning();
+
+    if (data.items.length > 0) {
+      await tx.insert(schema.budgetRequestItems).values(
+        data.items.map((item, index) => ({
+          budgetRequestId: budgetRequest.id,
+          lineIndex: index + 1,
+          description: item.description,
+          requestedAmount: item.amount.toString(),
+        })),
+      );
+    }
+
+    return budgetRequest;
+  }
+
+  /**
+   * Get routing rules for a proposal program
+   */
+  async getRoutingRules(proposalProgram: string) {
+    return this.drizzle.db
+      .select()
+      .from(schema.routingRules)
+      .where(eq(schema.routingRules.proposalProgram, proposalProgram as any))
+      .orderBy(asc(schema.routingRules.stepOrder));
+  }
+
+  /**
+   * Create approval steps from routing rules
+   */
+  async createApprovals(
+    tx: DB,
+    data: {
+      proposalId: string;
+      versionId: string;
+      approvalsData: Array<{
+        routingRuleId: string;
+        stepOrder: number;
+        approverRole: string;
+        isActive: boolean;
+        decision: string;
+      }>;
+    },
+  ) {
+    if (data.approvalsData.length > 0) {
+      await tx.insert(schema.proposalApprovals).values(
+        data.approvalsData.map((approval) => ({
+          proposalId: data.proposalId,
+          routingRuleId: approval.routingRuleId,
+          stepOrder: approval.stepOrder,
+          approverRole: approval.approverRole,
+          decision: approval.decision as any,
+          isActive: approval.isActive,
+          versionId: data.versionId,
+        })),
+      );
+    }
+  }
+
+  /**
+   * Create audit log entry
+   */
+  async createAuditLog(
+    tx: DB,
+    data: {
+      actorUserId: string;
+      action:
+        | 'CREATED'
+        | 'STATUS_CHANGED'
+        | 'DECISION_MADE'
+        | 'BUDGET_RELEASED'
+        | 'WORKSPACE_UNLOCKED'
+        | 'EVALUATOR_ASSIGNED';
+      entityType: string;
+      entityId: string;
+      metadata: any;
+    },
+  ) {
+    const [log] = await tx.insert(schema.auditLogs).values(data).returning();
+
+    return log;
   }
 }

@@ -12,6 +12,7 @@ import {
   Param,
   ParseUUIDPipe,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProposalsService } from './proposals.service';
@@ -56,22 +57,29 @@ export class ProposalsController {
   }
 
   @Post()
-  @RequirePermission(Permission.PROJECT_CREATE) // 🔒 Only roles with this permission can enter
-  @UseInterceptors(FileInterceptor('file')) // 📂 Capture the PDF
+  @RequirePermission(Permission.PROJECT_CREATE)
+  @UseInterceptors(FileInterceptor('file'))
   async submitProposal(
     @Body() createProposalDto: CreateProposalDto,
     @CurrentUser() user: any,
     @UploadedFile(
       new ParseFilePipe({
         validators: [
-          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB limit
-          new FileTypeValidator({ fileType: 'application/pdf' }), // PDF only
+          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }),
+          new FileTypeValidator({ fileType: 'application/pdf' }),
         ],
       }),
     )
     file: Express.Multer.File,
+    @Query('submit') submit?: string,
   ) {
-    return this.proposalsService.create(user, createProposalDto, file);
+    const shouldSubmit = submit === 'true';
+    return this.proposalsService.create(
+      user,
+      createProposalDto,
+      file,
+      shouldSubmit,
+    );
   }
 
   /**

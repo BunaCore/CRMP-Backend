@@ -1,0 +1,1 @@
+ALTER TABLE "proposals" ALTER COLUMN "current_step_order" DROP DEFAULT;
