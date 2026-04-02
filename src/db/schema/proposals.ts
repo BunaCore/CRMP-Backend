@@ -53,7 +53,7 @@ export const proposals = pgTable('proposals', {
   workspaceUnlockedAt: timestamp('workspace_unlocked_at', {
     withTimezone: true,
   }),
-  currentStepOrder: integer('current_step_order').default(0),
+  currentStepOrder: integer('current_step_order'),
   submittedAt: timestamp('submitted_at', { withTimezone: true }),
   currentVersionId: uuid('current_version_id'),
   projectId: uuid('project_id').references(() => projects.projectId),

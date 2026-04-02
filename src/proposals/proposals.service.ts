@@ -1,10 +1,13 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import { DrizzleService } from 'src/db/db.service';
-import * as schema from 'src/db/schema';
-import { eq } from 'drizzle-orm';
 import { ProposalsRepository } from './proposals.repository';
 import { UsersService } from 'src/users/users.service';
+import { WorkflowService } from './workflow.service';
 import {
   PendingApprovalDto,
   ProposalListItemDto,
@@ -17,136 +20,108 @@ export class ProposalsService {
     private readonly drizzle: DrizzleService,
     private readonly repository: ProposalsRepository,
     private readonly usersService: UsersService,
+    private readonly workflowService: WorkflowService,
   ) {}
 
-  async create(user: any, dto: CreateProposalDto, file: Express.Multer.File) {
+  async create(
+    user: any,
+    dto: CreateProposalDto,
+    file: Express.Multer.File,
+    shouldSubmit: boolean = false,
+  ) {
     try {
-      return await this.drizzle.db.transaction(async (tx) => {
-        // 1. Master Proposal: Setup the primary identity
-        // Note: We create this first to satisfy the NOT NULL FKs in downstream tables.
-        const [proposal] = await tx
-          .insert(schema.proposals)
-          .values({
-            createdBy: user.id,
-            title: dto.title,
-            abstract: dto.abstract,
-            proposalProgram: dto.proposalProgram as any,
-            isFunded: dto.isFunded || false,
-            degreeLevel: (dto.degreeLevel || 'NA') as any,
-            researchArea: dto.researchArea,
-            durationMonths: dto.durationMonths,
-            departmentId: dto.departmentId,
-            currentStatus: 'Draft',
-            submittedAt: new Date(),
-          })
-          .returning();
-
-        // 2. File Metadata: Record the uploaded PDF details
-        const [proposalFile] = await tx
-          .insert(schema.proposalFiles)
-          .values({
-            proposalId: proposal.id,
-            uploadedBy: user.id,
-            fileName: file.originalname,
-            filePath: `proposals/${Date.now()}_${file.originalname}`, // Mock path for now
-            fileType: file.mimetype,
-            fileSize: file.size,
-          })
-          .returning();
-
-        // 3. Immutability (Versioning): Create V1 Snapshot
-        // We store the team (collaborators) in contentJson to preserve history
-        const [version] = await tx
-          .insert(schema.proposalVersions)
-          .values({
-            proposalId: proposal.id,
-            createdBy: user.id,
-            versionNumber: 1,
-            isCurrent: true,
-            fileId: proposalFile.id,
-            contentJson: { collaborators: dto.collaborators || [] },
-            changeSummary: 'Initial Submission',
-          })
-          .returning();
-
-        // Link the proposal back to its current version
-        await tx
-          .update(schema.proposals)
-          .set({ currentVersionId: version.id })
-          .where(eq(schema.proposals.id, proposal.id));
-
-        // 4. Financial Record: Budget Header + Bulk Items
-        // Senior Logic: Calculate sum and bulk insert items in a single query
-        const totalAmount = dto.budget.reduce(
-          (sum, item) => sum + Number(item.amount),
-          0,
+      // 0. Validate department exists if departmentId is provided
+      if (dto.departmentId) {
+        const departmentExists = await this.repository.departmentExists(
+          dto.departmentId,
         );
-        const [budgetRequest] = await tx
-          .insert(schema.budgetRequests)
-          .values({
-            proposalId: proposal.id,
-            requestedBy: user.id,
-            currentStatus: 'Submitted' as any,
-            totalAmount: totalAmount.toString(),
-          })
-          .returning();
-
-        if (dto.budget.length > 0) {
-          await tx.insert(schema.budgetRequestItems).values(
-            dto.budget.map((item, index) => ({
-              budgetRequestId: budgetRequest.id,
-              lineIndex: index + 1,
-              description: item.description,
-              requestedAmount: item.amount.toString(),
-            })),
+        if (!departmentExists) {
+          throw new NotFoundException(
+            `Department with ID "${dto.departmentId}" does not exist.`,
           );
         }
+      }
 
-        // --- Prompt 3: Workflow Logic (Retained for completeness) ---
-        const rules = await tx.query.routingRules.findMany({
-          where: eq(
-            schema.routingRules.proposalProgram,
-            dto.proposalProgram as any,
-          ),
-          orderBy: (rules, { asc }) => [asc(rules.stepOrder)],
+      // 1. Create proposal (independent transaction)
+      const proposal = await this.drizzle.db.transaction(async (tx) => {
+        // 1.1 Create master proposal
+        const created = await this.repository.createProposal(tx, {
+          createdBy: user.id,
+          title: dto.title,
+          abstract: dto.abstract,
+          proposalProgram: dto.proposalProgram as any,
+          isFunded: dto.isFunded || false,
+          degreeLevel: (dto.degreeLevel || 'NA') as any,
+          researchArea: dto.researchArea,
+          durationMonths: dto.durationMonths,
+          departmentId: dto.departmentId,
         });
 
-        if (rules.length > 0) {
-          await tx.insert(schema.proposalApprovals).values(
-            rules.map((rule) => ({
-              proposalId: proposal.id,
-              routingRuleId: rule.id,
-              stepOrder: rule.stepOrder,
-              approverRole: rule.approverRole,
-              decision: 'Pending' as any,
-              versionId: version.id,
-            })),
-          );
-        }
+        // 1.2 Create file metadata
+        const proposalFile = await this.repository.createProposalFile(tx, {
+          proposalId: created.id,
+          uploadedBy: user.id,
+          fileName: file.originalname,
+          filePath: `proposals/${Date.now()}_${file.originalname}`,
+          fileType: file.mimetype,
+          fileSize: file.size,
+        });
 
-        // 6. Compliance: Audit logging
-        await tx.insert(schema.auditLogs).values({
+        // 1.3 Create version snapshot
+        await this.repository.createProposalVersion(tx, {
+          proposalId: created.id,
+          createdBy: user.id,
+          fileId: proposalFile.id,
+          collaborators: dto.collaborators,
+        });
+
+        // 1.4 Create budget request and items
+        await this.repository.createBudgetRequest(tx, {
+          proposalId: created.id,
+          requestedBy: user.id,
+          items: dto.budget,
+        });
+
+        // 1.5 Audit log
+        await this.repository.createAuditLog(tx, {
           actorUserId: user.id,
           action: 'CREATED',
           entityType: 'proposals',
-          entityId: proposal.id,
+          entityId: created.id,
           metadata: {
-            title: proposal.title,
-            program: proposal.proposalProgram,
+            title: created.title,
+            program: created.proposalProgram,
           },
         });
 
-        return {
-          id: proposal.id,
-          status: 'Submitted',
-          message:
-            'Proposal recorded successfully. All relations and budget items synchronized.',
-        };
+        return created;
       });
+
+      // 2. Optional: Submit proposal in separate transaction
+      let submissionError: string | null = null;
+
+      if (shouldSubmit) {
+        try {
+          await this.workflowService.submitProposal(proposal.id, user.id);
+        } catch (error) {
+          submissionError =
+            error instanceof Error ? error.message : 'Submission failed';
+        }
+      }
+
+      return {
+        proposal: {
+          id: proposal.id,
+          title: proposal.title,
+          status: shouldSubmit && !submissionError ? 'Under_Review' : 'Draft',
+        },
+        submitted: shouldSubmit && !submissionError,
+        submissionError,
+      };
     } catch (error) {
-      console.error('Core Transaction Failed:', error);
+      console.error('Proposal creation failed:', error);
       throw new InternalServerErrorException(
-        'Database synchronization failed during proposal recording.',
+        'Failed to create proposal and related records.',
       );
     }
   }
