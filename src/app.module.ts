@@ -9,6 +9,7 @@ import { AccessControlModule } from './access-control';
 import { ProposalsModule } from './proposals/proposals.module';
 import { UndergradModule } from './undergrad/undergrad.module';
 import { PgModule } from './pg/pg.module';
+import { DepartmentsModule } from './departments/departments.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PgModule } from './pg/pg.module';
     ProposalsModule,
     UndergradModule,
     PgModule,
+    DepartmentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

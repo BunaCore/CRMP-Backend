@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, ilike, and, SQL } from 'drizzle-orm';
 import { DrizzleService } from 'src/db/db.service';
 import { departments } from 'src/db/schema/department';
+import { DepartmentSelectorDto } from 'src/types/selector';
 import { DB } from 'src/db/db.type';
 
 @Injectable()
@@ -45,5 +46,35 @@ export class DepartmentsRepository {
   async findAll(tx?: DB) {
     const db = tx || this.drizzle.db;
     return db.select().from(departments);
+  }
+
+  /**
+   * Get departments for selector/dropdown (lightweight query)
+   * Optional search by department name
+   * @param searchQuery - Optional search term for department name
+   * @param limit - Max results to return (default: 50)
+   */
+  async findForSelector(
+    searchQuery?: string,
+    limit: number = 50,
+  ): Promise<DepartmentSelectorDto[]> {
+    const conditions: SQL[] = [];
+
+    if (searchQuery) {
+      conditions.push(ilike(departments.name, `%${searchQuery}%`));
+    }
+
+    const query = this.drizzle.db
+      .select()
+      .from(departments)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .limit(limit);
+
+    const results = await query;
+
+    return results.map((dept) => ({
+      label: dept.name,
+      value: dept.id,
+    }));
   }
 }

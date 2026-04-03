@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { UsersRepository } from './users.repository';
 import { User, CreateUserInput } from 'src/users/types/user';
+import { UserSelectorDto } from 'src/types/selector';
 
 @Injectable()
 export class UsersService {
@@ -59,5 +60,17 @@ export class UsersService {
    */
   async getUserPermissions(userId: string): Promise<string[]> {
     return this.usersRepository.getUserPermissions(userId);
+  }
+
+  /**
+   * Get users in selector format (lightweight for dropdowns)
+   * Optionally filter by role
+   */
+  async getSelector(
+    searchQuery?: string,
+    roleName?: string,
+    limit: number = 50,
+  ): Promise<UserSelectorDto[]> {
+    return this.usersRepository.findForSelector(searchQuery, roleName, limit);
   }
 }

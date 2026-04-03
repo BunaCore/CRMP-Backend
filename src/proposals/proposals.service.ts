@@ -2,6 +2,7 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import { DrizzleService } from 'src/db/db.service';
@@ -30,7 +31,35 @@ export class ProposalsService {
     shouldSubmit: boolean = false,
   ) {
     try {
-      // 0. Validate department exists if departmentId is provided
+      // 0. Validate members structure and presence
+      const memberValidation = this.validateMembers(user.id, dto.members);
+      if (!memberValidation.valid) {
+        throw new BadRequestException(memberValidation.error);
+      }
+
+      // 0a. Validate all member users exist
+      const memberUserIds = dto.members.map((m) => m.userId);
+      const userExistValidation =
+        await this.validateMembersExist(memberUserIds);
+      if (!userExistValidation.valid) {
+        throw new NotFoundException(userExistValidation.error);
+      }
+
+      // 0b. Validate supervisors have SUPERVISOR role
+      const supervisorIds = dto.members
+        .filter((m) => m.role === 'SUPERVISOR')
+        .map((m) => m.userId);
+      if (supervisorIds.length > 0) {
+        const supervisorValidation =
+          await this.validateSupervisorRoles(supervisorIds);
+        if (!supervisorValidation.valid) {
+          throw new BadRequestException(
+            `Users not found with SUPERVISOR role: ${supervisorValidation.notSupervisors?.join(', ')}`,
+          );
+        }
+      }
+
+      // 1. Validate department exists if departmentId is provided
       if (dto.departmentId) {
         const departmentExists = await this.repository.departmentExists(
           dto.departmentId,
@@ -42,9 +71,9 @@ export class ProposalsService {
         }
       }
 
-      // 1. Create proposal (independent transaction)
+      // 2. Create proposal (independent transaction)
       const proposal = await this.drizzle.db.transaction(async (tx) => {
-        // 1.1 Create master proposal
+        // 2.1 Create master proposal
         const created = await this.repository.createProposal(tx, {
           createdBy: user.id,
           title: dto.title,
@@ -57,7 +86,10 @@ export class ProposalsService {
           departmentId: dto.departmentId,
         });
 
-        // 1.2 Create file metadata
+        // 2.2 Add proposal members
+        await this.repository.addProposalMembers(tx, created.id, dto.members);
+
+        // 2.3 Create file metadata
         const proposalFile = await this.repository.createProposalFile(tx, {
           proposalId: created.id,
           uploadedBy: user.id,
@@ -67,7 +99,7 @@ export class ProposalsService {
           fileSize: file.size,
         });
 
-        // 1.3 Create version snapshot
+        // 2.4 Create version snapshot
         await this.repository.createProposalVersion(tx, {
           proposalId: created.id,
           createdBy: user.id,
@@ -75,14 +107,14 @@ export class ProposalsService {
           collaborators: dto.collaborators,
         });
 
-        // 1.4 Create budget request and items
+        // 2.5 Create budget request and items
         await this.repository.createBudgetRequest(tx, {
           proposalId: created.id,
           requestedBy: user.id,
           items: dto.budget,
         });
 
-        // 1.5 Audit log
+        // 2.6 Audit log
         await this.repository.createAuditLog(tx, {
           actorUserId: user.id,
           action: 'CREATED',
@@ -307,5 +339,89 @@ export class ProposalsService {
     }
 
     return { canApprove: true };
+  }
+
+  // ─── Helper Methods: Member Validation ─────────────
+
+  /**
+   * Validate proposal members array
+   * Ensures: at least one member, exactly one PI, creator is included
+   */
+  private validateMembers(
+    creatorId: string,
+    members: Array<{ userId: string; role: string }>,
+  ): { valid: boolean; error?: string } {
+    // Check at least one member
+    if (!members || members.length === 0) {
+      return { valid: false, error: 'At least one member is required' };
+    }
+
+    // Check exactly one PI
+    const piCount = members.filter((m) => m.role === 'PI').length;
+    if (piCount === 0) {
+      return {
+        valid: false,
+        error: 'Exactly one member must be assigned as PI',
+      };
+    }
+    if (piCount > 1) {
+      return { valid: false, error: 'Only one member can be assigned as PI' };
+    }
+
+    // Check creator is included
+    const creatorMember = members.find((m) => m.userId === creatorId);
+    if (!creatorMember) {
+      return { valid: false, error: 'Creator must be included in members' };
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * Validate that all users exist in the system
+   */
+  private async validateMembersExist(userIds: string[]): Promise<{
+    valid: boolean;
+    error?: string;
+    missingIds?: string[];
+  }> {
+    const foundIds = await this.repository.validateUsersExist(userIds);
+    const missingIds = userIds.filter((id) => !foundIds.includes(id));
+
+    if (missingIds.length > 0) {
+      return {
+        valid: false,
+        error: `Users not found: ${missingIds.join(', ')}`,
+        missingIds,
+      };
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * Validate that users with SUPERVISOR role exist (optional but recommended)
+   */
+  private async validateSupervisorRoles(supervisorIds: string[]): Promise<{
+    valid: boolean;
+    notSupervisors?: string[];
+  }> {
+    if (supervisorIds.length === 0) {
+      return { valid: true };
+    }
+
+    const validSupervisors = await this.repository.filterUsersByRole(
+      supervisorIds,
+      'SUPERVISOR',
+    );
+    const notSupervisors = supervisorIds.filter(
+      (id) => !validSupervisors.includes(id),
+    );
+
+    if (notSupervisors.length > 0) {
+      return { valid: false, notSupervisors };
+    }
+
+    return { valid: true };
   }
 }

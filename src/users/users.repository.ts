@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, or, ilike } from 'drizzle-orm';
 import { DrizzleService } from 'src/db/db.service';
 import { users } from 'src/db/schema/user';
 import {
@@ -11,6 +11,7 @@ import {
 import { departmentCoordinators } from 'src/db/schema/department';
 import { refreshTokens } from 'src/db/schema/refresh-tokens';
 import { User, CreateUserInput, FindUserInput } from 'src/users/types/user';
+import { UserSelectorDto } from 'src/types/selector';
 import { DB } from 'src/db/db.type';
 
 @Injectable()
@@ -320,5 +321,75 @@ export class UsersRepository {
     }
 
     return refreshToken;
+  }
+
+  /**
+   * Get users for selector/dropdown (lightweight query)
+   * Optional search by name/email and role filter
+   * @param searchQuery - Optional search term for name or email
+   * @param roleName - Optional role name to filter by
+   * @param limit - Max results to return (default: 50)
+   */
+  async findForSelector(
+    searchQuery?: string,
+    roleName?: string,
+    limit: number = 50,
+  ): Promise<UserSelectorDto[]> {
+    const conditions: any[] = [];
+
+    if (searchQuery) {
+      conditions.push(
+        or(
+          ilike(users.fullName as any, `%${searchQuery}%`),
+          ilike(users.email, `%${searchQuery}%`),
+        ),
+      );
+    }
+
+    if (roleName) {
+      conditions.push(eq(roles.name, roleName));
+    }
+
+    let query: any = this.drizzle.db
+      .select({
+        id: users.id,
+        fullName: users.fullName,
+        department: users.department,
+        isExternal: users.isExternal,
+        role: roles.name,
+      })
+      .from(users)
+      .leftJoin(userRoles, eq(users.id, userRoles.userId))
+      .leftJoin(roles, eq(userRoles.roleId, roles.id));
+
+    for (const condition of conditions) {
+      query = query.where(condition);
+    }
+
+    const results = await query.limit(limit);
+
+    return results.map((row) => ({
+      label: row.fullName || row.id,
+      value: row.id,
+      meta: {
+        role: row.role || undefined,
+        department: row.department || undefined,
+        isExternal: row.isExternal || false,
+      },
+    }));
+  }
+
+  /**
+   * Check if users exist by their IDs
+   * @param userIds - Array of user IDs to validate
+   * @returns boolean - true if all users exist
+   */
+  async usersExist(userIds: string[]): Promise<boolean> {
+    const result = await this.drizzle.db
+      .select({ id: users.id })
+      .from(users)
+      .where(inArray(users.id, userIds));
+
+    return result.length === userIds.length;
   }
 }

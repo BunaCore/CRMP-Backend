@@ -3,6 +3,7 @@ import { DrizzleService } from 'src/db/db.service';
 import * as schema from 'src/db/schema';
 import { eq, and, inArray, ne, isNotNull, desc, asc } from 'drizzle-orm';
 import { DB } from 'src/db/db.type';
+import { ProposalMemberRole } from './dto/proposal-member.dto';
 
 @Injectable()
 export class ProposalsRepository {
@@ -423,5 +424,91 @@ export class ProposalsRepository {
     const [log] = await tx.insert(schema.auditLogs).values(data).returning();
 
     return log;
+  }
+
+  /**
+   * Insert proposal members in bulk
+   * @param tx Database transaction
+   * @param proposalId Proposal ID
+   * @param members Array of {userId, role}
+   */
+  async addProposalMembers(
+    tx: DB,
+    proposalId: string,
+    members: Array<{ userId: string; role: ProposalMemberRole }>,
+  ) {
+    if (members.length === 0) {
+      return [];
+    }
+
+    const memberRecords = members.map((m) => ({
+      proposalId,
+      userId: m.userId,
+      role: m.role,
+    }));
+
+    return tx.insert(schema.proposalMembers).values(memberRecords).returning();
+  }
+
+  /**
+   * Find all members of a proposal with user details
+   * @param proposalId Proposal ID
+   */
+  async getProposalMembers(proposalId: string) {
+    return this.drizzle.db
+      .select({
+        id: schema.proposalMembers.id,
+        proposalId: schema.proposalMembers.proposalId,
+        userId: schema.proposalMembers.userId,
+        role: schema.proposalMembers.role,
+        addedAt: schema.proposalMembers.addedAt,
+        user: {
+          id: schema.users.id,
+          fullName: schema.users.fullName,
+          department: schema.users.department,
+          isExternal: schema.users.isExternal,
+        },
+      })
+      .from(schema.proposalMembers)
+      .leftJoin(
+        schema.users,
+        eq(schema.proposalMembers.userId, schema.users.id),
+      )
+      .where(eq(schema.proposalMembers.proposalId, proposalId));
+  }
+
+  /**
+   * Validate that users exist in the system
+   * @param userIds Array of user IDs to validate
+   * @returns Count of found users
+   */
+  async validateUsersExist(userIds: string[]) {
+    const results = await this.drizzle.db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(inArray(schema.users.id, userIds));
+
+    return results.map((r) => r.id);
+  }
+
+  /**
+   * Check if users have specific roles
+   * @param userIds User IDs to check
+   * @param roleName Role name to filter by
+   * @returns User IDs that have the specified role
+   */
+  async filterUsersByRole(userIds: string[], roleName: string) {
+    const results = await this.drizzle.db
+      .select({ userId: schema.userRoles.userId })
+      .from(schema.userRoles)
+      .leftJoin(schema.roles, eq(schema.userRoles.roleId, schema.roles.id))
+      .where(
+        and(
+          inArray(schema.userRoles.userId, userIds),
+          eq(schema.roles.name, roleName),
+        ),
+      );
+
+    return results.map((r) => r.userId);
   }
 }
