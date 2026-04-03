@@ -1,52 +1,53 @@
 export enum Permission {
-  // Project creation and submission
-  PROJECT_CREATE = 'PROJECT_CREATE',
-  PROJECT_PRE_REGISTER = 'PROJECT_PRE_REGISTER',
-  PROJECT_SUBMIT = 'PROJECT_SUBMIT',
+  // --- Proposal Core ---
+  PROPOSAL_CREATE = 'proposal:create',
+  PROPOSAL_READ = 'proposal:read',
+  PROPOSAL_UPDATE = 'proposal:update',
+  PROPOSAL_DELETE = 'proposal:delete',
+  PROPOSAL_SUBMIT = 'proposal:submit',
 
-  // Project review and approval
-  PROJECT_REVIEW = 'PROJECT_REVIEW',
-  PROJECT_APPROVE = 'PROJECT_APPROVE',
-  PROJECT_REJECT = 'PROJECT_REJECT',
-  PROJECT_RECOMMEND = 'PROJECT_RECOMMEND',
+  // --- Proposal Decisions (workflow actions) ---
+  PROPOSAL_APPROVE = 'proposal:approve',
+  PROPOSAL_REJECT = 'proposal:reject',
+  PROPOSAL_REQUEST_REVISION = 'proposal:request_revision',
 
-  // Budget management
-  BUDGET_VIEW = 'BUDGET_VIEW',
-  BUDGET_APPROVE = 'BUDGET_APPROVE',
-  BUDGET_REJECT = 'BUDGET_REJECT',
+  // --- Evaluation ---
+  EVALUATION_ASSIGN = 'evaluation:assign',
+  EVALUATION_SUBMIT = 'evaluation:submit',
+  EVALUATION_READ = 'evaluation:read',
 
-  // Team management
-  TEAM_MANAGE = 'TEAM_MANAGE',
-  TEAM_VIEW = 'TEAM_VIEW',
-  EVALUATOR_ASSIGN = 'EVALUATOR_ASSIGN',
+  // --- Users (lifecycle + access) ---
+  USER_READ = 'user:read', // View users (scoped)
+  USER_PROVISION = 'user:provision', // Activate/deactivate, invite, lifecycle
+  USER_ASSIGN_ROLE = 'user:assign_role', // Change roles/permissions
 
-  // Ethical clearance
-  ETHICS_REVIEW = 'ETHICS_REVIEW',
-  ETHICS_APPROVE = 'ETHICS_APPROVE',
-  ETHICS_REJECT = 'ETHICS_REJECT',
+  // --- Authorization Management ---
+  ROLE_CREATE = 'role:create',
+  ROLE_READ = 'role:read',
+  ROLE_UPDATE = 'role:update',
+  ROLE_DELETE = 'role:delete',
+  PERMISSION_ASSIGN = 'permission:assign', // Attach permissions to roles
 
-  // Administrative
-  ADMIN_VIEW = 'ADMIN_VIEW',
-  ADMIN_EDIT = 'ADMIN_EDIT',
-  CALENDAR_MANAGE = 'CALENDAR_MANAGE',
+  // --- Organization Structure ---
+  DEPARTMENT_CREATE = 'department:create',
+  DEPARTMENT_READ = 'department:read',
+  DEPARTMENT_UPDATE = 'department:update',
+  DEPARTMENT_DELETE = 'department:delete',
 
-  // View permissions
-  PROJECT_VIEW = 'PROJECT_VIEW',
-  USER_VIEW = 'USER_VIEW',
+  SCHOOL_CREATE = 'school:create',
+  SCHOOL_READ = 'school:read',
+  SCHOOL_UPDATE = 'school:update',
+  SCHOOL_DELETE = 'school:delete',
 
-  // ── Coordinator-exclusive permissions (UG track) ──────────────
-  // Only the COORDINATOR role receives these — no other role can access
-  // undergrad routes even if they share common permissions like PROJECT_VIEW
-  COORDINATOR_PROPOSALS_VIEW = 'COORDINATOR_PROPOSALS_VIEW', // list + detail + advisors
-  COORDINATOR_DECIDE = 'COORDINATOR_DECIDE', // accept / reject / revision
-  COORDINATOR_ASSIGN = 'COORDINATOR_ASSIGN', // assign advisor to proposal
+  // --- Domain-Specific Access ---
+  ETHICS_READ = 'ethics:read',
+  ETHICS_DECIDE = 'ethics:decide',
 
-  // ── Funded-exclusive permissions (Funded track) ──────────────
-  FUNDED_SUBMIT = 'FUNDED_SUBMIT', // PI submission
-  FUNDED_VIEW = 'FUNDED_VIEW', // View list and detail
-  FUNDED_RAD_ACCESS = 'FUNDED_RAD_ACCESS', // RAD triage and assignment
-  FUNDED_EVALUATOR_ACCESS = 'FUNDED_EVALUATOR_ACCESS', // Peer reviewers
-  FUNDED_APPROVER_ACCESS = 'FUNDED_APPROVER_ACCESS', // RA/Finance/VPRTT/AC
-  FUNDED_DECIDE = 'FUNDED_DECIDE', // General review decision
-  FUNDED_ASSIGN = 'FUNDED_ASSIGN', // RAD assignment of evaluators/advisors
+  BUDGET_VIEW = 'budget:view',
+  BUDGET_MANAGE = 'budget:manage',
+
+  // --- System & Platform ---
+  SYSTEM_CONFIG = 'system:config', // Deadlines, workflow rules, global settings
+  AUDIT_LOG_VIEW = 'audit_log:view',
+  REPORT_EXPORT = 'report:export',
 }

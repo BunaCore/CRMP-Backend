@@ -28,7 +28,7 @@ export class PgController {
   constructor(private readonly pgService: PgService) {}
 
   @Get('proposals')
-  @RequirePermission(Permission.PROJECT_REVIEW)
+  @RequirePermission(Permission.EVALUATION_SUBMIT)
   async getProposals(
     @CurrentUser() user: AuthenticatedUser,
     @Query('status') status?: string,
@@ -38,7 +38,7 @@ export class PgController {
   }
 
   @Get('proposals/:id')
-  @RequirePermission(Permission.PROJECT_REVIEW)
+  @RequirePermission(Permission.EVALUATION_SUBMIT)
   async getProposalDetail(
     @CurrentUser() _user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) proposalId: string,
@@ -47,7 +47,7 @@ export class PgController {
   }
 
   @Patch('proposals/:id/decision')
-  @RequirePermission([Permission.PROJECT_APPROVE, Permission.PROJECT_REJECT])
+  @RequirePermission([Permission.PROPOSAL_APPROVE, Permission.PROPOSAL_REJECT])
   async makeDecision(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) proposalId: string,

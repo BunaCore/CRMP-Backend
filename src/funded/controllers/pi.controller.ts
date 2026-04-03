@@ -8,7 +8,7 @@ import { SubmitFundedDto } from '../dto/submit-funded.dto';
 
 @Controller('funded/pi')
 @UseGuards(JwtAuthGuard, AccessGuard)
-@RequirePermission(Permission.FUNDED_SUBMIT) // Strictly isolated
+@RequirePermission(Permission.PROPOSAL_SUBMIT) // Strictly isolated
 export class PiController {
   constructor(private readonly workflowService: FundedWorkflowService) {}
 

@@ -57,7 +57,7 @@ export class ProposalsController {
   }
 
   @Post()
-  @RequirePermission(Permission.PROJECT_CREATE)
+  @RequirePermission(Permission.PROPOSAL_CREATE)
   @UseInterceptors(FileInterceptor('file'))
   async submitProposal(
     @Body() createProposalDto: CreateProposalDto,
