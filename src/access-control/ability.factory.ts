@@ -75,12 +75,39 @@ export class AbilityFactory {
         conditions?: Record<string, any>;
       }>
     > = {
+      // --- Proposal Core ---
       [Permission.PROPOSAL_CREATE]: [{ action: 'create', subject: 'Proposal' }],
       [Permission.PROPOSAL_READ]: [{ action: 'read', subject: 'Proposal' }],
       [Permission.PROPOSAL_UPDATE]: [{ action: 'update', subject: 'Proposal' }],
       [Permission.PROPOSAL_DELETE]: [{ action: 'delete', subject: 'Proposal' }],
       [Permission.PROPOSAL_SUBMIT]: [{ action: 'submit', subject: 'Proposal' }],
 
+      // --- Proposal Member Management ---
+      [Permission.PROPOSAL_ASSIGN_ADVISOR]: [
+        { action: 'assignAdvisor', subject: 'Proposal' },
+      ],
+      [Permission.PROPOSAL_ASSIGN_SUPERVISOR]: [
+        { action: 'assignSupervisor', subject: 'Proposal' },
+      ],
+      [Permission.PROPOSAL_ASSIGN_EVALUATOR]: [
+        { action: 'assignEvaluator', subject: 'Proposal' },
+      ],
+      [Permission.PROPOSAL_ADD_MEMBER]: [
+        { action: 'addMember', subject: 'Proposal' },
+      ],
+      [Permission.PROPOSAL_MANAGE_MEMBERS]: [
+        { action: 'addMember', subject: 'Proposal' },
+        { action: 'removeMember', subject: 'Proposal' },
+        { action: 'updateMemberRole', subject: 'Proposal' },
+      ],
+
+      // --- Project Core ---
+      [Permission.PROJECT_CREATE]: [{ action: 'create', subject: 'Project' }],
+      [Permission.PROJECT_READ]: [{ action: 'read', subject: 'Project' }],
+      [Permission.PROJECT_UPDATE]: [{ action: 'update', subject: 'Project' }],
+      [Permission.PROJECT_DELETE]: [{ action: 'delete', subject: 'Project' }],
+
+      // --- Proposal Decisions (workflow actions) ---
       [Permission.PROPOSAL_APPROVE]: [
         { action: 'approve', subject: 'Proposal' },
       ],
@@ -89,6 +116,7 @@ export class AbilityFactory {
         { action: 'requestRevision', subject: 'Proposal' },
       ],
 
+      // --- Evaluation ---
       [Permission.EVALUATION_ASSIGN]: [
         { action: 'assign', subject: 'Evaluation' },
       ],
@@ -98,15 +126,48 @@ export class AbilityFactory {
       ],
       [Permission.EVALUATION_READ]: [{ action: 'read', subject: 'Evaluation' }],
 
+      // --- Users (lifecycle + access) ---
       [Permission.USER_READ]: [{ action: 'read', subject: 'User' }],
       [Permission.USER_PROVISION]: [{ action: 'provision', subject: 'User' }],
       [Permission.USER_ASSIGN_ROLE]: [
         { action: 'assignRole', subject: 'User' },
       ],
 
+      // --- Authorization Management ---
+      [Permission.ROLE_CREATE]: [{ action: 'create', subject: 'Role' }],
+      [Permission.ROLE_READ]: [{ action: 'read', subject: 'Role' }],
+      [Permission.ROLE_UPDATE]: [{ action: 'update', subject: 'Role' }],
+      [Permission.ROLE_DELETE]: [{ action: 'delete', subject: 'Role' }],
+      [Permission.PERMISSION_ASSIGN]: [
+        { action: 'assignPermission', subject: 'Role' },
+      ],
+
+      // --- Organization Structure ---
+      [Permission.DEPARTMENT_CREATE]: [
+        { action: 'create', subject: 'Department' },
+      ],
+      [Permission.DEPARTMENT_READ]: [{ action: 'read', subject: 'Department' }],
+      [Permission.DEPARTMENT_UPDATE]: [
+        { action: 'update', subject: 'Department' },
+      ],
+      [Permission.DEPARTMENT_DELETE]: [
+        { action: 'delete', subject: 'Department' },
+      ],
+
+      [Permission.SCHOOL_CREATE]: [{ action: 'create', subject: 'School' }],
+      [Permission.SCHOOL_READ]: [{ action: 'read', subject: 'School' }],
+      [Permission.SCHOOL_UPDATE]: [{ action: 'update', subject: 'School' }],
+      [Permission.SCHOOL_DELETE]: [{ action: 'delete', subject: 'School' }],
+
+      // --- Domain-Specific Access ---
+      [Permission.ETHICS_READ]: [{ action: 'read', subject: 'Ethics' }],
+      [Permission.ETHICS_DECIDE]: [{ action: 'decide', subject: 'Ethics' }],
+
+      // --- Budget ---
       [Permission.BUDGET_VIEW]: [{ action: 'read', subject: 'Budget' }],
       [Permission.BUDGET_MANAGE]: [{ action: 'manage', subject: 'Budget' }],
 
+      // --- System & Platform ---
       [Permission.SYSTEM_CONFIG]: [{ action: 'manage', subject: 'System' }],
       [Permission.AUDIT_LOG_VIEW]: [{ action: 'read', subject: 'AuditLog' }],
       [Permission.REPORT_EXPORT]: [{ action: 'export', subject: 'Report' }],
