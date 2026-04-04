@@ -29,7 +29,7 @@ const USERS: SeedUserConfig[] = [
     name: 'System Admin',
     email: 'admin@crmp.edu',
     password: UNIVERSAL_PASSWORD,
-    roles: [Role.ADMIN],
+    roles: [Role.SYSTEM_ADMIN],
   },
   {
     name: 'Dr. Advisor (Supervisor)',
@@ -95,7 +95,7 @@ const USERS: SeedUserConfig[] = [
     name: 'Academic Council Rep',
     email: 'ac@crmp.edu',
     password: UNIVERSAL_PASSWORD,
-    roles: [Role.FACULTY, Role.AC],
+    roles: [Role.FACULTY, Role.AC_MEMBER],
   },
 ];
 
@@ -508,16 +508,22 @@ async function seed() {
 
     for (const config of proposalConfigs) {
       const { members, promoteToProject, ...proposalData } = config;
-      
+
       // Add departmentId for UG and PG proposals only
-      let proposalValues: any  = proposalData;
+      let proposalValues: any = proposalData;
       if (config.proposalProgram === 'UG') {
-        proposalValues = { ...proposalData, departmentId: departmentByProgram.UG.id };
+        proposalValues = {
+          ...proposalData,
+          departmentId: departmentByProgram.UG.id,
+        };
       } else if (config.proposalProgram === 'PG') {
-        proposalValues = { ...proposalData, departmentId: departmentByProgram.PG.id };
+        proposalValues = {
+          ...proposalData,
+          departmentId: departmentByProgram.PG.id,
+        };
       }
       // GENERAL proposals have no departmentId
-      
+
       const [proposal] = await tx
         .insert(schema.proposals)
         .values(proposalValues)

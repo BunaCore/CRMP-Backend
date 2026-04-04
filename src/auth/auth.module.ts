@@ -6,10 +6,15 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { UsersModule } from 'src/users/users.module';
+import { DbModule } from 'src/db/db.module';
+import { DepartmentsModule } from 'src/departments/departments.module';
+import { RolesRepository } from 'src/db/roles.repository';
 
 @Module({
   imports: [
     UsersModule,
+    DbModule,
+    DepartmentsModule,
     PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
@@ -24,7 +29,7 @@ import { UsersModule } from 'src/users/users.module';
       }),
     }),
   ],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, RolesRepository],
   controllers: [AuthController],
 })
 export class AuthModule {}

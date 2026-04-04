@@ -9,9 +9,9 @@ import {
   IsUUID,
   Min,
   IsBoolean,
-  ValidateIf,
 } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Type, Transform, plainToInstance } from 'class-transformer';
+import { ProposalMemberDto } from './proposal-member.dto';
 
 export enum ProposalProgram {
   UG = 'UG',
@@ -74,14 +74,21 @@ export class CreateProposalDto {
   @Type(() => Number)
   durationMonths: number;
 
+  @Transform(({ value }) => plainToInstance(BudgetItemDto, JSON.parse(value)))
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => BudgetItemDto)
   @IsNotEmpty()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
   budget: BudgetItemDto[];
+
+  @Transform(({ value }) =>
+    plainToInstance(ProposalMemberDto, JSON.parse(value)),
+  )
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProposalMemberDto)
+  @IsNotEmpty({ message: 'At least one member (PI) is required' })
+  members: ProposalMemberDto[];
 
   @IsArray()
   @IsUUID('4', { each: true })

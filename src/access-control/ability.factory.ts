@@ -66,142 +66,121 @@ export class AbilityFactory {
       conditions?: Record<string, any>;
     }> = [];
 
+    // Permission-to-rules map to avoid repeated case statements
+    const permissionRulesMap: Record<
+      string,
+      Array<{
+        action: string;
+        subject: string;
+        conditions?: Record<string, any>;
+      }>
+    > = {
+      // --- Proposal Core ---
+      [Permission.PROPOSAL_CREATE]: [{ action: 'create', subject: 'Proposal' }],
+      [Permission.PROPOSAL_READ]: [{ action: 'read', subject: 'Proposal' }],
+      [Permission.PROPOSAL_UPDATE]: [{ action: 'update', subject: 'Proposal' }],
+      [Permission.PROPOSAL_DELETE]: [{ action: 'delete', subject: 'Proposal' }],
+      [Permission.PROPOSAL_SUBMIT]: [{ action: 'submit', subject: 'Proposal' }],
+
+      // --- Proposal Member Management ---
+      [Permission.PROPOSAL_ASSIGN_ADVISOR]: [
+        { action: 'assignAdvisor', subject: 'Proposal' },
+      ],
+      [Permission.PROPOSAL_ASSIGN_SUPERVISOR]: [
+        { action: 'assignSupervisor', subject: 'Proposal' },
+      ],
+      [Permission.PROPOSAL_ASSIGN_EVALUATOR]: [
+        { action: 'assignEvaluator', subject: 'Proposal' },
+      ],
+      [Permission.PROPOSAL_ADD_MEMBER]: [
+        { action: 'addMember', subject: 'Proposal' },
+      ],
+      [Permission.PROPOSAL_MANAGE_MEMBERS]: [
+        { action: 'addMember', subject: 'Proposal' },
+        { action: 'removeMember', subject: 'Proposal' },
+        { action: 'updateMemberRole', subject: 'Proposal' },
+      ],
+
+      // --- Project Core ---
+      [Permission.PROJECT_CREATE]: [{ action: 'create', subject: 'Project' }],
+      [Permission.PROJECT_READ]: [{ action: 'read', subject: 'Project' }],
+      [Permission.PROJECT_UPDATE]: [{ action: 'update', subject: 'Project' }],
+      [Permission.PROJECT_DELETE]: [{ action: 'delete', subject: 'Project' }],
+
+      // --- Proposal Decisions (workflow actions) ---
+      [Permission.PROPOSAL_APPROVE]: [
+        { action: 'approve', subject: 'Proposal' },
+      ],
+      [Permission.PROPOSAL_REJECT]: [{ action: 'reject', subject: 'Proposal' }],
+      [Permission.PROPOSAL_REQUEST_REVISION]: [
+        { action: 'requestRevision', subject: 'Proposal' },
+      ],
+
+      // --- Evaluation ---
+      [Permission.EVALUATION_ASSIGN]: [
+        { action: 'assign', subject: 'Evaluation' },
+      ],
+      [Permission.EVALUATION_SUBMIT]: [
+        { action: 'create', subject: 'Evaluation' },
+        { action: 'update', subject: 'Evaluation' },
+      ],
+      [Permission.EVALUATION_READ]: [{ action: 'read', subject: 'Evaluation' }],
+
+      // --- Users (lifecycle + access) ---
+      [Permission.USER_READ]: [{ action: 'read', subject: 'User' }],
+      [Permission.USER_PROVISION]: [{ action: 'provision', subject: 'User' }],
+      [Permission.USER_ASSIGN_ROLE]: [
+        { action: 'assignRole', subject: 'User' },
+      ],
+
+      // --- Authorization Management ---
+      [Permission.ROLE_CREATE]: [{ action: 'create', subject: 'Role' }],
+      [Permission.ROLE_READ]: [{ action: 'read', subject: 'Role' }],
+      [Permission.ROLE_UPDATE]: [{ action: 'update', subject: 'Role' }],
+      [Permission.ROLE_DELETE]: [{ action: 'delete', subject: 'Role' }],
+      [Permission.PERMISSION_ASSIGN]: [
+        { action: 'assignPermission', subject: 'Role' },
+      ],
+
+      // --- Organization Structure ---
+      [Permission.DEPARTMENT_CREATE]: [
+        { action: 'create', subject: 'Department' },
+      ],
+      [Permission.DEPARTMENT_READ]: [{ action: 'read', subject: 'Department' }],
+      [Permission.DEPARTMENT_UPDATE]: [
+        { action: 'update', subject: 'Department' },
+      ],
+      [Permission.DEPARTMENT_DELETE]: [
+        { action: 'delete', subject: 'Department' },
+      ],
+
+      [Permission.SCHOOL_CREATE]: [{ action: 'create', subject: 'School' }],
+      [Permission.SCHOOL_READ]: [{ action: 'read', subject: 'School' }],
+      [Permission.SCHOOL_UPDATE]: [{ action: 'update', subject: 'School' }],
+      [Permission.SCHOOL_DELETE]: [{ action: 'delete', subject: 'School' }],
+
+      // --- Domain-Specific Access ---
+      [Permission.ETHICS_READ]: [{ action: 'read', subject: 'Ethics' }],
+      [Permission.ETHICS_DECIDE]: [{ action: 'decide', subject: 'Ethics' }],
+
+      // --- Budget ---
+      [Permission.BUDGET_VIEW]: [{ action: 'read', subject: 'Budget' }],
+      [Permission.BUDGET_MANAGE]: [{ action: 'manage', subject: 'Budget' }],
+
+      // --- System & Platform ---
+      [Permission.SYSTEM_CONFIG]: [{ action: 'manage', subject: 'System' }],
+      [Permission.AUDIT_LOG_VIEW]: [{ action: 'read', subject: 'AuditLog' }],
+      [Permission.REPORT_EXPORT]: [{ action: 'export', subject: 'Report' }],
+    };
+
+    // Apply all rules for each permission
     permissionKeys.forEach((key) => {
-      switch (key) {
-        // Proposal permissions
-        case Permission.PROJECT_CREATE:
-          rules.push({ action: 'create', subject: 'Proposal' });
-          break;
-        case Permission.PROJECT_SUBMIT:
-          rules.push({
-            action: 'submit',
-            subject: 'Proposal',
-            conditions: { status: 'Draft' },
-          });
-          break;
-
-        case Permission.PROJECT_VIEW:
-          rules.push({ action: 'read', subject: 'Proposal' });
-          break;
-
-        case Permission.PROJECT_REVIEW:
-          rules.push({ action: 'review', subject: 'Proposal' });
-          break;
-
-        case Permission.PROJECT_APPROVE:
-          rules.push({ action: 'approve', subject: 'Proposal' });
-          break;
-
-        case Permission.PROJECT_REJECT:
-          rules.push({ action: 'reject', subject: 'Proposal' });
-          break;
-
-        case Permission.PROJECT_RECOMMEND:
-          rules.push({ action: 'recommend', subject: 'Proposal' });
-          break;
-
-        // Budget permissions
-        case Permission.BUDGET_VIEW:
-          rules.push({ action: 'read', subject: 'Budget' });
-          break;
-
-        case Permission.BUDGET_APPROVE:
-          rules.push({ action: 'approve', subject: 'Budget' });
-          break;
-
-        case Permission.BUDGET_REJECT:
-          rules.push({ action: 'reject', subject: 'Budget' });
-          break;
-
-        // Team management
-        case Permission.TEAM_MANAGE:
-          rules.push({ action: 'manage', subject: 'Team' });
-          break;
-
-        case Permission.TEAM_VIEW:
-          rules.push({ action: 'read', subject: 'Team' });
-          break;
-
-        // Evaluator assignment
-        case Permission.EVALUATOR_ASSIGN:
-          rules.push({ action: 'assign', subject: 'Evaluator' });
-          break;
-
-        // Ethics
-        case Permission.ETHICS_REVIEW:
-          rules.push({ action: 'review', subject: 'Ethics' });
-          break;
-
-        case Permission.ETHICS_APPROVE:
-          rules.push({ action: 'approve', subject: 'Ethics' });
-          break;
-
-        case Permission.ETHICS_REJECT:
-          rules.push({ action: 'reject', subject: 'Ethics' });
-          break;
-
-        // Admin
-        case Permission.ADMIN_VIEW:
-          rules.push({ action: 'read', subject: 'Admin' });
-          break;
-
-        case Permission.ADMIN_EDIT:
-          rules.push({ action: 'update', subject: 'Admin' });
-          break;
-
-        case Permission.CALENDAR_MANAGE:
-          rules.push({ action: 'manage', subject: 'Calendar' });
-          break;
-
-        // User permissions
-        case Permission.USER_VIEW:
-          rules.push({ action: 'read', subject: 'User' });
-          break;
-
-        // Coordinator-exclusive
-        case Permission.COORDINATOR_PROPOSALS_VIEW:
-          rules.push({ action: 'read', subject: 'CoordinatorProposal' });
-          break;
-
-        case Permission.COORDINATOR_DECIDE:
-          rules.push({ action: 'decide', subject: 'CoordinatorProposal' });
-          break;
-
-        case Permission.COORDINATOR_ASSIGN:
-          rules.push({ action: 'assign', subject: 'Advisor' });
-          break;
-
-        // Funded permissions
-        case Permission.FUNDED_SUBMIT:
-          rules.push({
-            action: 'submit',
-            subject: 'FundedProposal',
-          });
-          break;
-
-        case Permission.FUNDED_VIEW:
-          rules.push({ action: 'read', subject: 'FundedProposal' });
-          break;
-
-        case Permission.FUNDED_RAD_ACCESS:
-          rules.push({ action: 'triage', subject: 'FundedProposal' });
-          break;
-
-        case Permission.FUNDED_EVALUATOR_ACCESS:
-          rules.push({ action: 'evaluate', subject: 'FundedProposal' });
-          break;
-
-        case Permission.FUNDED_APPROVER_ACCESS:
-          rules.push({ action: 'approve', subject: 'FundedProposal' });
-          break;
-
-        case Permission.FUNDED_DECIDE:
-          rules.push({ action: 'decide', subject: 'FundedProposal' });
-          break;
-
-        default:
-          // Unknown permission - log but don't fail
-          console.warn(`Unknown permission: ${key}`);
+      const rulesForPermission = permissionRulesMap[key];
+      if (rulesForPermission) {
+        rules.push(...rulesForPermission);
+      } else {
+        // Unknown permission - log but don't fail
+        console.warn(`Unknown permission: ${key}`);
       }
     });
 

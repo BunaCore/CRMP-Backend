@@ -20,7 +20,7 @@ import { ReviewFundedDto } from '../dto/review-funded.dto';
 
 @Controller('funded/rad')
 @UseGuards(JwtAuthGuard, AccessGuard)
-@RequirePermission(Permission.FUNDED_RAD_ACCESS)
+@RequirePermission(Permission.EVALUATION_READ)
 export class RadController {
   constructor(
     private readonly workflowService: FundedWorkflowService,
@@ -34,7 +34,7 @@ export class RadController {
   }
 
   @Post(':proposalId/assign-advisor')
-  @RequirePermission(Permission.FUNDED_ASSIGN)
+  @RequirePermission(Permission.EVALUATION_ASSIGN)
   async assignAdvisor(
     @Param('proposalId') proposalId: string,
     @Req() req,
@@ -45,7 +45,7 @@ export class RadController {
   }
 
   @Post(':proposalId/assign-evaluators')
-  @RequirePermission(Permission.FUNDED_ASSIGN)
+  @RequirePermission(Permission.EVALUATION_ASSIGN)
   async assignEvaluators(
     @Param('proposalId') proposalId: string,
     @Req() req,
@@ -60,7 +60,7 @@ export class RadController {
   }
 
   @Post(':proposalId/review/:approvalId')
-  @RequirePermission(Permission.FUNDED_DECIDE)
+  @RequirePermission(Permission.PROPOSAL_APPROVE)
   async triageDecision(
     @Param('proposalId') proposalId: string,
     @Param('approvalId') approvalId: string,

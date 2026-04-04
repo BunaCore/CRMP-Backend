@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, or, ilike } from 'drizzle-orm';
 import { DrizzleService } from 'src/db/db.service';
 import { users } from 'src/db/schema/user';
 import {
@@ -9,7 +9,10 @@ import {
   roles,
 } from 'src/db/schema/roles';
 import { departmentCoordinators } from 'src/db/schema/department';
+import { refreshTokens } from 'src/db/schema/refresh-tokens';
 import { User, CreateUserInput, FindUserInput } from 'src/users/types/user';
+import { UserSelectorDto } from 'src/types/selector';
+import { DB } from 'src/db/db.type';
 
 @Injectable()
 export class UsersRepository {
@@ -86,7 +89,7 @@ export class UsersRepository {
         phoneNumber: input.phoneNumber,
         university: input.university,
         universityId: input.universityId,
-        accountStatus: input.accountStatus || 'deactive',
+        accountStatus: input.accountStatus,
       })
       .returning();
 
@@ -190,5 +193,203 @@ export class UsersRepository {
       .where(inArray(permissions.id, permissionIds));
 
     return perms.map((p) => p.key).filter(Boolean) as string[];
+  }
+
+  /**
+   * Create a new user within an optional transaction
+   * @param input - User data to create
+   * @param tx - Optional transaction to use for the query
+   */
+  async createWithTx(input: CreateUserInput, tx?: DB): Promise<User> {
+    const db = tx || this.drizzle.db;
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: input.email,
+        passwordHash: input.passwordHash,
+        fullName: input.fullName,
+        department: input.department,
+        phoneNumber: input.phoneNumber,
+        university: input.university,
+        universityId: input.universityId,
+        accountStatus: input.accountStatus,
+      })
+      .returning();
+
+    return user;
+  }
+
+  /**
+   * Assign a role to a user within an optional transaction
+   * @param userId - User ID (UUID)
+   * @param roleId - Role ID (UUID)
+   * @param tx - Optional transaction to use for the query
+   */
+  async assignRole(userId: string, roleId: string, tx?: DB): Promise<void> {
+    const db = tx || this.drizzle.db;
+    await db.insert(userRoles).values({
+      userId,
+      roleId,
+    });
+  }
+
+  /**
+   * Find user by email with roles and permissions
+   * @param email - User email
+   * @param tx - Optional transaction to use for the query
+   */
+  async findByEmailWithTx(email: string, tx?: DB): Promise<User | null> {
+    const db = tx || this.drizzle.db;
+    const rows = await db
+      .select({
+        user: users,
+        roleName: roles.name,
+      })
+      .from(users)
+      .leftJoin(userRoles, eq(users.id, userRoles.userId))
+      .leftJoin(roles, eq(userRoles.roleId, roles.id))
+      .where(eq(users.email, email));
+
+    if (!rows.length) return null;
+
+    const user = rows[0].user;
+    const rolesList = rows
+      .filter((r) => r.roleName)
+      .map((r) => r.roleName as string);
+
+    return {
+      ...user,
+      roles: rolesList,
+      role: rolesList[0] || '',
+    } as any;
+  }
+
+  /**
+   * Save a refresh token
+   * @param userId - User ID (UUID)
+   * @param token - Refresh token string
+   * @param expiresAt - Token expiration timestamp
+   * @param tx - Optional transaction to use for the query
+   */
+  async saveRefreshToken(
+    userId: string,
+    token: string,
+    expiresAt: Date,
+    tx?: DB,
+  ): Promise<void> {
+    const db = tx || this.drizzle.db;
+    await db.insert(refreshTokens).values({
+      userId,
+      token,
+      expiresAt,
+    });
+  }
+
+  /**
+   * Revoke a refresh token
+   * @param token - Refresh token string
+   * @param tx - Optional transaction to use for the query
+   */
+  async revokeRefreshToken(token: string, tx?: DB): Promise<void> {
+    const db = tx || this.drizzle.db;
+    await db
+      .update(refreshTokens)
+      .set({ revokedAt: new Date() })
+      .where(eq(refreshTokens.token, token));
+  }
+
+  /**
+   * Find valid (non-expired, non-revoked) refresh token
+   * @param token - Refresh token string
+   * @param tx - Optional transaction to use for the query
+   */
+  async findValidRefreshToken(token: string, tx?: DB) {
+    const db = tx || this.drizzle.db;
+    const now = new Date();
+    const [refreshToken] = await db
+      .select()
+      .from(refreshTokens)
+      .where(
+        and(
+          eq(refreshTokens.token, token),
+          eq(refreshTokens.revokedAt, null as any),
+        ),
+      );
+
+    if (!refreshToken || refreshToken.expiresAt < now) {
+      return null;
+    }
+
+    return refreshToken;
+  }
+
+  /**
+   * Get users for selector/dropdown (lightweight query)
+   * Optional search by name/email and role filter
+   * @param searchQuery - Optional search term for name or email
+   * @param roleName - Optional role name to filter by
+   * @param limit - Max results to return (default: 50)
+   */
+  async findForSelector(
+    searchQuery?: string,
+    roleName?: string,
+    limit: number = 50,
+  ): Promise<UserSelectorDto[]> {
+    const conditions: any[] = [];
+
+    if (searchQuery) {
+      conditions.push(
+        or(
+          ilike(users.fullName as any, `%${searchQuery}%`),
+          ilike(users.email, `%${searchQuery}%`),
+        ),
+      );
+    }
+
+    if (roleName) {
+      conditions.push(eq(roles.name, roleName));
+    }
+
+    let query: any = this.drizzle.db
+      .select({
+        id: users.id,
+        fullName: users.fullName,
+        department: users.department,
+        isExternal: users.isExternal,
+        role: roles.name,
+      })
+      .from(users)
+      .leftJoin(userRoles, eq(users.id, userRoles.userId))
+      .leftJoin(roles, eq(userRoles.roleId, roles.id));
+
+    for (const condition of conditions) {
+      query = query.where(condition);
+    }
+
+    const results = await query.limit(limit);
+
+    return results.map((row) => ({
+      label: row.fullName || row.id,
+      value: row.id,
+      meta: {
+        role: row.role || undefined,
+        department: row.department || undefined,
+        isExternal: row.isExternal || false,
+      },
+    }));
+  }
+
+  /**
+   * Check if users exist by their IDs
+   * @param userIds - Array of user IDs to validate
+   * @returns boolean - true if all users exist
+   */
+  async usersExist(userIds: string[]): Promise<boolean> {
+    const result = await this.drizzle.db
+      .select({ id: users.id })
+      .from(users)
+      .where(inArray(users.id, userIds));
+
+    return result.length === userIds.length;
   }
 }

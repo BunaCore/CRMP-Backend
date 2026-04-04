@@ -2,6 +2,7 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import { DrizzleService } from 'src/db/db.service';
@@ -13,6 +14,8 @@ import {
   ProposalListItemDto,
 } from './dto/proposal-list.dto';
 import { ApproverResolution } from './types/proposal';
+import { AuthenticatedUser } from 'src/auth/decorators/current-user.decorator';
+import { ProposalMemberRole } from './dto/proposal-members.dto';
 
 @Injectable()
 export class ProposalsService {
@@ -22,108 +25,155 @@ export class ProposalsService {
     private readonly usersService: UsersService,
     private readonly workflowService: WorkflowService,
   ) {}
-
   async create(
-    user: any,
+    user: AuthenticatedUser,
     dto: CreateProposalDto,
     file: Express.Multer.File,
     shouldSubmit: boolean = false,
   ) {
-    try {
-      // 0. Validate department exists if departmentId is provided
-      if (dto.departmentId) {
-        const departmentExists = await this.repository.departmentExists(
-          dto.departmentId,
+    // 0. Validate members structure (PI and MEMBER roles only)
+    const memberValidation = this.validateMembers(user.id, dto.members);
+    if (!memberValidation.valid) {
+      throw new BadRequestException(memberValidation.error);
+    }
+
+    // 0a. Validate all member users exist
+    const memberUserIds = dto.members.map((m) => m.userId);
+    const userExistValidation = await this.validateMembersExist(memberUserIds);
+    if (!userExistValidation.valid) {
+      throw new NotFoundException(userExistValidation.error);
+    }
+
+    // 0b. Validate supervisor (advisorUserId) if provided
+    let supervisorMember: { userId: string; role: string } | null = null;
+    if (dto.advisorUserId) {
+      // Check supervisor exists
+      const advisorExists = await this.repository.validateUsersExist([
+        dto.advisorUserId,
+      ]);
+      if (advisorExists.length === 0) {
+        throw new NotFoundException(
+          `Supervisor with ID "${dto.advisorUserId}" does not exist.`,
         );
-        if (!departmentExists) {
-          throw new NotFoundException(
-            `Department with ID "${dto.departmentId}" does not exist.`,
-          );
-        }
       }
+      // Check supervisor has SUPERVISOR role
+      const hasSupervisorRole = await this.repository.filterUsersByRole(
+        [dto.advisorUserId],
+        'SUPERVISOR',
+      );
+      if (hasSupervisorRole.length === 0) {
+        throw new BadRequestException(
+          `User "${dto.advisorUserId}" does not have SUPERVISOR role.`,
+        );
+      }
+      supervisorMember = { userId: dto.advisorUserId, role: 'SUPERVISOR' };
+    }
 
-      // 1. Create proposal (independent transaction)
-      const proposal = await this.drizzle.db.transaction(async (tx) => {
-        // 1.1 Create master proposal
-        const created = await this.repository.createProposal(tx, {
-          createdBy: user.id,
-          title: dto.title,
-          abstract: dto.abstract,
-          proposalProgram: dto.proposalProgram as any,
-          isFunded: dto.isFunded || false,
-          degreeLevel: (dto.degreeLevel || 'NA') as any,
-          researchArea: dto.researchArea,
-          durationMonths: dto.durationMonths,
-          departmentId: dto.departmentId,
-        });
+    // 1. Validate department exists if departmentId is provided
+    if (dto.departmentId) {
+      const departmentExists = await this.repository.departmentExists(
+        dto.departmentId,
+      );
+      if (!departmentExists) {
+        throw new NotFoundException(
+          `Department with ID "${dto.departmentId}" does not exist.`,
+        );
+      }
+    }
 
-        // 1.2 Create file metadata
-        const proposalFile = await this.repository.createProposalFile(tx, {
-          proposalId: created.id,
-          uploadedBy: user.id,
-          fileName: file.originalname,
-          filePath: `proposals/${Date.now()}_${file.originalname}`,
-          fileType: file.mimetype,
-          fileSize: file.size,
-        });
-
-        // 1.3 Create version snapshot
-        await this.repository.createProposalVersion(tx, {
-          proposalId: created.id,
-          createdBy: user.id,
-          fileId: proposalFile.id,
-          collaborators: dto.collaborators,
-        });
-
-        // 1.4 Create budget request and items
-        await this.repository.createBudgetRequest(tx, {
-          proposalId: created.id,
-          requestedBy: user.id,
-          items: dto.budget,
-        });
-
-        // 1.5 Audit log
-        await this.repository.createAuditLog(tx, {
-          actorUserId: user.id,
-          action: 'CREATED',
-          entityType: 'proposals',
-          entityId: created.id,
-          metadata: {
-            title: created.title,
-            program: created.proposalProgram,
-          },
-        });
-
-        return created;
+    // 2. Create proposal (independent transaction)
+    const proposal = await this.drizzle.db.transaction(async (tx) => {
+      // 2.1 Create master proposal
+      const created = await this.repository.createProposal(tx, {
+        createdBy: user.id,
+        title: dto.title,
+        abstract: dto.abstract,
+        proposalProgram: dto.proposalProgram as any,
+        isFunded: dto.isFunded || false,
+        degreeLevel: (dto.degreeLevel || 'NA') as any,
+        researchArea: dto.researchArea,
+        durationMonths: dto.durationMonths,
+        departmentId: dto.departmentId,
       });
 
-      // 2. Optional: Submit proposal in separate transaction
-      let submissionError: string | null = null;
-
-      if (shouldSubmit) {
-        try {
-          await this.workflowService.submitProposal(proposal.id, user.id);
-        } catch (error) {
-          submissionError =
-            error instanceof Error ? error.message : 'Submission failed';
-        }
-      }
-
-      return {
-        proposal: {
-          id: proposal.id,
-          title: proposal.title,
-          status: shouldSubmit && !submissionError ? 'Under_Review' : 'Draft',
-        },
-        submitted: shouldSubmit && !submissionError,
-        submissionError,
-      };
-    } catch (error) {
-      console.error('Proposal creation failed:', error);
-      throw new InternalServerErrorException(
-        'Failed to create proposal and related records.',
+      // 2.2 Add proposal members (PI/MEMBER from members array + SUPERVISOR from advisorUserId)
+      const allMembers =
+        supervisorMember !== null
+          ? ([...dto.members, supervisorMember] as Array<{
+              userId: string;
+              role: string;
+            }>)
+          : (dto.members as unknown as Array<{
+              userId: string;
+              role: string;
+            }>);
+      await this.repository.addProposalMembers(
+        tx,
+        created.id,
+        allMembers as Array<{ userId: string; role: ProposalMemberRole }>,
       );
+
+      // 2.3 Create file metadata
+      const proposalFile = await this.repository.createProposalFile(tx, {
+        proposalId: created.id,
+        uploadedBy: user.id,
+        fileName: file.originalname,
+        filePath: `proposals/${Date.now()}_${file.originalname}`,
+        fileType: file.mimetype,
+        fileSize: file.size,
+      });
+
+      // 2.4 Create version snapshot
+      await this.repository.createProposalVersion(tx, {
+        proposalId: created.id,
+        createdBy: user.id,
+        fileId: proposalFile.id,
+        collaborators: dto.collaborators,
+      });
+
+      // 2.5 Create budget request and items
+      await this.repository.createBudgetRequest(tx, {
+        proposalId: created.id,
+        requestedBy: user.id,
+        items: dto.budget,
+      });
+
+      // 2.6 Audit log
+      await this.repository.createAuditLog(tx, {
+        actorUserId: user.id,
+        action: 'CREATED',
+        entityType: 'proposals',
+        entityId: created.id,
+        metadata: {
+          title: created.title,
+          program: created.proposalProgram,
+        },
+      });
+
+      return created;
+    });
+
+    // 2. Optional: Submit proposal in separate transaction
+    let submissionError: string | null = null;
+
+    if (shouldSubmit) {
+      try {
+        await this.workflowService.submitProposal(proposal.id, user.id);
+      } catch (error) {
+        submissionError =
+          error instanceof Error ? error.message : 'Submission failed';
+      }
     }
+
+    return {
+      proposal: {
+        id: proposal.id,
+        title: proposal.title,
+        status: shouldSubmit && !submissionError ? 'Under_Review' : 'Draft',
+      },
+      submitted: shouldSubmit && !submissionError,
+      submissionError,
+    };
   }
 
   /**
@@ -198,7 +248,9 @@ export class ProposalsService {
    * Query ONLY active pending steps: is_active = true AND decision = 'Pending'
    * Trust is_active as source of truth
    */
-  async getPendingApprovals(user: any): Promise<PendingApprovalDto[]> {
+  async getPendingApprovals(
+    user: AuthenticatedUser,
+  ): Promise<PendingApprovalDto[]> {
     // 1. Fetch all proposals with active pending approval steps
     const proposalsWithSteps =
       await this.repository.findProposalsWithActivePendingSteps();
@@ -269,7 +321,7 @@ export class ProposalsService {
    * Centralized role validation with department context for COORDINATOR
    */
   private async resolveApprover(
-    user: any,
+    user: AuthenticatedUser,
     proposal: any,
     requiredRole: string,
     userRoles: string[],
@@ -307,5 +359,63 @@ export class ProposalsService {
     }
 
     return { canApprove: true };
+  }
+
+  // ─── Helper Methods: Member Validation ─────────────
+
+  /**
+   * Validate proposal members array (PI and MEMBER roles only)
+   * Ensures: at least one member, exactly one PI, creator is included
+   */
+  private validateMembers(
+    creatorId: string,
+    members: Array<{ userId: string; role: string }>,
+  ): { valid: boolean; error?: string } {
+    // Check at least one member
+    if (!members || members.length === 0) {
+      return { valid: false, error: 'At least one member is required' };
+    }
+
+    // Check exactly one PI
+    const piCount = members.filter((m) => m.role === 'PI').length;
+    if (piCount === 0) {
+      return {
+        valid: false,
+        error: 'Exactly one member must be assigned as PI',
+      };
+    }
+    if (piCount > 1) {
+      return { valid: false, error: 'Only one member can be assigned as PI' };
+    }
+
+    // Check creator is included
+    const creatorMember = members.find((m) => m.userId === creatorId);
+    if (!creatorMember) {
+      return { valid: false, error: 'Creator must be included in members' };
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * Validate that all users exist in the system
+   */
+  private async validateMembersExist(userIds: string[]): Promise<{
+    valid: boolean;
+    error?: string;
+    missingIds?: string[];
+  }> {
+    const foundIds = await this.repository.validateUsersExist(userIds);
+    const missingIds = userIds.filter((id) => !foundIds.includes(id));
+
+    if (missingIds.length > 0) {
+      return {
+        valid: false,
+        error: `Users not found: ${missingIds.join(', ')}`,
+        missingIds,
+      };
+    }
+
+    return { valid: true };
   }
 }

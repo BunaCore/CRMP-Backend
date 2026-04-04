@@ -17,7 +17,7 @@ import { ReviewFundedDto } from '../dto/review-funded.dto';
 
 @Controller('funded/evaluator')
 @UseGuards(JwtAuthGuard, AccessGuard)
-@RequirePermission(Permission.FUNDED_EVALUATOR_ACCESS)
+@RequirePermission(Permission.EVALUATION_READ)
 export class EvaluatorController {
   constructor(
     private readonly workflowService: FundedWorkflowService,
@@ -30,7 +30,7 @@ export class EvaluatorController {
   }
 
   @Post(':proposalId/review/:approvalId')
-  @RequirePermission(Permission.FUNDED_DECIDE)
+  @RequirePermission(Permission.EVALUATION_SUBMIT)
   async submitEvaluation(
     @Param('proposalId') proposalId: string,
     @Param('approvalId') approvalId: string,

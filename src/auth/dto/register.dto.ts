@@ -4,6 +4,7 @@ import {
   MinLength,
   IsOptional,
   IsNotEmpty,
+  IsUUID,
 } from 'class-validator';
 
 export class RegisterDto {
@@ -21,8 +22,8 @@ export class RegisterDto {
   fullName?: string;
 
   @IsOptional()
-  @IsString()
-  department?: string;
+  @IsUUID('4', { message: 'Department ID must be a valid UUID' })
+  departmentId?: string;
 
   @IsOptional()
   @IsString()

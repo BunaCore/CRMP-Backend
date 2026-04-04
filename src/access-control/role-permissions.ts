@@ -1,129 +1,167 @@
 import { Role } from './role.enum';
 import { Permission } from './permission.enum';
 
-/**
- * Static role-to-permission mapping
- * Each role has a flat set of permissions (no inheritance)
- */
 export const RolePermissions: Record<Role, Permission[]> = {
+  // --- Academic / Research Identity ---
+
   [Role.STUDENT]: [
-    Permission.PROJECT_CREATE,
-    Permission.PROJECT_SUBMIT,
-    Permission.PROJECT_VIEW,
-    Permission.TEAM_VIEW,
+    Permission.PROPOSAL_CREATE,
+    Permission.PROPOSAL_READ,
+    Permission.PROPOSAL_UPDATE,
+    Permission.PROPOSAL_SUBMIT,
+
+    // ✅ PI capability
+    Permission.PROPOSAL_ADD_MEMBER,
   ],
 
-  [Role.PI]: [
-    Permission.PROJECT_CREATE,
-    Permission.PROJECT_SUBMIT,
-    Permission.PROJECT_VIEW,
-    Permission.TEAM_MANAGE,
-    Permission.TEAM_VIEW,
-    Permission.BUDGET_VIEW,
-    // ── Funded Project (PI) ───────
-    Permission.FUNDED_SUBMIT,
-    Permission.FUNDED_VIEW,
+  [Role.FACULTY]: [
+    Permission.PROPOSAL_CREATE,
+    Permission.PROPOSAL_READ,
+    Permission.PROPOSAL_UPDATE,
+    Permission.PROPOSAL_SUBMIT,
+
+    Permission.PROPOSAL_ADD_MEMBER,
+
+    Permission.EVALUATION_READ,
   ],
 
   [Role.SUPERVISOR]: [
-    Permission.PROJECT_VIEW,
-    Permission.PROJECT_REVIEW,
-    Permission.TEAM_VIEW,
-    Permission.PROJECT_RECOMMEND,
-  ],
+    Permission.PROPOSAL_READ,
 
-  [Role.COORDINATOR]: [
-    Permission.PROJECT_VIEW,
-    Permission.PROJECT_REVIEW,
-    Permission.PROJECT_APPROVE,
-    Permission.PROJECT_REJECT,
-    Permission.USER_VIEW,
-    Permission.EVALUATOR_ASSIGN,
-    // ── Coordinator-exclusive (UG track) ───────
-    Permission.COORDINATOR_PROPOSALS_VIEW,
-    Permission.COORDINATOR_DECIDE,
-    Permission.COORDINATOR_ASSIGN,
-  ],
+    // ❗ No direct update (avoid silent mutation)
+    Permission.PROPOSAL_REQUEST_REVISION,
 
-  [Role.DGC_MEMBER]: [
-    Permission.PROJECT_VIEW,
-    Permission.PROJECT_REVIEW,
-    Permission.PROJECT_APPROVE,
-    Permission.PROJECT_REJECT,
-    Permission.EVALUATOR_ASSIGN,
-    Permission.BUDGET_VIEW,
+    Permission.EVALUATION_READ,
   ],
 
   [Role.EVALUATOR]: [
-    Permission.PROJECT_VIEW,
-    Permission.PROJECT_REVIEW,
-    // ── Funded Project (Evaluator) ───────
-    Permission.FUNDED_EVALUATOR_ACCESS,
-    Permission.FUNDED_VIEW,
-    Permission.FUNDED_DECIDE,
+    Permission.PROPOSAL_READ,
+
+    Permission.EVALUATION_SUBMIT,
+    Permission.EVALUATION_READ,
   ],
 
+  // --- Departmental Authority ---
+
+  [Role.COORDINATOR]: [
+    Permission.PROPOSAL_READ,
+    Permission.PROPOSAL_UPDATE,
+
+    Permission.PROPOSAL_ASSIGN_EVALUATOR, // ✅ key addition
+
+    Permission.PROPOSAL_APPROVE,
+    Permission.PROPOSAL_REJECT,
+    Permission.PROPOSAL_REQUEST_REVISION,
+
+    Permission.EVALUATION_ASSIGN,
+    Permission.EVALUATION_READ,
+
+    Permission.USER_READ,
+  ],
+
+  [Role.DGC_MEMBER]: [
+    Permission.PROPOSAL_READ,
+
+    Permission.PROPOSAL_APPROVE,
+    Permission.PROPOSAL_REJECT,
+    Permission.PROPOSAL_REQUEST_REVISION,
+
+    Permission.EVALUATION_READ,
+  ],
+
+  // --- College & Central Offices ---
+
   [Role.COLLEGE_OFFICE]: [
-    Permission.PROJECT_VIEW,
-    Permission.PROJECT_APPROVE,
-    Permission.PROJECT_REJECT,
-    Permission.BUDGET_VIEW,
+    Permission.PROPOSAL_READ,
+
+    Permission.PROPOSAL_APPROVE,
+    Permission.PROPOSAL_REJECT,
+
+    Permission.REPORT_EXPORT,
   ],
 
   [Role.PG_OFFICE]: [
-    Permission.PROJECT_VIEW,
-    Permission.PROJECT_APPROVE,
-    Permission.PROJECT_REJECT,
-    Permission.BUDGET_VIEW,
-    Permission.BUDGET_APPROVE,
-    Permission.BUDGET_REJECT,
-    Permission.ADMIN_VIEW,
-  ],
+    Permission.PROPOSAL_READ,
 
-  [Role.FINANCE]: [
-    Permission.BUDGET_VIEW,
-    Permission.BUDGET_APPROVE,
-    Permission.BUDGET_REJECT,
-    // ── Funded Project (Finance) ───────
-    Permission.FUNDED_APPROVER_ACCESS,
-    Permission.FUNDED_VIEW,
-    Permission.FUNDED_DECIDE,
+    Permission.PROPOSAL_APPROVE,
+    Permission.PROPOSAL_REJECT,
+
+    Permission.REPORT_EXPORT,
   ],
 
   [Role.RAD]: [
-    Permission.PROJECT_VIEW,
-    Permission.PROJECT_REVIEW,
-    Permission.PROJECT_APPROVE,
-    Permission.PROJECT_REJECT,
-    Permission.ADMIN_VIEW,
-    // ── Funded Project (RAD) ───────
-    Permission.FUNDED_RAD_ACCESS,
-    Permission.FUNDED_VIEW,
-    Permission.FUNDED_ASSIGN,
-    Permission.FUNDED_DECIDE,
+    Permission.PROPOSAL_READ,
+
+    // ✅ RAD handles research/grants evaluator assignment
+    Permission.PROPOSAL_ASSIGN_EVALUATOR,
+
+    Permission.PROPOSAL_APPROVE,
+    Permission.PROPOSAL_REJECT,
+
+    Permission.EVALUATION_ASSIGN,
+    Permission.EVALUATION_READ,
+
+    Permission.BUDGET_VIEW,
+
+    Permission.REPORT_EXPORT,
   ],
 
-  [Role.ADMIN]: [
-    Permission.ADMIN_VIEW,
-    Permission.ADMIN_EDIT,
-    Permission.USER_VIEW,
-    Permission.PROJECT_VIEW,
+  [Role.FINANCE]: [
+    Permission.PROPOSAL_READ, // ⚠️ you may later scope this
+
+    Permission.BUDGET_VIEW,
+    Permission.BUDGET_MANAGE,
   ],
+
+  // --- Executive & System ---
+
   [Role.VPRTT]: [
-    Permission.PROJECT_VIEW,
-    Permission.BUDGET_VIEW,
-    // ── Funded Project (VPRTT) ───────
-    Permission.FUNDED_APPROVER_ACCESS,
-    Permission.FUNDED_VIEW,
-    Permission.FUNDED_DECIDE,
+    Permission.PROPOSAL_READ,
+
+    Permission.PROPOSAL_APPROVE,
+    Permission.PROPOSAL_REJECT,
+
+    Permission.REPORT_EXPORT,
   ],
-  [Role.AC]: [
-    Permission.PROJECT_VIEW,
-    Permission.BUDGET_VIEW,
-    // ── Funded Project (AC) ───────
-    Permission.FUNDED_APPROVER_ACCESS,
-    Permission.FUNDED_VIEW,
-    Permission.FUNDED_DECIDE,
+
+  [Role.AC_MEMBER]: [
+    Permission.PROPOSAL_READ,
+
+    Permission.PROPOSAL_APPROVE,
+    Permission.PROPOSAL_REJECT,
   ],
-  [Role.FACULTY]: [],
+
+  [Role.SYSTEM_ADMIN]: [
+    Permission.USER_READ,
+    Permission.USER_PROVISION,
+    Permission.USER_ASSIGN_ROLE,
+
+    Permission.ROLE_CREATE,
+    Permission.ROLE_READ,
+    Permission.ROLE_UPDATE,
+    Permission.ROLE_DELETE,
+
+    Permission.PERMISSION_ASSIGN,
+
+    Permission.DEPARTMENT_CREATE,
+    Permission.DEPARTMENT_READ,
+    Permission.DEPARTMENT_UPDATE,
+    Permission.DEPARTMENT_DELETE,
+
+    Permission.SCHOOL_CREATE,
+    Permission.SCHOOL_READ,
+    Permission.SCHOOL_UPDATE,
+    Permission.SCHOOL_DELETE,
+
+    Permission.SYSTEM_CONFIG,
+    Permission.AUDIT_LOG_VIEW,
+  ],
+
+  // --- External ---
+
+  [Role.EXTERNAL_EXPERT]: [
+    Permission.PROPOSAL_READ,
+    Permission.EVALUATION_SUBMIT,
+    Permission.EVALUATION_READ,
+  ],
 };

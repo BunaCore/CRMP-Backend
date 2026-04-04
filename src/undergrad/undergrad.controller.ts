@@ -47,7 +47,7 @@ export class UndergradController {
   // Access: COORDINATOR only (COORDINATOR_PROPOSALS_VIEW)
   // ─────────────────────────────────────────────────────────────────────────
   @Get('proposals')
-  @RequirePermission(Permission.COORDINATOR_PROPOSALS_VIEW)
+  @RequirePermission(Permission.PROPOSAL_READ)
   async getProposals(
     @CurrentUser() _user: AuthenticatedUser,
     @Query('status') status?: string,
@@ -66,7 +66,7 @@ export class UndergradController {
   // Access: COORDINATOR only (COORDINATOR_PROPOSALS_VIEW)
   // ─────────────────────────────────────────────────────────────────────────
   @Get('proposals/:id')
-  @RequirePermission(Permission.COORDINATOR_PROPOSALS_VIEW)
+  @RequirePermission(Permission.PROPOSAL_READ)
   async getProposalDetail(
     @CurrentUser() _user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) proposalId: string,
@@ -94,7 +94,7 @@ export class UndergradController {
   // Access: COORDINATOR only (COORDINATOR_DECIDE)
   // ──────────────────────────────────────────────────────────────────────
   @Patch('proposals/:id/decision')
-  @RequirePermission(Permission.COORDINATOR_DECIDE)
+  @RequirePermission(Permission.PROPOSAL_APPROVE)
   async makeDecision(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) proposalId: string,
@@ -111,7 +111,7 @@ export class UndergradController {
   // Access: COORDINATOR only (COORDINATOR_PROPOSALS_VIEW)
   // ──────────────────────────────────────────────────────────────────────
   @Get('advisors')
-  @RequirePermission(Permission.COORDINATOR_PROPOSALS_VIEW)
+  @RequirePermission(Permission.PROPOSAL_READ)
   async getAdvisors(@CurrentUser() _user: AuthenticatedUser) {
     return this.undergradService.getAdvisors();
   }
@@ -132,7 +132,7 @@ export class UndergradController {
   // Access: COORDINATOR only (COORDINATOR_ASSIGN)
   // ──────────────────────────────────────────────────────────────────────
   @Post('proposals/:id/assign-evaluator')
-  @RequirePermission(Permission.COORDINATOR_ASSIGN)
+  @RequirePermission(Permission.EVALUATION_ASSIGN)
   async assignEvaluator(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) proposalId: string,
