@@ -6,12 +6,23 @@ export enum Permission {
   PROPOSAL_DELETE = 'proposal:delete',
   PROPOSAL_SUBMIT = 'proposal:submit',
 
+  // --- Proposal assigning members or any intended parties
+  PROPOSAL_ASSIGN_ADVISOR = 'proposal:assign_advisor',
+  PROPOSAL_ASSIGN_SUPERVISOR = 'proposal:assign_supervisor',
+  PROPOSAL_ADD_MEMBER = 'proposal:add_member',
+  PROPOSAL_MANAGE_MEMBERS = 'proposal:manage_members', // Add/remove members, change roles
+  // --- Project_Core ---
+  PROJECT_CREATE = 'project:create',
+  PROJECT_READ = 'project:read',
+  PROJECT_UPDATE = 'project:update',
+  PROJECT_DELETE = 'project:delete',
+
   // --- Proposal Decisions (workflow actions) ---
   PROPOSAL_APPROVE = 'proposal:approve',
   PROPOSAL_REJECT = 'proposal:reject',
   PROPOSAL_REQUEST_REVISION = 'proposal:request_revision',
 
-  // --- Evaluation ---
+  // --- Evaluation marks ---
   EVALUATION_ASSIGN = 'evaluation:assign',
   EVALUATION_SUBMIT = 'evaluation:submit',
   EVALUATION_READ = 'evaluation:read',

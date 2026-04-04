@@ -14,6 +14,8 @@ import {
   ProposalListItemDto,
 } from './dto/proposal-list.dto';
 import { ApproverResolution } from './types/proposal';
+import { AuthenticatedUser } from 'src/auth/decorators/current-user.decorator';
+import { ProposalMemberRole } from './dto/proposal-members.dto';
 
 @Injectable()
 export class ProposalsService {
@@ -23,139 +25,155 @@ export class ProposalsService {
     private readonly usersService: UsersService,
     private readonly workflowService: WorkflowService,
   ) {}
-
   async create(
-    user: any,
+    user: AuthenticatedUser,
     dto: CreateProposalDto,
     file: Express.Multer.File,
     shouldSubmit: boolean = false,
   ) {
-    try {
-      // 0. Validate members structure and presence
-      const memberValidation = this.validateMembers(user.id, dto.members);
-      if (!memberValidation.valid) {
-        throw new BadRequestException(memberValidation.error);
-      }
+    // 0. Validate members structure (PI and MEMBER roles only)
+    const memberValidation = this.validateMembers(user.id, dto.members);
+    if (!memberValidation.valid) {
+      throw new BadRequestException(memberValidation.error);
+    }
 
-      // 0a. Validate all member users exist
-      const memberUserIds = dto.members.map((m) => m.userId);
-      const userExistValidation =
-        await this.validateMembersExist(memberUserIds);
-      if (!userExistValidation.valid) {
-        throw new NotFoundException(userExistValidation.error);
-      }
+    // 0a. Validate all member users exist
+    const memberUserIds = dto.members.map((m) => m.userId);
+    const userExistValidation = await this.validateMembersExist(memberUserIds);
+    if (!userExistValidation.valid) {
+      throw new NotFoundException(userExistValidation.error);
+    }
 
-      // 0b. Validate supervisors have SUPERVISOR role
-      const supervisorIds = dto.members
-        .filter((m) => m.role === 'SUPERVISOR')
-        .map((m) => m.userId);
-      if (supervisorIds.length > 0) {
-        const supervisorValidation =
-          await this.validateSupervisorRoles(supervisorIds);
-        if (!supervisorValidation.valid) {
-          throw new BadRequestException(
-            `Users not found with SUPERVISOR role: ${supervisorValidation.notSupervisors?.join(', ')}`,
-          );
-        }
-      }
-
-      // 1. Validate department exists if departmentId is provided
-      if (dto.departmentId) {
-        const departmentExists = await this.repository.departmentExists(
-          dto.departmentId,
+    // 0b. Validate supervisor (advisorUserId) if provided
+    let supervisorMember: { userId: string; role: string } | null = null;
+    if (dto.advisorUserId) {
+      // Check supervisor exists
+      const advisorExists = await this.repository.validateUsersExist([
+        dto.advisorUserId,
+      ]);
+      if (advisorExists.length === 0) {
+        throw new NotFoundException(
+          `Supervisor with ID "${dto.advisorUserId}" does not exist.`,
         );
-        if (!departmentExists) {
-          throw new NotFoundException(
-            `Department with ID "${dto.departmentId}" does not exist.`,
-          );
-        }
       }
+      // Check supervisor has SUPERVISOR role
+      const hasSupervisorRole = await this.repository.filterUsersByRole(
+        [dto.advisorUserId],
+        'SUPERVISOR',
+      );
+      if (hasSupervisorRole.length === 0) {
+        throw new BadRequestException(
+          `User "${dto.advisorUserId}" does not have SUPERVISOR role.`,
+        );
+      }
+      supervisorMember = { userId: dto.advisorUserId, role: 'SUPERVISOR' };
+    }
 
-      // 2. Create proposal (independent transaction)
-      const proposal = await this.drizzle.db.transaction(async (tx) => {
-        // 2.1 Create master proposal
-        const created = await this.repository.createProposal(tx, {
-          createdBy: user.id,
-          title: dto.title,
-          abstract: dto.abstract,
-          proposalProgram: dto.proposalProgram as any,
-          isFunded: dto.isFunded || false,
-          degreeLevel: (dto.degreeLevel || 'NA') as any,
-          researchArea: dto.researchArea,
-          durationMonths: dto.durationMonths,
-          departmentId: dto.departmentId,
-        });
+    // 1. Validate department exists if departmentId is provided
+    if (dto.departmentId) {
+      const departmentExists = await this.repository.departmentExists(
+        dto.departmentId,
+      );
+      if (!departmentExists) {
+        throw new NotFoundException(
+          `Department with ID "${dto.departmentId}" does not exist.`,
+        );
+      }
+    }
 
-        // 2.2 Add proposal members
-        await this.repository.addProposalMembers(tx, created.id, dto.members);
-
-        // 2.3 Create file metadata
-        const proposalFile = await this.repository.createProposalFile(tx, {
-          proposalId: created.id,
-          uploadedBy: user.id,
-          fileName: file.originalname,
-          filePath: `proposals/${Date.now()}_${file.originalname}`,
-          fileType: file.mimetype,
-          fileSize: file.size,
-        });
-
-        // 2.4 Create version snapshot
-        await this.repository.createProposalVersion(tx, {
-          proposalId: created.id,
-          createdBy: user.id,
-          fileId: proposalFile.id,
-          collaborators: dto.collaborators,
-        });
-
-        // 2.5 Create budget request and items
-        await this.repository.createBudgetRequest(tx, {
-          proposalId: created.id,
-          requestedBy: user.id,
-          items: dto.budget,
-        });
-
-        // 2.6 Audit log
-        await this.repository.createAuditLog(tx, {
-          actorUserId: user.id,
-          action: 'CREATED',
-          entityType: 'proposals',
-          entityId: created.id,
-          metadata: {
-            title: created.title,
-            program: created.proposalProgram,
-          },
-        });
-
-        return created;
+    // 2. Create proposal (independent transaction)
+    const proposal = await this.drizzle.db.transaction(async (tx) => {
+      // 2.1 Create master proposal
+      const created = await this.repository.createProposal(tx, {
+        createdBy: user.id,
+        title: dto.title,
+        abstract: dto.abstract,
+        proposalProgram: dto.proposalProgram as any,
+        isFunded: dto.isFunded || false,
+        degreeLevel: (dto.degreeLevel || 'NA') as any,
+        researchArea: dto.researchArea,
+        durationMonths: dto.durationMonths,
+        departmentId: dto.departmentId,
       });
 
-      // 2. Optional: Submit proposal in separate transaction
-      let submissionError: string | null = null;
-
-      if (shouldSubmit) {
-        try {
-          await this.workflowService.submitProposal(proposal.id, user.id);
-        } catch (error) {
-          submissionError =
-            error instanceof Error ? error.message : 'Submission failed';
-        }
-      }
-
-      return {
-        proposal: {
-          id: proposal.id,
-          title: proposal.title,
-          status: shouldSubmit && !submissionError ? 'Under_Review' : 'Draft',
-        },
-        submitted: shouldSubmit && !submissionError,
-        submissionError,
-      };
-    } catch (error) {
-      console.error('Proposal creation failed:', error);
-      throw new InternalServerErrorException(
-        'Failed to create proposal and related records.',
+      // 2.2 Add proposal members (PI/MEMBER from members array + SUPERVISOR from advisorUserId)
+      const allMembers =
+        supervisorMember !== null
+          ? ([...dto.members, supervisorMember] as Array<{
+              userId: string;
+              role: string;
+            }>)
+          : (dto.members as unknown as Array<{
+              userId: string;
+              role: string;
+            }>);
+      await this.repository.addProposalMembers(
+        tx,
+        created.id,
+        allMembers as Array<{ userId: string; role: ProposalMemberRole }>,
       );
+
+      // 2.3 Create file metadata
+      const proposalFile = await this.repository.createProposalFile(tx, {
+        proposalId: created.id,
+        uploadedBy: user.id,
+        fileName: file.originalname,
+        filePath: `proposals/${Date.now()}_${file.originalname}`,
+        fileType: file.mimetype,
+        fileSize: file.size,
+      });
+
+      // 2.4 Create version snapshot
+      await this.repository.createProposalVersion(tx, {
+        proposalId: created.id,
+        createdBy: user.id,
+        fileId: proposalFile.id,
+        collaborators: dto.collaborators,
+      });
+
+      // 2.5 Create budget request and items
+      await this.repository.createBudgetRequest(tx, {
+        proposalId: created.id,
+        requestedBy: user.id,
+        items: dto.budget,
+      });
+
+      // 2.6 Audit log
+      await this.repository.createAuditLog(tx, {
+        actorUserId: user.id,
+        action: 'CREATED',
+        entityType: 'proposals',
+        entityId: created.id,
+        metadata: {
+          title: created.title,
+          program: created.proposalProgram,
+        },
+      });
+
+      return created;
+    });
+
+    // 2. Optional: Submit proposal in separate transaction
+    let submissionError: string | null = null;
+
+    if (shouldSubmit) {
+      try {
+        await this.workflowService.submitProposal(proposal.id, user.id);
+      } catch (error) {
+        submissionError =
+          error instanceof Error ? error.message : 'Submission failed';
+      }
     }
+
+    return {
+      proposal: {
+        id: proposal.id,
+        title: proposal.title,
+        status: shouldSubmit && !submissionError ? 'Under_Review' : 'Draft',
+      },
+      submitted: shouldSubmit && !submissionError,
+      submissionError,
+    };
   }
 
   /**
@@ -230,7 +248,9 @@ export class ProposalsService {
    * Query ONLY active pending steps: is_active = true AND decision = 'Pending'
    * Trust is_active as source of truth
    */
-  async getPendingApprovals(user: any): Promise<PendingApprovalDto[]> {
+  async getPendingApprovals(
+    user: AuthenticatedUser,
+  ): Promise<PendingApprovalDto[]> {
     // 1. Fetch all proposals with active pending approval steps
     const proposalsWithSteps =
       await this.repository.findProposalsWithActivePendingSteps();
@@ -301,7 +321,7 @@ export class ProposalsService {
    * Centralized role validation with department context for COORDINATOR
    */
   private async resolveApprover(
-    user: any,
+    user: AuthenticatedUser,
     proposal: any,
     requiredRole: string,
     userRoles: string[],
@@ -344,7 +364,7 @@ export class ProposalsService {
   // ─── Helper Methods: Member Validation ─────────────
 
   /**
-   * Validate proposal members array
+   * Validate proposal members array (PI and MEMBER roles only)
    * Ensures: at least one member, exactly one PI, creator is included
    */
   private validateMembers(
@@ -394,32 +414,6 @@ export class ProposalsService {
         error: `Users not found: ${missingIds.join(', ')}`,
         missingIds,
       };
-    }
-
-    return { valid: true };
-  }
-
-  /**
-   * Validate that users with SUPERVISOR role exist (optional but recommended)
-   */
-  private async validateSupervisorRoles(supervisorIds: string[]): Promise<{
-    valid: boolean;
-    notSupervisors?: string[];
-  }> {
-    if (supervisorIds.length === 0) {
-      return { valid: true };
-    }
-
-    const validSupervisors = await this.repository.filterUsersByRole(
-      supervisorIds,
-      'SUPERVISOR',
-    );
-    const notSupervisors = supervisorIds.filter(
-      (id) => !validSupervisors.includes(id),
-    );
-
-    if (notSupervisors.length > 0) {
-      return { valid: false, notSupervisors };
     }
 
     return { valid: true };

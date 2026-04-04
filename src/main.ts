@@ -1,7 +1,9 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, BadRequestException } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { validationExceptionFactory } from './common/validation/validation-exception.factory';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -10,6 +12,9 @@ async function bootstrap() {
   app.enableCors({
     origin: '*',
   });
+
+  // Global exception filter - handles all errors at the edge
+  app.useGlobalFilters(new GlobalExceptionFilter());
 
   // Global validation pipe with custom error handling
   app.useGlobalPipes(
@@ -20,20 +25,7 @@ async function bootstrap() {
       transformOptions: {
         enableImplicitConversion: true,
       },
-      exceptionFactory: (errors) => {
-        const structured = errors.map((error) => ({
-          field: error.property,
-          errors: error.constraints,
-          errorStr: error.constraints
-            ? Object.values(error.constraints)[0]
-            : null, // Get the first error message
-        }));
-        return new BadRequestException({
-          statusCode: 400,
-          message: 'Validation failed',
-          errors: structured,
-        });
-      },
+      exceptionFactory: validationExceptionFactory,
     }),
   );
 

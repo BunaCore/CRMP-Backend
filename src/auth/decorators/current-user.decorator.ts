@@ -7,7 +7,8 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 export interface AuthenticatedUser {
   id: string; // User ID (from JWT sub claim, but fetched fresh from DB)
   email: string; // From database
-  role: string; // From JWT and verified in database
+  roles: string[]; // Array of assigned roles (e.g., ['FACULTY', 'COORDINATOR'])
+  role: string; // Primary role (from JWT and verified in database)
   department?: string; // From database
   accountStatus?: string; // From database
   fullName?: string; // From database

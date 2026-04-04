@@ -23,7 +23,10 @@ import {
   WorkflowActionResponseDto,
 } from './dto/workflow.dto';
 import { JwtAuthGuard } from 'src/auth/jwt.guard';
-import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from 'src/auth/decorators/current-user.decorator';
 import { AccessGuard } from 'src/access-control/access.guard';
 import { RequirePermission } from 'src/access-control/require-permission.decorator';
 import { Permission } from 'src/access-control/permission.enum';
@@ -42,7 +45,7 @@ export class ProposalsController {
    * Simple ownership-based query
    */
   @Get('my')
-  async getMyProposals(@CurrentUser() user: any) {
+  async getMyProposals(@CurrentUser() user: AuthenticatedUser) {
     return this.proposalsService.getMyProposals(user.id);
   }
 
@@ -52,7 +55,7 @@ export class ProposalsController {
    * Dynamic workflow-based query with role resolution
    */
   @Get('pending-approvals')
-  async getPendingApprovals(@CurrentUser() user: any) {
+  async getPendingApprovals(@CurrentUser() user: AuthenticatedUser) {
     return this.proposalsService.getPendingApprovals(user);
   }
 
@@ -61,7 +64,7 @@ export class ProposalsController {
   @UseInterceptors(FileInterceptor('file'))
   async submitProposal(
     @Body() createProposalDto: CreateProposalDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @UploadedFile(
       new ParseFilePipe({
         validators: [
@@ -91,7 +94,7 @@ export class ProposalsController {
   @Post(':id/submit')
   async submit(
     @Param('id', new ParseUUIDPipe()) proposalId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<WorkflowActionResponseDto> {
     const result = await this.workflowService.submitProposal(
       proposalId,
@@ -114,7 +117,7 @@ export class ProposalsController {
   @Post(':id/approve')
   async approve(
     @Param('id', new ParseUUIDPipe()) proposalId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: ApprovalActionDto,
   ): Promise<WorkflowActionResponseDto> {
     const result = await this.workflowService.acceptStep(
@@ -144,7 +147,7 @@ export class ProposalsController {
   @Post(':id/reject')
   async reject(
     @Param('id', new ParseUUIDPipe()) proposalId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: ApprovalActionDto,
   ): Promise<WorkflowActionResponseDto> {
     if (!dto.note || dto.note.trim().length === 0) {
@@ -174,7 +177,7 @@ export class ProposalsController {
   @Post(':id/request-revision')
   async requestRevision(
     @Param('id', new ParseUUIDPipe()) proposalId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: ApprovalActionDto,
   ): Promise<WorkflowActionResponseDto> {
     if (!dto.note || dto.note.trim().length === 0) {

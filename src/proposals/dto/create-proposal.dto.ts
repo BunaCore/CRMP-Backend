@@ -10,7 +10,7 @@ import {
   Min,
   IsBoolean,
 } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Type, Transform, plainToInstance } from 'class-transformer';
 import { ProposalMemberDto } from './proposal-member.dto';
 
 export enum ProposalProgram {
@@ -74,15 +74,16 @@ export class CreateProposalDto {
   @Type(() => Number)
   durationMonths: number;
 
+  @Transform(({ value }) => plainToInstance(BudgetItemDto, JSON.parse(value)))
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => BudgetItemDto)
   @IsNotEmpty()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
   budget: BudgetItemDto[];
 
+  @Transform(({ value }) =>
+    plainToInstance(ProposalMemberDto, JSON.parse(value)),
+  )
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ProposalMemberDto)
