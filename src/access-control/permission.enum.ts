@@ -9,6 +9,7 @@ export enum Permission {
   // --- Proposal assigning members or any intended parties
   PROPOSAL_ASSIGN_ADVISOR = 'proposal:assign_advisor',
   PROPOSAL_ASSIGN_SUPERVISOR = 'proposal:assign_supervisor',
+  PROPOSAL_ASSIGN_EVALUATOR = 'proposal:assign_evaluator',
   PROPOSAL_ADD_MEMBER = 'proposal:add_member',
   PROPOSAL_MANAGE_MEMBERS = 'proposal:manage_members', // Add/remove members, change roles
   // --- Project_Core ---

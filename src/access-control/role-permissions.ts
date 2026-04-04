@@ -1,10 +1,6 @@
 import { Role } from './role.enum';
 import { Permission } from './permission.enum';
 
-/**
- * Static role-to-permission mapping
- * Each role has a flat set of permissions (no inheritance)
- */
 export const RolePermissions: Record<Role, Permission[]> = {
   // --- Academic / Research Identity ---
 
@@ -13,6 +9,9 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.PROPOSAL_READ,
     Permission.PROPOSAL_UPDATE,
     Permission.PROPOSAL_SUBMIT,
+
+    // ✅ PI capability
+    Permission.PROPOSAL_ADD_MEMBER,
   ],
 
   [Role.FACULTY]: [
@@ -20,17 +19,24 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.PROPOSAL_READ,
     Permission.PROPOSAL_UPDATE,
     Permission.PROPOSAL_SUBMIT,
+
+    Permission.PROPOSAL_ADD_MEMBER,
+
     Permission.EVALUATION_READ,
   ],
 
   [Role.SUPERVISOR]: [
     Permission.PROPOSAL_READ,
-    Permission.PROPOSAL_UPDATE, // business logic will scope this
+
+    // ❗ No direct update (avoid silent mutation)
+    Permission.PROPOSAL_REQUEST_REVISION,
+
     Permission.EVALUATION_READ,
   ],
 
   [Role.EVALUATOR]: [
     Permission.PROPOSAL_READ,
+
     Permission.EVALUATION_SUBMIT,
     Permission.EVALUATION_READ,
   ],
@@ -39,6 +45,9 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
   [Role.COORDINATOR]: [
     Permission.PROPOSAL_READ,
+    Permission.PROPOSAL_UPDATE,
+
+    Permission.PROPOSAL_ASSIGN_EVALUATOR, // ✅ key addition
 
     Permission.PROPOSAL_APPROVE,
     Permission.PROPOSAL_REJECT,
@@ -83,17 +92,22 @@ export const RolePermissions: Record<Role, Permission[]> = {
   [Role.RAD]: [
     Permission.PROPOSAL_READ,
 
+    // ✅ RAD handles research/grants evaluator assignment
+    Permission.PROPOSAL_ASSIGN_EVALUATOR,
+
     Permission.PROPOSAL_APPROVE,
     Permission.PROPOSAL_REJECT,
 
     Permission.EVALUATION_ASSIGN,
     Permission.EVALUATION_READ,
 
+    Permission.BUDGET_VIEW,
+
     Permission.REPORT_EXPORT,
   ],
 
   [Role.FINANCE]: [
-    Permission.PROPOSAL_READ,
+    Permission.PROPOSAL_READ, // ⚠️ you may later scope this
 
     Permission.BUDGET_VIEW,
     Permission.BUDGET_MANAGE,

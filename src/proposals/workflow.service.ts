@@ -412,35 +412,28 @@ export class WorkflowService {
       };
     }
 
-    // COORDINATOR requires dept verification
+    // COORDINATOR requires department verification
     if (requiredRole === 'COORDINATOR') {
-      if (!proposal.projectId) {
-        return {
-          canApprove: false,
-          reason: 'Proposal not linked to a project',
-        };
-      }
-
-      const projectCtx = await this.repository.findProjectWithDepartment(
-        proposal.projectId,
+      const proposalCtx = await this.repository.findProposalWithDepartment(
+        proposal.id,
       );
 
-      if (!projectCtx) {
+      if (!proposalCtx) {
         return {
           canApprove: false,
-          reason: 'Project or department not found',
+          reason: 'Proposal or department not found',
         };
       }
-      console.log('user:', user);
+
       const isCoord = await this.usersService.isCoordinatorOfDepartment(
         user.id,
-        projectCtx.departmentId,
+        proposalCtx.departmentId,
       );
 
       if (!isCoord) {
         return {
           canApprove: false,
-          reason: `User is not coordinator of department: ${projectCtx.department?.name || 'unknown'}`,
+          reason: `User is not coordinator of department: ${proposalCtx.department?.name || 'unknown'}`,
         };
       }
     }

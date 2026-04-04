@@ -123,6 +123,33 @@ export class ProposalsRepository {
   }
 
   /**
+   * Find proposal with department info
+   * Used to get department context for coordinator approval validation
+   * Fetches department directly from proposal.departmentId (immutable)
+   */
+  async findProposalWithDepartment(proposalId: string) {
+    const [proposal] = await this.drizzle.db
+      .select()
+      .from(schema.proposals)
+      .where(eq(schema.proposals.id, proposalId));
+
+    if (!proposal || !proposal.departmentId) {
+      return null;
+    }
+
+    const [department] = await this.drizzle.db
+      .select()
+      .from(schema.departments)
+      .where(eq(schema.departments.id, proposal.departmentId));
+
+    return {
+      proposalId: proposal.id,
+      departmentId: proposal.departmentId,
+      department,
+    };
+  }
+
+  /**
    * Find pending approval record for proposal at current step
    * Returns the proposal_approvals entry that hasn't been decided yet
    */
