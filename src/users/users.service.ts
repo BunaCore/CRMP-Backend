@@ -73,4 +73,18 @@ export class UsersService {
   ): Promise<UserSelectorDto[]> {
     return this.usersRepository.findForSelector(searchQuery, roleName, limit);
   }
+
+  /**
+   * Find multiple users by IDs (bulk query)
+   * Useful for avoiding N+1 queries when fetching user details
+   *
+   * @param userIds Array of user IDs
+   * @returns Array of users found
+   */
+  async findByIds(userIds: string[]): Promise<User[]> {
+    if (userIds.length === 0) {
+      return [];
+    }
+    return this.usersRepository.findByIds(userIds);
+  }
 }

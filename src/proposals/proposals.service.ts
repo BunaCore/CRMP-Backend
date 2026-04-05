@@ -7,6 +7,7 @@ import {
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import { DrizzleService } from 'src/db/db.service';
 import { ProposalsRepository } from './proposals.repository';
+import { ProposalApprovalService } from './proposal-approval.service';
 import { UsersService } from 'src/users/users.service';
 import { WorkflowService } from './workflow.service';
 import {
@@ -16,12 +17,20 @@ import {
 import { ApproverResolution } from './types/proposal';
 import { AuthenticatedUser } from 'src/auth/decorators/current-user.decorator';
 import { ProposalMemberRole } from './dto/proposal-member.dto';
+import { mapProposalToResponse } from './utils/proposal.mapper';
+import {
+  mapProposalToDetailResponse,
+  ProposalDetailResponse,
+} from './utils/proposal-detail.mapper';
+import { ProposalResponse } from 'src/types/proposal-response.type';
+import { GetProposalsQueryDto } from './dto/get-proposals-query.dto';
 
 @Injectable()
 export class ProposalsService {
   constructor(
     private readonly drizzle: DrizzleService,
     private readonly repository: ProposalsRepository,
+    private readonly approvalService: ProposalApprovalService,
     private readonly usersService: UsersService,
     private readonly workflowService: WorkflowService,
   ) {}
@@ -206,7 +215,7 @@ export class ProposalsService {
         const creator = await this.usersService.findOne(proposal.createdBy);
 
         // Get active step if exists
-        const activeStep = await this.repository.getActiveStepForProposal(
+        const activeStep = await this.approvalService.getActiveStep(
           proposal.id,
         );
 
@@ -253,7 +262,7 @@ export class ProposalsService {
   ): Promise<PendingApprovalDto[]> {
     // 1. Fetch all proposals with active pending approval steps
     const proposalsWithSteps =
-      await this.repository.findProposalsWithActivePendingSteps();
+      await this.approvalService.getProposalsWithActivePendingSteps();
 
     console.log(proposalsWithSteps);
 
@@ -417,5 +426,168 @@ export class ProposalsService {
     }
 
     return { valid: true };
+  }
+
+  /**
+   * Get all proposals as frontend-friendly responses
+   * Optimized to avoid N+1 queries:
+   * - Single query: all proposals + budget
+   * - Single query: all members for those proposals
+   * - Single query: all users involved
+   * - Single query: all departments
+   *
+   * @returns Array of ProposalResponse
+   */
+  async getProposals(
+    query: GetProposalsQueryDto,
+    currentUserId?: string,
+  ): Promise<ProposalResponse[]> {
+    // 1. Fetch proposals matching filters from repository (already paginated)
+    const proposals = await this.repository.getProposals(query, currentUserId);
+
+    if (proposals.length === 0) {
+      return [];
+    }
+
+    const proposalIds = proposals.map((p) => p.id);
+
+    // 2. Fetch all budgets for these proposals (bulk query)
+    const budgetsRaw =
+      await this.repository.getBudgetsByProposalIds(proposalIds);
+    const budgetsMap = new Map(
+      budgetsRaw.map((b) => [b.proposalId, b.totalAmount]),
+    );
+
+    // 3. Fetch all members for these proposals (bulk query)
+    const membersRaw =
+      await this.repository.getMembersByProposalIds(proposalIds);
+
+    // 4. Extract unique user IDs and fetch all users in bulk
+    const userIds = new Set(membersRaw.map((m) => m.userId));
+    const users =
+      userIds.size > 0
+        ? await this.usersService.findByIds(Array.from(userIds))
+        : [];
+
+    // Build users map for O(1) lookup
+    const usersMap = new Map(
+      users.map((u) => [
+        u.id,
+        { id: u.id, fullName: u.fullName, email: u.email },
+      ]),
+    );
+
+    // 5. Fetch departments for these proposals (bulk query)
+    const departmentIds = Array.from(
+      new Set(proposals.map((p) => p.departmentId).filter((id) => id != null)),
+    );
+    const departmentMap =
+      await this.repository.getDepartmentsByIds(departmentIds);
+
+    // 6. Group members by proposal ID for O(1) lookup
+    const membersByProposalId = new Map<string, typeof membersRaw>();
+
+    for (const member of membersRaw) {
+      if (!membersByProposalId.has(member.proposalId)) {
+        membersByProposalId.set(member.proposalId, []);
+      }
+      membersByProposalId.get(member.proposalId)!.push(member);
+    }
+
+    // 7. Map each proposal to response
+    return proposals.map((p) => {
+      const members = membersByProposalId.get(p.id) || [];
+      const budget = budgetsMap.get(p.id)
+        ? parseFloat(budgetsMap.get(p.id)!)
+        : undefined;
+
+      return mapProposalToResponse(
+        {
+          id: p.id,
+          title: p.title,
+          abstract: p.abstract ?? undefined,
+          currentStatus: p.currentStatus ?? undefined,
+          submittedAt: p.submittedAt ?? undefined,
+          isFunded: p.isFunded ?? false,
+          degreeLevel: p.degreeLevel ?? undefined,
+          researchArea: p.researchArea ?? undefined,
+        },
+        members.map((m) => ({
+          userId: m.userId,
+          role: m.role,
+          user: m.user
+            ? {
+                id: m.user.id,
+                fullName: m.user.fullName ?? undefined,
+                email: m.user.email,
+              }
+            : undefined,
+        })),
+        usersMap,
+        departmentMap,
+        p.departmentId ?? undefined,
+        budget,
+      );
+    });
+  }
+
+  /**
+   * Get detailed proposal view by ID
+   * Fetches all related data for frontend display
+   * Avoids N+1 queries through bulk operations
+   *
+   * @param proposalId - Proposal ID to fetch
+   * @returns ProposalDetailResponse
+   */
+  async getProposalByIdDetailed(
+    proposalId: string,
+  ): Promise<ProposalDetailResponse> {
+    // 1. Fetch proposal
+    const proposal = await this.repository.findById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException(
+        `Proposal with ID "${proposalId}" not found.`,
+      );
+    }
+
+    // 2. Fetch proposal members
+    const members = await this.repository.getProposalMembers(proposalId);
+
+    // 3. Extract unique user IDs and fetch users in batch
+    const userIds = new Set(members.map((m) => m.userId));
+    const users =
+      userIds.size > 0
+        ? await this.usersService.findByIds(Array.from(userIds))
+        : [];
+
+    // Build users map for O(1) lookup
+    const usersMap = new Map(
+      users.map((u) => [
+        u.id,
+        { id: u.id, fullName: u.fullName, email: u.email },
+      ]),
+    );
+
+    // 4. Fetch department if exists
+    let department = null;
+    if (proposal.departmentId) {
+      const deptIds = await this.repository.getDepartmentsByIds([
+        proposal.departmentId,
+      ]);
+      department = deptIds.get(proposal.departmentId);
+    }
+
+    // 5. Fetch all approval steps for this proposal (complete workflow history)
+    const proposalApprovals =
+      await this.approvalService.getProposalApprovals(proposalId);
+
+    // 6. Map to detailed response
+    return mapProposalToDetailResponse(
+      proposal,
+      members,
+      usersMap,
+      department,
+      proposalApprovals,
+    );
   }
 }

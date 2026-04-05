@@ -29,6 +29,7 @@ import {
   AssignAdvisorDto,
   AssignEvaluatorsDto,
 } from './dto/manage-members.dto';
+import { GetProposalsQueryDto } from './dto/get-proposals-query.dto';
 import { JwtAuthGuard } from 'src/auth/jwt.guard';
 import {
   CurrentUser,
@@ -48,6 +49,34 @@ export class ProposalsController {
   ) {}
 
   /**
+   * GET /proposals
+   * Fetch proposals with flexible filtering, searching, and pagination
+   * Supports:
+   * - me?: boolean - Filter by user association (creator or member)
+   * - roles?: string - Comma-separated roles (PI,MEMBER,ADVISOR,EVALUATOR)
+   * - status?: string - proposal status filter
+   * - program?: string - proposal program filter
+   * - departmentId?: string - department filter
+   * - search?: string - full-text search on title
+   * - page?: number - pagination page (default 1)
+   * - limit?: number - items per page (default 10, max 50)
+   *
+   * Examples:
+   * GET /proposals
+   * GET /proposals?me=true
+   * GET /proposals?roles=PI,ADVISOR
+   * GET /proposals?status=Under_Review&page=1&limit=20
+   * GET /proposals?search=malaria&departmentId=dept-123
+   */
+  @Get()
+  async getAllProposals(
+    @Query() query: GetProposalsQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.proposalsService.getProposals(query, user.id);
+  }
+
+  /**
    * GET /proposals/my
    * Fetch all proposals created by the authenticated user
    * Simple ownership-based query
@@ -65,6 +94,18 @@ export class ProposalsController {
   @Get('pending-approvals')
   async getPendingApprovals(@CurrentUser() user: AuthenticatedUser) {
     return this.proposalsService.getPendingApprovals(user);
+  }
+
+  /**
+   * GET /proposals/:id
+   * Fetch detailed proposal view
+   * Includes members, workflow steps, and department info
+   */
+  @Get(':id')
+  async getProposalDetail(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+  ) {
+    return this.proposalsService.getProposalByIdDetailed(proposalId);
   }
 
   @Post()

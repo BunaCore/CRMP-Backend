@@ -9,6 +9,7 @@ import { DB } from 'src/db/db.type';
 import * as schema from 'src/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { ProposalsRepository } from './proposals.repository';
+import { ProposalApprovalService } from './proposal-approval.service';
 import { UsersService } from 'src/users/users.service';
 import { ApproverResolution } from './types/proposal';
 
@@ -31,6 +32,7 @@ export class WorkflowService {
   constructor(
     private readonly drizzle: DrizzleService,
     private readonly repository: ProposalsRepository,
+    private readonly approvalService: ProposalApprovalService,
     private readonly usersService: UsersService,
   ) {}
 
@@ -414,9 +416,10 @@ export class WorkflowService {
 
     // COORDINATOR requires department verification
     if (requiredRole === 'COORDINATOR') {
-      const proposalCtx = await this.repository.findProposalWithDepartment(
-        proposal.id,
-      );
+      const proposalCtx =
+        await this.approvalService.getProposalWithDepartmentContext(
+          proposal.id,
+        );
 
       if (!proposalCtx) {
         return {
