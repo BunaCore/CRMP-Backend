@@ -15,7 +15,7 @@ import {
 } from './dto/proposal-list.dto';
 import { ApproverResolution } from './types/proposal';
 import { AuthenticatedUser } from 'src/auth/decorators/current-user.decorator';
-import { ProposalMemberRole } from './dto/proposal-members.dto';
+import { ProposalMemberRole } from './dto/proposal-member.dto';
 
 @Injectable()
 export class ProposalsService {
