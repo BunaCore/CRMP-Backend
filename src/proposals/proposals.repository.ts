@@ -623,4 +623,49 @@ export class ProposalsRepository {
 
     return result.rowCount || 0;
   }
+
+  /**
+   * Flexible query to get members by proposal and optional roles filter
+   * Returns full member details with user info
+   *
+   * @param proposalId Proposal ID
+   * @param roles Optional array of roles to filter by. If not provided, returns all members.
+   * @returns Array of members with user details
+   */
+  async getMembersByRoles(proposalId: string, roles?: string[]) {
+    // Build the where conditions dynamically
+    const whereConditions: any[] = [
+      eq(schema.proposalMembers.proposalId, proposalId),
+    ];
+
+    if (roles && roles.length > 0) {
+      whereConditions.push(inArray(schema.proposalMembers.role, roles as any));
+    }
+
+    return this.drizzle.db
+      .select({
+        id: schema.proposalMembers.id,
+        proposalId: schema.proposalMembers.proposalId,
+        userId: schema.proposalMembers.userId,
+        role: schema.proposalMembers.role,
+        addedAt: schema.proposalMembers.addedAt,
+        user: {
+          id: schema.users.id,
+          fullName: schema.users.fullName,
+          email: schema.users.email,
+          department: schema.users.department,
+          isExternal: schema.users.isExternal,
+        },
+      })
+      .from(schema.proposalMembers)
+      .leftJoin(
+        schema.users,
+        eq(schema.proposalMembers.userId, schema.users.id),
+      )
+      .where(
+        whereConditions.length > 1
+          ? and(...whereConditions)
+          : whereConditions[0],
+      );
+  }
 }

@@ -242,4 +242,91 @@ export class ProposalMembersService {
       skipped: userIds.length - newEvaluators.length,
     };
   }
+
+  /**
+   * Get core members (PI + MEMBER roles)
+   *
+   * @param proposalId Proposal ID
+   * @returns Array of PI and MEMBER members with user details
+   */
+  async getCoreMembers(proposalId: string) {
+    // Verify proposal exists
+    const proposal = await this.repository.findById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException(`Proposal with ID "${proposalId}" not found`);
+    }
+
+    return this.repository.getMembersByRoles(proposalId, [
+      ProposalMemberRole.PI,
+      ProposalMemberRole.MEMBER,
+    ]);
+  }
+
+  /**
+   * Get advisors (ADVISOR role)
+   *
+   * @param proposalId Proposal ID
+   * @returns Array of ADVISOR members with user details
+   */
+  async getAdvisors(proposalId: string) {
+    // Verify proposal exists
+    const proposal = await this.repository.findById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException(`Proposal with ID "${proposalId}" not found`);
+    }
+
+    return this.repository.getMembersByRoles(proposalId, [
+      ProposalMemberRole.ADVISOR,
+    ]);
+  }
+
+  /**
+   * Get evaluators (EVALUATOR role)
+   *
+   * @param proposalId Proposal ID
+   * @returns Array of EVALUATOR members with user details
+   */
+  async getEvaluators(proposalId: string) {
+    // Verify proposal exists
+    const proposal = await this.repository.findById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException(`Proposal with ID "${proposalId}" not found`);
+    }
+
+    return this.repository.getMembersByRoles(proposalId, [
+      ProposalMemberRole.EVALUATOR,
+    ]);
+  }
+
+  /**
+   * Get all members grouped by role
+   * Provides a comprehensive view of proposal membership
+   *
+   * @param proposalId Proposal ID
+   * @returns Object with members grouped by role: { [role]: Member[] }
+   */
+  async getAllMembersGrouped(
+    proposalId: string,
+  ): Promise<Record<string, any[]>> {
+    // Verify proposal exists
+    const proposal = await this.repository.findById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException(`Proposal with ID "${proposalId}" not found`);
+    }
+
+    // Fetch all members without role filter
+    const allMembers = await this.repository.getMembersByRoles(proposalId);
+
+    // Group by role
+    const grouped: Record<string, any[]> = {};
+    for (const member of allMembers) {
+      const role = member.role as string;
+      if (!grouped[role]) {
+        grouped[role] = [];
+      }
+      grouped[role].push(member);
+    }
+
+    return grouped;
+  }
 }

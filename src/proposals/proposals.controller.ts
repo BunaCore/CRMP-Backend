@@ -272,6 +272,58 @@ export class ProposalsController {
       dto.userIds,
     );
   }
+
+  /**
+   * GET /proposals/:id/members
+   * Fetch core members (PI + MEMBER) for a proposal
+   * No permission check required (read-only)
+   */
+  @Get(':id/members')
+  async getCoreMembers(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.proposalMembersService.getCoreMembers(proposalId);
+  }
+
+  /**
+   * GET /proposals/:id/advisors
+   * Fetch advisors (ADVISOR role) for a proposal
+   * No permission check required (read-only)
+   */
+  @Get(':id/advisors')
+  async getAdvisors(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.proposalMembersService.getAdvisors(proposalId);
+  }
+
+  /**
+   * GET /proposals/:id/evaluators
+   * Fetch evaluators (EVALUATOR role) for a proposal
+   * No permission check required (read-only)
+   */
+  @Get(':id/evaluators')
+  async getEvaluators(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.proposalMembersService.getEvaluators(proposalId);
+  }
+
+  /**
+   * GET /proposals/:id/all-members
+   * Fetch all members grouped by role
+   * No permission check required (read-only)
+   */
+  @Get(':id/all-members')
+  async getAllMembersGrouped(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.proposalMembersService.getAllMembersGrouped(proposalId);
+  }
 }
 
 // {
