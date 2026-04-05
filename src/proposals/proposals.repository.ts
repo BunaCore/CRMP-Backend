@@ -1,9 +1,29 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { DrizzleService } from 'src/db/db.service';
 import * as schema from 'src/db/schema';
-import { eq, and, inArray, ne, isNotNull, desc, asc } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  inArray,
+  ne,
+  isNotNull,
+  desc,
+  asc,
+  ilike,
+  or,
+  sql,
+  SQL,
+} from 'drizzle-orm';
 import { DB } from 'src/db/db.type';
 import { ProposalMemberRole } from './dto/proposal-member.dto';
+import { GetProposalsQueryDto } from './dto/get-proposals-query.dto';
+import {
+  ProposalRow,
+  BudgetRow,
+  MemberRow,
+  UserRow,
+  DepartmentRow,
+} from './types/proposal-query';
 
 @Injectable()
 export class ProposalsRepository {
@@ -557,6 +577,131 @@ export class ProposalsRepository {
     return Array.from(grouped.values());
   }
 
+  async getProposals(
+    query: GetProposalsQueryDto,
+    currentUserId?: string,
+  ): Promise<ProposalRow[]> {
+    // Validate required params
+    if (query.me === true && !currentUserId) {
+      throw new BadRequestException('currentUserId is required when me=true');
+    }
+
+    // Step 1: Build where conditions for proposal table
+    const proposalConditions: SQL<unknown>[] = [];
+
+    if (query.status) {
+      const validStatuses = [
+        'Draft',
+        'Under_Review',
+        'Needs_Revision',
+        'Approved',
+        'Rejected',
+      ];
+      if (validStatuses.includes(query.status)) {
+        proposalConditions.push(
+          eq(schema.proposals.currentStatus, query.status as any),
+        );
+      }
+    }
+
+    if (query.program) {
+      const validPrograms = ['UG', 'PG', 'GENERAL'];
+      if (validPrograms.includes(query.program)) {
+        proposalConditions.push(
+          eq(schema.proposals.proposalProgram, query.program as any),
+        );
+      }
+    }
+
+    if (query.departmentId) {
+      proposalConditions.push(
+        eq(schema.proposals.departmentId, query.departmentId),
+      );
+    }
+
+    if (query.search) {
+      proposalConditions.push(
+        ilike(schema.proposals.title, `%${query.search}%`),
+      );
+    }
+
+    const needsMemberFilter =
+      query.me === true || query.getRolesArray().length > 0;
+    const roles = query.getRolesArray();
+
+    // STEP 1: Fetch proposal IDs with filters and pagination
+    let proposalIdsQuery = this.drizzle.db
+      .selectDistinct({
+        id: schema.proposals.id,
+        createdAt: schema.proposals.createdAt,
+      })
+      .from(schema.proposals);
+
+    // Conditionally add member join only if needed for filtering
+    if (needsMemberFilter) {
+      proposalIdsQuery = proposalIdsQuery.leftJoin(
+        schema.proposalMembers,
+        eq(schema.proposalMembers.proposalId, schema.proposals.id),
+      ) as any;
+    }
+
+    // Build member conditions
+    const memberConditions: SQL<unknown>[] = [];
+    if (query.me === true && currentUserId) {
+      memberConditions.push(eq(schema.proposalMembers.userId, currentUserId));
+    }
+    if (roles.length > 0) {
+      memberConditions.push(inArray(schema.proposalMembers.role, roles));
+    }
+
+    // Combine all conditions
+    const allConditions: SQL<unknown>[] = [
+      ...proposalConditions,
+      ...memberConditions,
+    ];
+
+    if (allConditions.length > 0) {
+      proposalIdsQuery = proposalIdsQuery.where(
+        allConditions.length === 1 ? allConditions[0] : and(...allConditions),
+      ) as any;
+    }
+
+    // Apply pagination on proposal ID query
+    const offset = query.getOffset();
+    const limit = query.limit ?? 10;
+
+    const proposalIdsResult = await proposalIdsQuery
+      .orderBy(desc(schema.proposals.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    // If no proposals found
+    if (proposalIdsResult.length === 0) {
+      return [];
+    }
+
+    const proposalIds = proposalIdsResult.map((row) => row.id);
+
+    // STEP 2: Fetch all proposal data by IDs (batch query)
+    const proposals = await this.drizzle.db
+      .select({
+        id: schema.proposals.id,
+        title: schema.proposals.title,
+        abstract: schema.proposals.abstract,
+        currentStatus: schema.proposals.currentStatus,
+        submittedAt: schema.proposals.submittedAt,
+        isFunded: schema.proposals.isFunded,
+        degreeLevel: schema.proposals.degreeLevel,
+        researchArea: schema.proposals.researchArea,
+        departmentId: schema.proposals.departmentId,
+        createdBy: schema.proposals.createdBy,
+      })
+      .from(schema.proposals)
+      .where(inArray(schema.proposals.id, proposalIds));
+
+    return proposals as ProposalRow[];
+  }
+
   /**
    * Fetch all members for multiple proposals (bulk query)
    * Avoids N+1 by fetching all at once
@@ -612,5 +757,27 @@ export class ProposalsRepository {
       deptMap.set(dept.id, dept);
     }
     return deptMap;
+  }
+
+  /**
+   * Fetch budgets for multiple proposals (bulk query)
+   *
+   * @param proposalIds Array of proposal IDs
+   * @returns Array of budget rows
+   */
+  async getBudgetsByProposalIds(proposalIds: string[]): Promise<BudgetRow[]> {
+    if (proposalIds.length === 0) {
+      return [];
+    }
+
+    return this.drizzle.db
+      .select({
+        proposalId: schema.budgetRequests.proposalId,
+        totalAmount: schema.budgetRequests.totalAmount,
+      })
+      .from(schema.budgetRequests)
+      .where(inArray(schema.budgetRequests.proposalId, proposalIds)) as Promise<
+      BudgetRow[]
+    >;
   }
 }

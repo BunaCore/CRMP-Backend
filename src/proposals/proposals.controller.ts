@@ -29,6 +29,7 @@ import {
   AssignAdvisorDto,
   AssignEvaluatorsDto,
 } from './dto/manage-members.dto';
+import { GetProposalsQueryDto } from './dto/get-proposals-query.dto';
 import { JwtAuthGuard } from 'src/auth/jwt.guard';
 import {
   CurrentUser,
@@ -49,12 +50,30 @@ export class ProposalsController {
 
   /**
    * GET /proposals
-   * Fetch all proposals as frontend-friendly list
-   * No permission check (read-only, for discovery)
+   * Fetch proposals with flexible filtering, searching, and pagination
+   * Supports:
+   * - me?: boolean - Filter by user association (creator or member)
+   * - roles?: string - Comma-separated roles (PI,MEMBER,ADVISOR,EVALUATOR)
+   * - status?: string - proposal status filter
+   * - program?: string - proposal program filter
+   * - departmentId?: string - department filter
+   * - search?: string - full-text search on title
+   * - page?: number - pagination page (default 1)
+   * - limit?: number - items per page (default 10, max 50)
+   *
+   * Examples:
+   * GET /proposals
+   * GET /proposals?me=true
+   * GET /proposals?roles=PI,ADVISOR
+   * GET /proposals?status=Under_Review&page=1&limit=20
+   * GET /proposals?search=malaria&departmentId=dept-123
    */
   @Get()
-  async getAllProposals() {
-    return this.proposalsService.getAllProposals();
+  async getAllProposals(
+    @Query() query: GetProposalsQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.proposalsService.getProposals(query, user.id);
   }
 
   /**

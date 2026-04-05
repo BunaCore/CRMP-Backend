@@ -23,6 +23,7 @@ import {
   ProposalDetailResponse,
 } from './utils/proposal-detail.mapper';
 import { ProposalResponse } from 'src/types/proposal-response.type';
+import { GetProposalsQueryDto } from './dto/get-proposals-query.dto';
 
 @Injectable()
 export class ProposalsService {
@@ -437,55 +438,54 @@ export class ProposalsService {
    *
    * @returns Array of ProposalResponse
    */
-  async getAllProposals(): Promise<ProposalResponse[]> {
-    // 1. Fetch all proposals with budget
-    const proposals = await this.repository.getAllProposals();
-    console.log(proposals);
+  async getProposals(
+    query: GetProposalsQueryDto,
+    currentUserId?: string,
+  ): Promise<ProposalResponse[]> {
+    // 1. Fetch proposals matching filters from repository (already paginated)
+    const proposals = await this.repository.getProposals(query, currentUserId);
 
     if (proposals.length === 0) {
       return [];
     }
 
     const proposalIds = proposals.map((p) => p.id);
-    const departmentIds = proposals
-      .map((p) => p.departmentId)
-      .filter((id): id is string => !!id);
 
-    // 2. Fetch all members for these proposals (single bulk query)
+    // 2. Fetch all budgets for these proposals (bulk query)
+    const budgetsRaw =
+      await this.repository.getBudgetsByProposalIds(proposalIds);
+    const budgetsMap = new Map(
+      budgetsRaw.map((b) => [b.proposalId, b.totalAmount]),
+    );
+
+    // 3. Fetch all members for these proposals (bulk query)
     const membersRaw =
       await this.repository.getMembersByProposalIds(proposalIds);
 
-    // 3. Extract unique user IDs and fetch all users
+    // 4. Extract unique user IDs and fetch all users in bulk
     const userIds = new Set(membersRaw.map((m) => m.userId));
     const users =
       userIds.size > 0
         ? await this.usersService.findByIds(Array.from(userIds))
         : [];
 
-    // 4. Fetch departments (single bulk query)
-    const departmentMap =
-      await this.repository.getDepartmentsByIds(departmentIds);
-
-    // 5. Build lookup maps for O(1) access
-    const usersMap: Map<
-      string,
-      { id: string; fullName?: string | null; email?: string }
-    > = new Map(
+    // Build users map for O(1) lookup
+    const usersMap = new Map(
       users.map((u) => [
         u.id,
         { id: u.id, fullName: u.fullName, email: u.email },
       ]),
     );
 
-    // 6. Group members by proposal ID
-    const membersByProposalId = new Map<
-      string,
-      Array<{
-        userId: string;
-        role: string;
-        user?: any;
-      }>
-    >();
+    // 5. Fetch departments for these proposals (bulk query)
+    const departmentIds = Array.from(
+      new Set(proposals.map((p) => p.departmentId).filter((id) => id != null)),
+    );
+    const departmentMap =
+      await this.repository.getDepartmentsByIds(departmentIds);
+
+    // 6. Group members by proposal ID for O(1) lookup
+    const membersByProposalId = new Map<string, typeof membersRaw>();
 
     for (const member of membersRaw) {
       if (!membersByProposalId.has(member.proposalId)) {
@@ -497,16 +497,35 @@ export class ProposalsService {
     // 7. Map each proposal to response
     return proposals.map((p) => {
       const members = membersByProposalId.get(p.id) || [];
-      const budget = p.budget?.totalAmount
-        ? parseFloat(p.budget.totalAmount)
+      const budget = budgetsMap.get(p.id)
+        ? parseFloat(budgetsMap.get(p.id)!)
         : undefined;
 
       return mapProposalToResponse(
-        p,
-        members,
+        {
+          id: p.id,
+          title: p.title,
+          abstract: p.abstract ?? undefined,
+          currentStatus: p.currentStatus ?? undefined,
+          submittedAt: p.submittedAt ?? undefined,
+          isFunded: p.isFunded ?? false,
+          degreeLevel: p.degreeLevel ?? undefined,
+          researchArea: p.researchArea ?? undefined,
+        },
+        members.map((m) => ({
+          userId: m.userId,
+          role: m.role,
+          user: m.user
+            ? {
+                id: m.user.id,
+                fullName: m.user.fullName ?? undefined,
+                email: m.user.email,
+              }
+            : undefined,
+        })),
         usersMap,
         departmentMap,
-        p.departmentId,
+        p.departmentId ?? undefined,
         budget,
       );
     });
