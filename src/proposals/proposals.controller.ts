@@ -48,6 +48,16 @@ export class ProposalsController {
   ) {}
 
   /**
+   * GET /proposals
+   * Fetch all proposals as frontend-friendly list
+   * No permission check (read-only, for discovery)
+   */
+  @Get()
+  async getAllProposals() {
+    return this.proposalsService.getAllProposals();
+  }
+
+  /**
    * GET /proposals/my
    * Fetch all proposals created by the authenticated user
    * Simple ownership-based query

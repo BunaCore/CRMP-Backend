@@ -392,4 +392,52 @@ export class UsersRepository {
 
     return result.length === userIds.length;
   }
+
+  /**
+   * Find multiple users by IDs (bulk query)
+   * Avoids N+1 queries by fetching all users at once
+   *
+   * @param userIds Array of user IDs to fetch
+   * @returns Array of users with their roles
+   */
+  async findByIds(userIds: string[]): Promise<User[]> {
+    if (userIds.length === 0) {
+      return [];
+    }
+
+    const rows = await this.drizzle.db
+      .select({
+        user: users,
+        roleName: roles.name,
+      })
+      .from(users)
+      .leftJoin(userRoles, eq(users.id, userRoles.userId))
+      .leftJoin(roles, eq(userRoles.roleId, roles.id))
+      .where(inArray(users.id, userIds));
+
+    // Group by user ID and collect roles
+    const userMap = new Map<string, User>();
+
+    for (const row of rows) {
+      const userId = row.user.id;
+
+      if (!userMap.has(userId)) {
+        userMap.set(userId, {
+          ...row.user,
+          roles: [],
+          role: '',
+        } as any);
+      }
+
+      if (row.roleName) {
+        const user = userMap.get(userId)!;
+        (user.roles as string[]).push(row.roleName);
+        if (!(user.role as string)) {
+          user.role = row.roleName;
+        }
+      }
+    }
+
+    return Array.from(userMap.values());
+  }
 }

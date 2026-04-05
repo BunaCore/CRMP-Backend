@@ -668,4 +668,102 @@ export class ProposalsRepository {
           : whereConditions[0],
       );
   }
+
+  /**
+   * Fetch all proposals for list view
+   * Returns basic proposal info + budget data (no members)
+   * Sorted by creation date DESC
+   */
+  async getAllProposals() {
+    const proposals = await this.drizzle.db
+      .select({
+        proposal: {
+          id: schema.proposals.id,
+          title: schema.proposals.title,
+          abstract: schema.proposals.abstract,
+          currentStatus: schema.proposals.currentStatus,
+          submittedAt: schema.proposals.submittedAt,
+          isFunded: schema.proposals.isFunded,
+          degreeLevel: schema.proposals.degreeLevel,
+          researchArea: schema.proposals.researchArea,
+          departmentId: schema.proposals.departmentId,
+        },
+        budget: {
+          totalAmount: schema.budgetRequests.totalAmount,
+        },
+      })
+      .from(schema.proposals)
+      .leftJoin(
+        schema.budgetRequests,
+        eq(schema.budgetRequests.proposalId, schema.proposals.id),
+      )
+      .orderBy(desc(schema.proposals.createdAt));
+
+    // Group by proposal ID to handle multiple budget rows (if any)
+    const grouped = new Map<string, any>();
+    for (const row of proposals) {
+      if (!grouped.has(row.proposal.id)) {
+        grouped.set(row.proposal.id, { ...row.proposal, budget: row.budget });
+      }
+    }
+
+    return Array.from(grouped.values());
+  }
+
+  /**
+   * Fetch all members for multiple proposals (bulk query)
+   * Avoids N+1 by fetching all at once
+   *
+   * @param proposalIds Array of proposal IDs
+   * @returns Members with user details grouped by proposalId
+   */
+  async getMembersByProposalIds(proposalIds: string[]) {
+    if (proposalIds.length === 0) {
+      return [];
+    }
+
+    return this.drizzle.db
+      .select({
+        proposalId: schema.proposalMembers.proposalId,
+        userId: schema.proposalMembers.userId,
+        role: schema.proposalMembers.role,
+        addedAt: schema.proposalMembers.addedAt,
+        user: {
+          id: schema.users.id,
+          fullName: schema.users.fullName,
+          email: schema.users.email,
+          department: schema.users.department,
+        },
+      })
+      .from(schema.proposalMembers)
+      .leftJoin(
+        schema.users,
+        eq(schema.proposalMembers.userId, schema.users.id),
+      )
+      .where(inArray(schema.proposalMembers.proposalId, proposalIds));
+  }
+
+  /**
+   * Fetch departments by IDs (bulk)
+   *
+   * @param departmentIds Array of department IDs
+   * @returns Map of department ID → Department
+   */
+  async getDepartmentsByIds(departmentIds: string[]) {
+    if (departmentIds.length === 0) {
+      return new Map();
+    }
+
+    const departments = await this.drizzle.db
+      .select()
+      .from(schema.departments)
+      .where(inArray(schema.departments.id, departmentIds));
+
+    // Return as map for O(1) lookup
+    const deptMap = new Map<string, any>();
+    for (const dept of departments) {
+      deptMap.set(dept.id, dept);
+    }
+    return deptMap;
+  }
 }

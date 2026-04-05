@@ -16,6 +16,8 @@ import {
 import { ApproverResolution } from './types/proposal';
 import { AuthenticatedUser } from 'src/auth/decorators/current-user.decorator';
 import { ProposalMemberRole } from './dto/proposal-member.dto';
+import { mapProposalToResponse } from './utils/proposal.mapper';
+import { ProposalResponse } from 'src/types/proposal-response.type';
 
 @Injectable()
 export class ProposalsService {
@@ -417,5 +419,90 @@ export class ProposalsService {
     }
 
     return { valid: true };
+  }
+
+  /**
+   * Get all proposals as frontend-friendly responses
+   * Optimized to avoid N+1 queries:
+   * - Single query: all proposals + budget
+   * - Single query: all members for those proposals
+   * - Single query: all users involved
+   * - Single query: all departments
+   *
+   * @returns Array of ProposalResponse
+   */
+  async getAllProposals(): Promise<ProposalResponse[]> {
+    // 1. Fetch all proposals with budget
+    const proposals = await this.repository.getAllProposals();
+    console.log(proposals);
+
+    if (proposals.length === 0) {
+      return [];
+    }
+
+    const proposalIds = proposals.map((p) => p.id);
+    const departmentIds = proposals
+      .map((p) => p.departmentId)
+      .filter((id): id is string => !!id);
+
+    // 2. Fetch all members for these proposals (single bulk query)
+    const membersRaw =
+      await this.repository.getMembersByProposalIds(proposalIds);
+
+    // 3. Extract unique user IDs and fetch all users
+    const userIds = new Set(membersRaw.map((m) => m.userId));
+    const users =
+      userIds.size > 0
+        ? await this.usersService.findByIds(Array.from(userIds))
+        : [];
+
+    // 4. Fetch departments (single bulk query)
+    const departmentMap =
+      await this.repository.getDepartmentsByIds(departmentIds);
+
+    // 5. Build lookup maps for O(1) access
+    const usersMap: Map<
+      string,
+      { id: string; fullName?: string | null; email?: string }
+    > = new Map(
+      users.map((u) => [
+        u.id,
+        { id: u.id, fullName: u.fullName, email: u.email },
+      ]),
+    );
+
+    // 6. Group members by proposal ID
+    const membersByProposalId = new Map<
+      string,
+      Array<{
+        userId: string;
+        role: string;
+        user?: any;
+      }>
+    >();
+
+    for (const member of membersRaw) {
+      if (!membersByProposalId.has(member.proposalId)) {
+        membersByProposalId.set(member.proposalId, []);
+      }
+      membersByProposalId.get(member.proposalId)!.push(member);
+    }
+
+    // 7. Map each proposal to response
+    return proposals.map((p) => {
+      const members = membersByProposalId.get(p.id) || [];
+      const budget = p.budget?.totalAmount
+        ? parseFloat(p.budget.totalAmount)
+        : undefined;
+
+      return mapProposalToResponse(
+        p,
+        members,
+        usersMap,
+        departmentMap,
+        p.departmentId,
+        budget,
+      );
+    });
   }
 }
