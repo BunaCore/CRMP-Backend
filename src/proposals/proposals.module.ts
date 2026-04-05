@@ -3,6 +3,8 @@ import { ProposalsController } from './proposals.controller';
 import { ProposalsService } from './proposals.service';
 import { ProposalMembersService } from './proposal-members.service';
 import { ProposalsRepository } from './proposals.repository';
+import { ProposalApprovalRepository } from './proposal-approval.repository';
+import { ProposalApprovalService } from './proposal-approval.service';
 import { WorkflowService } from './workflow.service';
 import { AccessControlModule } from 'src/access-control/access-control.module';
 import { DbModule } from 'src/db/db.module';
@@ -15,6 +17,8 @@ import { UsersModule } from 'src/users/users.module';
     ProposalsService,
     ProposalMembersService,
     ProposalsRepository,
+    ProposalApprovalRepository,
+    ProposalApprovalService,
     WorkflowService,
   ],
   exports: [WorkflowService],

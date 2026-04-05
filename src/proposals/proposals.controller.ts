@@ -77,6 +77,18 @@ export class ProposalsController {
     return this.proposalsService.getPendingApprovals(user);
   }
 
+  /**
+   * GET /proposals/:id
+   * Fetch detailed proposal view
+   * Includes members, workflow steps, and department info
+   */
+  @Get(':id')
+  async getProposalDetail(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+  ) {
+    return this.proposalsService.getProposalByIdDetailed(proposalId);
+  }
+
   @Post()
   @RequirePermission(Permission.PROPOSAL_CREATE)
   @UseInterceptors(FileInterceptor('file'))

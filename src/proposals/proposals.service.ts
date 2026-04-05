@@ -7,6 +7,7 @@ import {
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import { DrizzleService } from 'src/db/db.service';
 import { ProposalsRepository } from './proposals.repository';
+import { ProposalApprovalService } from './proposal-approval.service';
 import { UsersService } from 'src/users/users.service';
 import { WorkflowService } from './workflow.service';
 import {
@@ -17,6 +18,10 @@ import { ApproverResolution } from './types/proposal';
 import { AuthenticatedUser } from 'src/auth/decorators/current-user.decorator';
 import { ProposalMemberRole } from './dto/proposal-member.dto';
 import { mapProposalToResponse } from './utils/proposal.mapper';
+import {
+  mapProposalToDetailResponse,
+  ProposalDetailResponse,
+} from './utils/proposal-detail.mapper';
 import { ProposalResponse } from 'src/types/proposal-response.type';
 
 @Injectable()
@@ -24,6 +29,7 @@ export class ProposalsService {
   constructor(
     private readonly drizzle: DrizzleService,
     private readonly repository: ProposalsRepository,
+    private readonly approvalService: ProposalApprovalService,
     private readonly usersService: UsersService,
     private readonly workflowService: WorkflowService,
   ) {}
@@ -208,7 +214,7 @@ export class ProposalsService {
         const creator = await this.usersService.findOne(proposal.createdBy);
 
         // Get active step if exists
-        const activeStep = await this.repository.getActiveStepForProposal(
+        const activeStep = await this.approvalService.getActiveStep(
           proposal.id,
         );
 
@@ -255,7 +261,7 @@ export class ProposalsService {
   ): Promise<PendingApprovalDto[]> {
     // 1. Fetch all proposals with active pending approval steps
     const proposalsWithSteps =
-      await this.repository.findProposalsWithActivePendingSteps();
+      await this.approvalService.getProposalsWithActivePendingSteps();
 
     console.log(proposalsWithSteps);
 
@@ -504,5 +510,65 @@ export class ProposalsService {
         budget,
       );
     });
+  }
+
+  /**
+   * Get detailed proposal view by ID
+   * Fetches all related data for frontend display
+   * Avoids N+1 queries through bulk operations
+   *
+   * @param proposalId - Proposal ID to fetch
+   * @returns ProposalDetailResponse
+   */
+  async getProposalByIdDetailed(
+    proposalId: string,
+  ): Promise<ProposalDetailResponse> {
+    // 1. Fetch proposal
+    const proposal = await this.repository.findById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException(
+        `Proposal with ID "${proposalId}" not found.`,
+      );
+    }
+
+    // 2. Fetch proposal members
+    const members = await this.repository.getProposalMembers(proposalId);
+
+    // 3. Extract unique user IDs and fetch users in batch
+    const userIds = new Set(members.map((m) => m.userId));
+    const users =
+      userIds.size > 0
+        ? await this.usersService.findByIds(Array.from(userIds))
+        : [];
+
+    // Build users map for O(1) lookup
+    const usersMap = new Map(
+      users.map((u) => [
+        u.id,
+        { id: u.id, fullName: u.fullName, email: u.email },
+      ]),
+    );
+
+    // 4. Fetch department if exists
+    let department = null;
+    if (proposal.departmentId) {
+      const deptIds = await this.repository.getDepartmentsByIds([
+        proposal.departmentId,
+      ]);
+      department = deptIds.get(proposal.departmentId);
+    }
+
+    // 5. Fetch all approval steps for this proposal (complete workflow history)
+    const proposalApprovals =
+      await this.approvalService.getProposalApprovals(proposalId);
+
+    // 6. Map to detailed response
+    return mapProposalToDetailResponse(
+      proposal,
+      members,
+      usersMap,
+      department,
+      proposalApprovals,
+    );
   }
 }
