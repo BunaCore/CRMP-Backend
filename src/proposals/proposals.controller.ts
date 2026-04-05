@@ -16,12 +16,19 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProposalsService } from './proposals.service';
+import { ProposalMembersService } from './proposal-members.service';
 import { WorkflowService } from './workflow.service';
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import {
   ApprovalActionDto,
   WorkflowActionResponseDto,
 } from './dto/workflow.dto';
+import {
+  AddMembersDto,
+  RemoveMembersDto,
+  AssignAdvisorDto,
+  AssignEvaluatorsDto,
+} from './dto/manage-members.dto';
 import { JwtAuthGuard } from 'src/auth/jwt.guard';
 import {
   CurrentUser,
@@ -36,6 +43,7 @@ import { Permission } from 'src/access-control/permission.enum';
 export class ProposalsController {
   constructor(
     private readonly proposalsService: ProposalsService,
+    private readonly proposalMembersService: ProposalMembersService,
     private readonly workflowService: WorkflowService,
   ) {}
 
@@ -197,6 +205,124 @@ export class ProposalsController {
       proposalId,
       newStatus: 'Needs_Revision',
     };
+  }
+
+  /**
+   * POST /proposals/:id/members/add
+   * Add members to a proposal
+   * Handles duplicate filtering and validates all users exist
+   * Requires PROPOSAL_MANAGE_MEMBERS permission
+   */
+  @Post(':id/members/add')
+  @RequirePermission(Permission.PROPOSAL_MANAGE_MEMBERS)
+  async addMembers(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AddMembersDto,
+  ) {
+    return this.proposalMembersService.addMembers(proposalId, dto.members);
+  }
+
+  /**
+   * POST /proposals/:id/members/remove
+   * Remove members from a proposal
+   * Requires PROPOSAL_MANAGE_MEMBERS permission
+   */
+  @Post(':id/members/remove')
+  @RequirePermission(Permission.PROPOSAL_MANAGE_MEMBERS)
+  async removeMembers(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: RemoveMembersDto,
+  ) {
+    return this.proposalMembersService.removeMembers(proposalId, dto.userIds);
+  }
+
+  /**
+   * POST /proposals/:id/advisor/assign
+   * Assign a single advisor to a proposal
+   * Replaces existing advisor if one exists
+   * Requires PROPOSAL_MANAGE_MEMBERS permission
+   */
+  @Post(':id/advisor/assign')
+  @RequirePermission(Permission.PROPOSAL_MANAGE_MEMBERS)
+  async assignAdvisor(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AssignAdvisorDto,
+  ) {
+    return this.proposalMembersService.assignAdvisor(proposalId, dto.userId);
+  }
+
+  /**
+   * POST /proposals/:id/evaluators/assign
+   * Assign evaluators to a proposal
+   * Adds to existing evaluators (multiple allowed)
+   * Requires PROPOSAL_MANAGE_MEMBERS permission
+   */
+  @Post(':id/evaluators/assign')
+  @RequirePermission(Permission.PROPOSAL_MANAGE_MEMBERS)
+  async assignEvaluators(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AssignEvaluatorsDto,
+  ) {
+    return this.proposalMembersService.assignEvaluators(
+      proposalId,
+      dto.userIds,
+    );
+  }
+
+  /**
+   * GET /proposals/:id/members
+   * Fetch core members (PI + MEMBER) for a proposal
+   * No permission check required (read-only)
+   */
+  @Get(':id/members')
+  async getCoreMembers(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.proposalMembersService.getCoreMembers(proposalId);
+  }
+
+  /**
+   * GET /proposals/:id/advisors
+   * Fetch advisors (ADVISOR role) for a proposal
+   * No permission check required (read-only)
+   */
+  @Get(':id/advisors')
+  async getAdvisors(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.proposalMembersService.getAdvisors(proposalId);
+  }
+
+  /**
+   * GET /proposals/:id/evaluators
+   * Fetch evaluators (EVALUATOR role) for a proposal
+   * No permission check required (read-only)
+   */
+  @Get(':id/evaluators')
+  async getEvaluators(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.proposalMembersService.getEvaluators(proposalId);
+  }
+
+  /**
+   * GET /proposals/:id/all-members
+   * Fetch all members grouped by role
+   * No permission check required (read-only)
+   */
+  @Get(':id/all-members')
+  async getAllMembersGrouped(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.proposalMembersService.getAllMembersGrouped(proposalId);
   }
 }
 

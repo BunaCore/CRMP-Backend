@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ProposalsController } from './proposals.controller';
 import { ProposalsService } from './proposals.service';
+import { ProposalMembersService } from './proposal-members.service';
 import { ProposalsRepository } from './proposals.repository';
 import { WorkflowService } from './workflow.service';
 import { AccessControlModule } from 'src/access-control/access-control.module';
@@ -10,7 +11,12 @@ import { UsersModule } from 'src/users/users.module';
 @Module({
   imports: [AccessControlModule, DbModule, UsersModule],
   controllers: [ProposalsController],
-  providers: [ProposalsService, ProposalsRepository, WorkflowService],
+  providers: [
+    ProposalsService,
+    ProposalMembersService,
+    ProposalsRepository,
+    WorkflowService,
+  ],
   exports: [WorkflowService],
 })
 export class ProposalsModule {}

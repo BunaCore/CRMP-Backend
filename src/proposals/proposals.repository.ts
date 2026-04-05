@@ -97,6 +97,19 @@ export class ProposalsRepository {
   }
 
   /**
+   * Find proposal by ID
+   * Used for existence checks
+   */
+  async findById(proposalId: string) {
+    const [proposal] = await this.drizzle.db
+      .select()
+      .from(schema.proposals)
+      .where(eq(schema.proposals.id, proposalId));
+
+    return proposal || null;
+  }
+
+  /**
    * Find project with department info for a proposal
    * Used to get department context for coordinator approval resolution
    */
@@ -537,5 +550,122 @@ export class ProposalsRepository {
       );
 
     return results.map((r) => r.userId);
+  }
+
+  /**
+   * Remove proposal members by user IDs
+   * @param proposalId Proposal ID
+   * @param userIds Array of user IDs to remove
+   * @returns Count of removed members
+   */
+  async removeMembersByIds(
+    proposalId: string,
+    userIds: string[],
+  ): Promise<number> {
+    if (userIds.length === 0) {
+      return 0;
+    }
+
+    const result = await this.drizzle.db
+      .delete(schema.proposalMembers)
+      .where(
+        and(
+          eq(schema.proposalMembers.proposalId, proposalId),
+          inArray(schema.proposalMembers.userId, userIds),
+        ),
+      );
+
+    return result.rowCount || 0;
+  }
+
+  /**
+   * Get all members of a proposal with a specific role
+   * @param proposalId Proposal ID
+   * @param role Role name (e.g., 'ADVISOR', 'EVALUATOR', 'PI', 'MEMBER')
+   * @returns Array of user IDs with that role
+   */
+  async getMembersWithRole(
+    proposalId: string,
+    role: string,
+  ): Promise<string[]> {
+    const results = await this.drizzle.db
+      .select({ userId: schema.proposalMembers.userId })
+      .from(schema.proposalMembers)
+      .where(
+        and(
+          eq(schema.proposalMembers.proposalId, proposalId),
+          eq(schema.proposalMembers.role, role as any),
+        ),
+      );
+
+    return results.map((r) => r.userId);
+  }
+
+  /**
+   * Clear all members with a specific role from a proposal
+   * Used for replacing advisor (one advisor max per proposal)
+   * @param proposalId Proposal ID
+   * @param role Role to clear
+   * @returns Count of removed members
+   */
+  async clearMembersWithRole(
+    proposalId: string,
+    role: string,
+  ): Promise<number> {
+    const result = await this.drizzle.db
+      .delete(schema.proposalMembers)
+      .where(
+        and(
+          eq(schema.proposalMembers.proposalId, proposalId),
+          eq(schema.proposalMembers.role, role as any),
+        ),
+      );
+
+    return result.rowCount || 0;
+  }
+
+  /**
+   * Flexible query to get members by proposal and optional roles filter
+   * Returns full member details with user info
+   *
+   * @param proposalId Proposal ID
+   * @param roles Optional array of roles to filter by. If not provided, returns all members.
+   * @returns Array of members with user details
+   */
+  async getMembersByRoles(proposalId: string, roles?: string[]) {
+    // Build the where conditions dynamically
+    const whereConditions: any[] = [
+      eq(schema.proposalMembers.proposalId, proposalId),
+    ];
+
+    if (roles && roles.length > 0) {
+      whereConditions.push(inArray(schema.proposalMembers.role, roles as any));
+    }
+
+    return this.drizzle.db
+      .select({
+        id: schema.proposalMembers.id,
+        proposalId: schema.proposalMembers.proposalId,
+        userId: schema.proposalMembers.userId,
+        role: schema.proposalMembers.role,
+        addedAt: schema.proposalMembers.addedAt,
+        user: {
+          id: schema.users.id,
+          fullName: schema.users.fullName,
+          email: schema.users.email,
+          department: schema.users.department,
+          isExternal: schema.users.isExternal,
+        },
+      })
+      .from(schema.proposalMembers)
+      .leftJoin(
+        schema.users,
+        eq(schema.proposalMembers.userId, schema.users.id),
+      )
+      .where(
+        whereConditions.length > 1
+          ? and(...whereConditions)
+          : whereConditions[0],
+      );
   }
 }
