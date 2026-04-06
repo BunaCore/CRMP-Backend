@@ -350,13 +350,13 @@ export class UsersRepository {
       conditions.push(eq(roles.name, roleName));
     }
 
+    // Use selectDistinct on user fields to avoid duplicate rows when multiple roles exist
     let query: any = this.drizzle.db
-      .select({
+      .selectDistinct({
         id: users.id,
         fullName: users.fullName,
         department: users.department,
         isExternal: users.isExternal,
-        role: roles.name,
       })
       .from(users)
       .leftJoin(userRoles, eq(users.id, userRoles.userId))
@@ -372,7 +372,6 @@ export class UsersRepository {
       label: row.fullName || row.id,
       value: row.id,
       meta: {
-        role: row.role || undefined,
         department: row.department || undefined,
         isExternal: row.isExternal || false,
       },
