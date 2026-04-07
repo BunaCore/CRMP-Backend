@@ -123,6 +123,9 @@ export const proposalApprovals = pgTable('proposal_approvals', {
   // Parallel step grouping
   parallelGroupId: uuid('parallel_group_id'),
 
+  // Branching: track which branch/condition path this step came from
+  branchId: uuid('branch_id'),
+
   notifiedAt: timestamp('notified_at', { withTimezone: true }),
   versionId: uuid('version_id').references(() => proposalVersions.id),
   attachmentFileId: uuid('attachment_file_id').references(

@@ -40,6 +40,14 @@ export const routingRules = pgTable('routing_rules', {
   // FORM step fields (dynamic form schema)
   dynamicFieldsJson: jsonb('dynamic_fields_json'),
 
+  // Branching fields: conditional workflow steps
+  // branchId groups alternative workflow paths (e.g., high-budget vs low-budget flow)
+  // branchConditionJson defines when this step should be included
+  // Example: { operator: 'gt', field: 'budgetAmount', value: 500000 }
+  // During proposal creation, only steps where condition evaluates true are inserted
+  branchId: uuid('branch_id'),
+  branchConditionJson: jsonb('branch_condition_json'),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });

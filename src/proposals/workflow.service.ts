@@ -12,8 +12,15 @@ import { ProposalsRepository } from './proposals.repository';
 import { ProposalApprovalService } from './proposal-approval.service';
 import { UsersService } from 'src/users/users.service';
 import { ApproverResolution } from './types/proposal';
+import { EvaluationContext, BranchCondition } from './types/branch-condition';
 
 type DecisionOutcome = 'Accepted' | 'Rejected' | 'Needs_Revision';
+
+type ProposalRoutingInput = {
+  proposalProgram: string;
+  budgetAmount: string | number | null;
+  degreeLevel: string | null;
+};
 
 /**
  * WorkflowService orchestrates proposal submission, approval steps, and status transitions.
@@ -78,7 +85,11 @@ export class WorkflowService {
 
       if (existingApprovals.length === 0) {
         // First submission: create all steps from routing_rules
-        await this.generateApprovalStepsFromRules(tx, proposalId, proposal);
+        await this.generateApprovalStepsFromRules(tx, proposalId, {
+          proposalProgram: proposal.proposalProgram,
+          budgetAmount: proposal.budgetAmount,
+          degreeLevel: proposal.degreeLevel ?? null,
+        });
       } else {
         // Resubmit: resume from the last incomplete step
         await this.resumeWorkflowFromLastIncompleteStep(
@@ -672,6 +683,131 @@ export class WorkflowService {
   }
 
   /**
+   * Evaluate a branch condition against selected proposal fields.
+   * No full proposal object should be passed to this method.
+   */
+  private evaluateCondition(
+    rawCondition: unknown,
+    context: EvaluationContext,
+  ): boolean {
+    const condition = this.parseBranchCondition(rawCondition);
+    if (!condition) {
+      return false;
+    }
+
+    const contextValue = context[condition.field];
+    if (contextValue === undefined || contextValue === null) {
+      return false;
+    }
+
+    if (condition.operator === 'in') {
+      if (!Array.isArray(condition.value)) {
+        return false;
+      }
+
+      return condition.value.some((v) => String(v) === String(contextValue));
+    }
+
+    if (condition.operator === 'eq') {
+      return String(contextValue) === String(condition.value);
+    }
+
+    if (condition.operator === 'neq') {
+      return String(contextValue) !== String(condition.value);
+    }
+
+    const left = Number(contextValue);
+    const right = Number(condition.value);
+
+    if (!Number.isFinite(left) || !Number.isFinite(right)) {
+      return false;
+    }
+
+    if (condition.operator === 'gt') {
+      return left > right;
+    }
+
+    if (condition.operator === 'gte') {
+      return left >= right;
+    }
+
+    if (condition.operator === 'lt') {
+      return left < right;
+    }
+
+    if (condition.operator === 'lte') {
+      return left <= right;
+    }
+
+    return false;
+  }
+
+  /**
+   * Safely parse and validate branch condition JSON from routing rule.
+   */
+  private parseBranchCondition(rawCondition: unknown): BranchCondition | null {
+    if (
+      !rawCondition ||
+      typeof rawCondition !== 'object' ||
+      Array.isArray(rawCondition)
+    ) {
+      return null;
+    }
+
+    const candidate = rawCondition as Record<string, unknown>;
+
+    const operator = candidate.operator;
+    const field = candidate.field;
+    const value = candidate.value;
+
+    const validOperators: BranchCondition['operator'][] = [
+      'gt',
+      'lt',
+      'gte',
+      'lte',
+      'eq',
+      'neq',
+      'in',
+    ];
+    const validFields: (keyof EvaluationContext)[] = [
+      'budgetAmount',
+      'degreeLevel',
+      'proposalProgram',
+    ];
+
+    if (
+      typeof operator !== 'string' ||
+      !validOperators.includes(operator as BranchCondition['operator'])
+    ) {
+      return null;
+    }
+
+    if (
+      typeof field !== 'string' ||
+      !validFields.includes(field as keyof EvaluationContext)
+    ) {
+      return null;
+    }
+
+    if (
+      typeof value !== 'number' &&
+      typeof value !== 'string' &&
+      !(
+        Array.isArray(value) &&
+        value.every((v) => typeof v === 'number' || typeof v === 'string')
+      )
+    ) {
+      return null;
+    }
+
+    return {
+      operator: operator as BranchCondition['operator'],
+      field: field as keyof EvaluationContext,
+      value,
+    };
+  }
+
+  /**
    * UUID validation helper
    */
   private isValidUUID(value: string): boolean {
@@ -865,10 +1001,16 @@ export class WorkflowService {
    * Helper: Generate all approval steps from routing_rules on first submission
    * Copies stepType, voteThreshold, voteThresholdStrategy, dynamicFieldsJson for VOTE and FORM steps
    */
+  /**
+   * Helper: Generate all approval steps from routing_rules on first submission
+   * Evaluates branch conditions and only includes steps that match
+   * Copies stepType, voteThreshold, voteThresholdStrategy, dynamicFieldsJson
+   * Budget must be pre-calculated; recalculate on resubmit
+   */
   private async generateApprovalStepsFromRules(
     tx: DB,
     proposalId: string,
-    proposal: any,
+    proposal: ProposalRoutingInput,
   ): Promise<void> {
     const rules = await tx.query.routingRules.findMany({
       where: eq(
@@ -883,18 +1025,54 @@ export class WorkflowService {
       );
     }
 
+    // Ensure budgetAmount is calculated
+    if (proposal.budgetAmount === null || proposal.budgetAmount === undefined) {
+      throw new BadRequestException(
+        'Budget amount must be calculated before workflow generation',
+      );
+    }
+
+    // Create evaluation context with only required fields
+    const evaluationContext: EvaluationContext = {
+      budgetAmount: parseFloat(String(proposal.budgetAmount)),
+      degreeLevel: proposal.degreeLevel || undefined,
+      proposalProgram: proposal.proposalProgram,
+    };
+
     // Sort by stepOrder to ensure correct sequence
     const sortedRules = rules.sort((a, b) => a.stepOrder - b.stepOrder);
 
+    // Filter rules: only include steps whose branch condition passes
+    const matchingRules = sortedRules.filter((rule) => {
+      // If no branch condition, always include (default linear flow)
+      if (!rule.branchConditionJson) {
+        return true;
+      }
+
+      // Evaluate condition against proposal data
+      return this.evaluateCondition(
+        rule.branchConditionJson,
+        evaluationContext,
+      );
+    });
+
+    if (matchingRules.length === 0) {
+      throw new InternalServerErrorException(
+        'No workflow steps matched the proposal conditions',
+      );
+    }
+
+    // Insert only matching steps
     await tx.insert(schema.proposalApprovals).values(
-      sortedRules.map((rule) => ({
+      matchingRules.map((rule) => ({
         proposalId,
         routingRuleId: rule.id,
         stepOrder: rule.stepOrder,
         approverRole: rule.approverRole,
-        stepType: rule.stepType, // Copy from routing rule
+        stepType: rule.stepType,
+        branchId: rule.branchId, // Track which branch this step came from
         decision: 'Pending' as any,
-        isActive: rule.stepOrder === sortedRules[0].stepOrder, // Activate first step
+        isActive: rule.stepOrder === matchingRules[0].stepOrder, // Activate first step
         createdAt: new Date(),
       })),
     );
