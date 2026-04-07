@@ -238,37 +238,79 @@ async function seed() {
     console.log('Seeding routing rules...');
     await tx.insert(schema.routingRules).values([
       // --- Postgraduate Flow ---
-      // 1. Department review
       {
         proposalProgram: 'PG',
         stepOrder: 1,
         approverRole: 'DGC_MEMBER',
-        stepLabel: 'Department Initial Review',
+        stepLabel: 'DGC Committee Review',
+        stepType: 'APPROVAL',
         isParallel: false,
-        isFinal: false,
-        required: true,
+        dynamicFieldsJson: {
+          fields: [
+            {
+              name: 'meetingMinutes',
+              type: 'file',
+              required: true,
+              multiple: false,
+            },
+          ],
+        },
       },
-      // 2. PG Office final approval
       {
         proposalProgram: 'PG',
         stepOrder: 2,
+        approverRole: 'ADRPM',
+        stepLabel: 'ADRPM Approval',
+        stepType: 'APPROVAL',
+      },
+      {
+        proposalProgram: 'PG',
+        stepOrder: 3,
         approverRole: 'PG_OFFICE',
-        stepLabel: 'PG Office Final Approval',
-        isParallel: false,
+        stepLabel: 'PG Office Finalization',
+        stepType: 'APPROVAL',
         isFinal: true,
-        required: true,
       },
 
       // --- Undergraduate Flow ---
-      // 1. Coordinator screens, plagiarism check, assigns advisor
       {
         proposalProgram: 'UG',
         stepOrder: 1,
         approverRole: 'COORDINATOR',
-        stepLabel: 'Coordinator Screening (Final Approval)',
-        isParallel: false,
+        stepLabel: 'Initial Screening',
+        stepType: 'APPROVAL',
+        isFinal: false,
+        // no fields – coordinator just approves
+      },
+      {
+        proposalProgram: 'UG',
+        stepOrder: 2,
+        approverRole: 'EVALUATOR',
+        stepLabel: 'Evaluation Review',
+        stepType: 'VOTE',
+        voteThreshold: 3,
+        voteThresholdStrategy: 'MAJORITY',
+        isParallel: true,
+        isFinal: false,
+        dynamicFieldsJson: {
+          fields: [
+            {
+              name: 'evaluationReport',
+              type: 'file',
+              required: true,
+              multiple: false,
+            },
+            { name: 'comments', type: 'textarea', required: false },
+          ],
+        },
+      },
+      {
+        proposalProgram: 'UG',
+        stepOrder: 3,
+        approverRole: 'COORDINATOR',
+        stepLabel: 'Final Coordinator Approval',
+        stepType: 'APPROVAL',
         isFinal: true,
-        required: true,
       },
 
       // --- Funded Project Flow ---
@@ -276,57 +318,60 @@ async function seed() {
         proposalProgram: 'GENERAL',
         stepOrder: 1,
         approverRole: 'RAD',
-        stepLabel: 'RAD Pre-screening & Assignment',
-        isParallel: false,
+        stepLabel: 'RAD Pre-screening',
+        stepType: 'APPROVAL',
         isFinal: false,
-        required: true,
       },
       {
         proposalProgram: 'GENERAL',
         stepOrder: 2,
-        approverRole: 'EVALUATOR',
-        stepLabel: 'Peer Evaluation Review',
-        isParallel: true,
-        isFinal: false,
-        required: true,
+        approverRole: 'ADRPM',
+        stepLabel: 'ADRPM Review',
+        stepType: 'APPROVAL',
+        // no fields
       },
       {
         proposalProgram: 'GENERAL',
         stepOrder: 3,
-        approverRole: 'FINANCE',
-        stepLabel: 'Finance Budget Integrity Check',
-        isParallel: false,
-        isFinal: false,
-        required: true,
-      },
-      {
-        proposalProgram: 'GENERAL',
-        stepOrder: 4,
         approverRole: 'VPRTT',
-        stepLabel: 'VP Research Final Authorization',
-        isParallel: false,
+        stepLabel: 'VPRTT Approval (<500k)',
+        stepType: 'APPROVAL',
+        conditionGroup: 'BUDGET',
+        branchKey: 'LOW_BUDGET',
+        branchConditionJson: {
+          field: 'budget',
+          operator: 'lt',
+          value: 500000,
+        },
         isFinal: false,
-        required: true,
+        dynamicFieldsJson: {
+          fields: [
+            {
+              name: 'approvalMemo',
+              type: 'file',
+              required: true,
+              multiple: false,
+            },
+          ],
+        },
       },
       {
         proposalProgram: 'GENERAL',
-        stepOrder: 5,
-        approverRole: 'AC',
-        stepLabel: 'Academic Council Approval (>500k)',
-        isParallel: false,
+        stepOrder: 3,
+        approverRole: 'AC_MEMBER',
+        stepLabel: 'Academic Council Review (>=500k)',
+        stepType: 'VOTE',
+        voteThreshold: 7,
+        voteThresholdStrategy: 'MAJORITY',
+        conditionGroup: 'BUDGET',
+        branchKey: 'HIGH_BUDGET',
+        branchConditionJson: {
+          field: 'budget',
+          operator: 'gte',
+          value: 500000,
+        },
+        isParallel: true,
         isFinal: true,
-        required: true,
-      },
-
-      // --- Unfunded Project Flow ---
-      {
-        proposalProgram: 'GENERAL',
-        stepOrder: 1,
-        approverRole: 'RAD',
-        stepLabel: 'RAD Final Approval',
-        isParallel: false,
-        isFinal: true,
-        required: true,
       },
     ]);
 
