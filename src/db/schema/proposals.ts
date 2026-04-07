@@ -151,3 +151,15 @@ export const proposalComments = pgTable('proposal_comments', {
   isResolved: boolean('is_resolved').default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
+
+export const proposalDefences = pgTable('proposal_defences', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  proposalId: uuid('proposal_id')
+    .notNull()
+    .references(() => proposals.id, { onDelete: 'cascade' }),
+  scheduledBy: uuid('scheduled_by').references(() => users.id),
+  defenceDate: timestamp('defence_date', { withTimezone: true }).notNull(),
+  location: varchar('location', { length: 255 }).notNull(),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});

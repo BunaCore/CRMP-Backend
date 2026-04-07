@@ -56,6 +56,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.EVALUATION_ASSIGN,
     Permission.EVALUATION_READ,
 
+    Permission.DEFENCE_SCHEDULE, // ✅ Can schedule PI defences
+
     Permission.USER_READ,
   ],
 
@@ -67,6 +69,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.PROPOSAL_REQUEST_REVISION,
 
     Permission.EVALUATION_READ,
+
+    Permission.DEFENCE_SCHEDULE, // ✅ Can schedule PI defences
   ],
 
   // --- College & Central Offices ---
@@ -100,6 +104,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
     Permission.EVALUATION_ASSIGN,
     Permission.EVALUATION_READ,
+
+    Permission.DEFENCE_SCHEDULE, // ✅ Can schedule PI defences
 
     Permission.BUDGET_VIEW,
 

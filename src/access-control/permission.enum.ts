@@ -58,6 +58,8 @@ export enum Permission {
   BUDGET_VIEW = 'budget:view',
   BUDGET_MANAGE = 'budget:manage',
 
+  DEFENCE_SCHEDULE = 'defence:schedule', // Schedule PI defence (COORDINATOR, DGC_MEMBER, RAD only)
+
   // --- System & Platform ---
   SYSTEM_CONFIG = 'system:config', // Deadlines, workflow rules, global settings
   AUDIT_LOG_VIEW = 'audit_log:view',

@@ -780,4 +780,45 @@ export class ProposalsRepository {
       BudgetRow[]
     >;
   }
+
+  /**
+   * Get all comments for a proposal, ordered by creation date ASC
+   * Includes both top-level and threaded comments
+   */
+  async getCommentsByProposalId(proposalId: string) {
+    return this.drizzle.db
+      .select({
+        id: schema.proposalComments.id,
+        proposalId: schema.proposalComments.proposalId,
+        commentText: schema.proposalComments.commentText,
+        authorId: schema.proposalComments.authorId,
+        parentCommentId: schema.proposalComments.parentCommentId,
+        isResolved: schema.proposalComments.isResolved,
+        createdAt: schema.proposalComments.createdAt,
+      })
+      .from(schema.proposalComments)
+      .where(eq(schema.proposalComments.proposalId, proposalId))
+      .orderBy(asc(schema.proposalComments.createdAt));
+  }
+
+  /**
+   * Get all defence schedules for a proposal, ordered by defenceDate ASC
+   * Multiple schedules allowed (rescheduling)
+   */
+  async getDefencesByProposalId(proposalId: string) {
+    return this.drizzle.db
+      .select({
+        id: schema.proposalDefences.id,
+        proposalId: schema.proposalDefences.proposalId,
+        scheduledBy: schema.proposalDefences.scheduledBy,
+        defenceDate: schema.proposalDefences.defenceDate,
+        location: schema.proposalDefences.location,
+        note: schema.proposalDefences.note,
+        createdAt: schema.proposalDefences.createdAt,
+      })
+      .from(schema.proposalDefences)
+      .where(eq(schema.proposalDefences.proposalId, proposalId))
+      .orderBy(asc(schema.proposalDefences.defenceDate));
+  }
 }
+

@@ -5,64 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1772527908041,
-      "tag": "0000_vengeful_ken_ellis",
+      "when": 1775510788659,
+      "tag": "0000_demonic_sleeper",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1772794250921,
-      "tag": "0001_regular_kat_farrell",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1774713264883,
-      "tag": "0002_soft_blacklash",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1774786238333,
-      "tag": "0003_nifty_husk",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1774791951941,
-      "tag": "0004_lethal_phalanx",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1775044970147,
-      "tag": "0005_cheerful_nextwave",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1775075557482,
-      "tag": "0006_breezy_sharon_carter",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1775082858111,
-      "tag": "0007_orange_madame_hydra",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1775142622322,
-      "tag": "0008_free_wendell_rand",
+      "when": 1775550222220,
+      "tag": "0001_colorful_power_man",
       "breakpoints": true
     }
   ]
