@@ -10,7 +10,11 @@ import {
 import { users } from './user';
 import { proposalApprovals } from './proposals';
 import { ProjectProgramEnum } from './project';
-import { proposalStatusEnum, stepTypeEnum, voteStrategyEnum } from './enums';
+import {
+  proposalStatusEnum,
+  stepTypeEnum,
+  voteThresholdStrategyEnum,
+} from './enums';
 
 export const routingRules = pgTable('routing_rules', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -29,9 +33,11 @@ export const routingRules = pgTable('routing_rules', {
 
   // VOTE step fields
   voteThreshold: integer('vote_threshold'),
-  voteStrategy: voteStrategyEnum('vote_strategy').default('MAJORITY'),
+  voteThresholdStrategy: voteThresholdStrategyEnum(
+    'vote_threshold_strategy',
+  ).default('MAJORITY'),
 
-  // INPUT step fields (dynamic form schema)
+  // FORM step fields (dynamic form schema)
   dynamicFieldsJson: jsonb('dynamic_fields_json'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),

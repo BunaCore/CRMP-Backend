@@ -229,7 +229,7 @@ export class WorkflowService {
     proposalId: string,
     userId: string,
     comment?: string,
-  ): Promise<{ success: boolean }> {
+  ): Promise<{ success: boolean; isComplete: boolean }> {
     return await this.transitionStep(
       proposalId,
       userId,
@@ -248,7 +248,7 @@ export class WorkflowService {
     proposalId: string,
     userId: string,
     comment?: string,
-  ): Promise<{ success: boolean }> {
+  ): Promise<{ success: boolean; isComplete: boolean }> {
     return await this.transitionStep(
       proposalId,
       userId,
@@ -259,9 +259,426 @@ export class WorkflowService {
     );
   }
 
+  /**
+   * Phase 3: Submit action on active step (VOTE or FORM)
+   * VOTE: Track vote, check threshold, auto-advance if met
+   * FORM: Store form data, attach files, mark complete
+   */
+  async submitAction(
+    proposalId: string,
+    userId: string,
+    actionData: {
+      action: 'VOTE' | 'SUBMIT'; // VOTE for voting steps, SUBMIT for form steps
+      decision?: 'Accepted' | 'Rejected' | 'Needs_Revision'; // For VOTE
+      submittedData?: Record<string, any>; // For FORM (field values + fileIds)
+      comment?: string;
+    },
+  ): Promise<{ success: boolean; nextStep?: number; isComplete: boolean }> {
+    return await this.drizzle.db.transaction(async (tx) => {
+      // 1. Get proposal and active step
+      const { proposal, activeStep } = await this.getProposalWithActiveStep(
+        tx,
+        proposalId,
+      );
+
+      if (!proposal) {
+        throw new NotFoundException(`Proposal ${proposalId} not found`);
+      }
+
+      if (!activeStep) {
+        throw new BadRequestException('No active approval step found');
+      }
+
+      // 2. Validate user has the step's approverRole
+      const userRoles = await this.usersService.getUserRoles(userId);
+      const roleNames = userRoles
+        .map((ur) => ur.roleName)
+        .filter((r): r is string => r !== null);
+
+      if (!roleNames.includes(activeStep.approverRole)) {
+        throw new BadRequestException(
+          `User does not have required role: ${activeStep.approverRole}`,
+        );
+      }
+
+      // 3. Route by step type
+      if (activeStep.stepType === 'VOTE') {
+        return await this.handleVoteStep(
+          tx,
+          proposal,
+          activeStep,
+          userId,
+          actionData,
+        );
+      } else if (activeStep.stepType === 'FORM') {
+        return await this.handleFormStep(
+          tx,
+          proposal,
+          activeStep,
+          userId,
+          actionData,
+        );
+      } else if (activeStep.stepType === 'APPROVAL') {
+        // For APPROVAL, accept means approve, else reject/revise
+        if (
+          actionData.action === 'VOTE' &&
+          actionData.decision === 'Accepted'
+        ) {
+          return await this.acceptStep(proposalId, userId, actionData.comment);
+        } else {
+          return await this.rejectStep(proposalId, userId, actionData.comment);
+        }
+      }
+
+      throw new BadRequestException(
+        `Unknown step type: ${activeStep.stepType}`,
+      );
+    });
+  }
+
   // ============================================================================
-  // Private Helpers
+  // Phase 3: Vote/Form Handling
   // ============================================================================
+
+  /**
+   * Handle VOTE step: Track vote, check threshold, auto-advance if complete
+   */
+  private async handleVoteStep(
+    tx: DB,
+    proposal: any,
+    activeStep: any,
+    userId: string,
+    actionData: any,
+  ): Promise<{ success: boolean; nextStep?: number; isComplete: boolean }> {
+    // 1. Validate user eligible to vote
+    const eligibleVoters = await this.getEligibleVotersByRole(
+      tx,
+      activeStep.approverRole,
+    );
+    const eligibleVoterIds = eligibleVoters.map((v) => v.id);
+
+    if (!eligibleVoterIds.includes(userId)) {
+      throw new BadRequestException(
+        'User is not an eligible voter for this step',
+      );
+    }
+
+    // 2. Track vote in voteJson: { userId: "Accepted" | "Rejected" | "Needs_Revision" }
+    const currentVotes = activeStep.voteJson || {};
+    currentVotes[userId] = actionData.decision || 'Accepted';
+
+    await tx
+      .update(schema.proposalApprovals)
+      .set({
+        voteJson: currentVotes,
+      })
+      .where(eq(schema.proposalApprovals.id, activeStep.id));
+
+    // 3. Fetch routing rule to get threshold config
+    const routingRule = await tx.query.routingRules.findFirst({
+      where: eq(schema.routingRules.id, activeStep.routingRuleId),
+    });
+
+    if (!routingRule) {
+      throw new InternalServerErrorException('Routing rule not found for step');
+    }
+
+    const { voteThreshold, voteThresholdStrategy } = routingRule;
+
+    // 4. Check if threshold is met
+    const votesMet = await this.checkVoteThreshold(
+      currentVotes,
+      eligibleVoterIds.length,
+      voteThreshold,
+      voteThresholdStrategy,
+    );
+
+    if (!votesMet) {
+      // Threshold not met yet, just return success
+      return { success: true, isComplete: false };
+    }
+
+    // 5. Threshold is met - compute final decision
+    const approvalsCount = Object.values(currentVotes).filter(
+      (d) => d === 'Accepted',
+    ).length;
+    const rejectionsCount = Object.values(currentVotes).filter(
+      (d) => d === 'Rejected',
+    ).length;
+
+    let finalDecision: DecisionOutcome = 'Accepted';
+    if (rejectionsCount > 0 && voteThresholdStrategy !== 'MAJORITY') {
+      // If ALL strategy and any rejections exist, mark as rejected
+      finalDecision = 'Rejected';
+    } else if (
+      voteThresholdStrategy === 'MAJORITY' &&
+      rejectionsCount > approvalsCount
+    ) {
+      // If MAJORITY and more rejections than approvals
+      finalDecision = 'Rejected';
+    }
+
+    // 6. Mark step complete with final decision
+    await tx
+      .update(schema.proposalApprovals)
+      .set({
+        decision: finalDecision as any,
+        isActive: false,
+        decisionAt: new Date(),
+        comment: actionData.comment || null,
+      })
+      .where(eq(schema.proposalApprovals.id, activeStep.id));
+
+    // 7. Handle advancement or rejection
+    if (finalDecision === 'Accepted') {
+      // Auto-advance to next pending step
+      const nextStep = await tx.query.proposalApprovals.findFirst({
+        where: and(
+          eq(schema.proposalApprovals.proposalId, proposal.id),
+          eq(schema.proposalApprovals.decision, 'Pending' as any),
+          eq(schema.proposalApprovals.stepOrder, activeStep.stepOrder + 1),
+        ),
+      });
+
+      if (!nextStep) {
+        // No more steps - mark proposal as approved
+        await tx
+          .update(schema.proposals)
+          .set({
+            currentStatus: 'Approved' as any,
+            currentStepOrder: 0,
+            workspaceUnlocked: true,
+          })
+          .where(eq(schema.proposals.id, proposal.id));
+
+        await this.createProjectFromApprovedProposal(tx, proposal, userId);
+
+        return { success: true, isComplete: true };
+      }
+
+      // Activate next step
+      await tx
+        .update(schema.proposalApprovals)
+        .set({ isActive: true })
+        .where(eq(schema.proposalApprovals.id, nextStep.id));
+
+      await tx
+        .update(schema.proposals)
+        .set({ currentStepOrder: nextStep.stepOrder })
+        .where(eq(schema.proposals.id, proposal.id));
+
+      return {
+        success: true,
+        nextStep: nextStep.stepOrder,
+        isComplete: false,
+      };
+    } else {
+      // Rejected - mark proposal for revision
+      await tx
+        .update(schema.proposals)
+        .set({
+          currentStatus: 'Needs_Revision' as any,
+          isEditable: true,
+          currentStepOrder: 0,
+        })
+        .where(eq(schema.proposals.id, proposal.id));
+
+      return { success: true, isComplete: false };
+    }
+  }
+
+  /**
+   * Handle FORM step: Store form data, attach files, mark complete
+   */
+  private async handleFormStep(
+    tx: DB,
+    proposal: any,
+    activeStep: any,
+    userId: string,
+    actionData: any,
+  ): Promise<{ success: boolean; nextStep?: number; isComplete: boolean }> {
+    // 1. Validate form schema if present (deferred to controller for now)
+    const submittedData = actionData.submittedData || {};
+
+    // 2. Store submitted data
+    await tx
+      .update(schema.proposalApprovals)
+      .set({
+        submittedJson: submittedData,
+      })
+      .where(eq(schema.proposalApprovals.id, activeStep.id));
+
+    // 3. Attach any files in the submission
+    for (const [fieldName, value] of Object.entries(submittedData)) {
+      // Check if value is a UUID (file ID)
+      if (typeof value === 'string' && this.isValidUUID(value)) {
+        // Validate file exists and belongs to user (if not owned by submitter, reject)
+        const file = await tx.query.files.findFirst({
+          where: eq(schema.files.id, value),
+        });
+
+        if (!file) {
+          throw new BadRequestException(
+            `File ${value} for field "${fieldName}" not found`,
+          );
+        }
+
+        if (file.uploadedBy !== userId) {
+          throw new BadRequestException(`File ${value} does not belong to you`);
+        }
+
+        // Attach file to this step (TEMP → ATTACHED)
+        await tx
+          .update(schema.files)
+          .set({
+            resourceType: 'PROPOSAL_STEP',
+            resourceId: activeStep.id,
+            purpose: fieldName,
+            status: 'ATTACHED' as any,
+          })
+          .where(eq(schema.files.id, value));
+      }
+    }
+
+    // 4. Mark step as complete (Accepted for approval)
+    const finalDecision: DecisionOutcome = actionData.decision || 'Accepted';
+
+    await tx
+      .update(schema.proposalApprovals)
+      .set({
+        decision: finalDecision as any,
+        isActive: false,
+        decisionAt: new Date(),
+        comment: actionData.comment || null,
+        approverUserId: userId,
+      })
+      .where(eq(schema.proposalApprovals.id, activeStep.id));
+
+    // 5. Advance or reject based on action
+    if (finalDecision === 'Accepted') {
+      const nextStep = await tx.query.proposalApprovals.findFirst({
+        where: and(
+          eq(schema.proposalApprovals.proposalId, proposal.id),
+          eq(schema.proposalApprovals.decision, 'Pending' as any),
+          eq(schema.proposalApprovals.stepOrder, activeStep.stepOrder + 1),
+        ),
+      });
+
+      if (!nextStep) {
+        // No more steps - mark proposal as approved
+        await tx
+          .update(schema.proposals)
+          .set({
+            currentStatus: 'Approved' as any,
+            currentStepOrder: 0,
+            workspaceUnlocked: true,
+          })
+          .where(eq(schema.proposals.id, proposal.id));
+
+        await this.createProjectFromApprovedProposal(tx, proposal, userId);
+
+        return { success: true, isComplete: true };
+      }
+
+      // Activate next step
+      await tx
+        .update(schema.proposalApprovals)
+        .set({ isActive: true })
+        .where(eq(schema.proposalApprovals.id, nextStep.id));
+
+      await tx
+        .update(schema.proposals)
+        .set({ currentStepOrder: nextStep.stepOrder })
+        .where(eq(schema.proposals.id, proposal.id));
+
+      return {
+        success: true,
+        nextStep: nextStep.stepOrder,
+        isComplete: false,
+      };
+    } else {
+      // Rejection or revision
+      await tx
+        .update(schema.proposals)
+        .set({
+          currentStatus:
+            actionData.decision === 'Rejected'
+              ? ('Rejected' as any)
+              : ('Needs_Revision' as any),
+          isEditable: true,
+          currentStepOrder: 0,
+        })
+        .where(eq(schema.proposals.id, proposal.id));
+
+      return { success: true, isComplete: false };
+    }
+  }
+
+  // ============================================================================
+  // Vote Helper Methods
+  // ============================================================================
+
+  /**
+   * Get eligible voters for a step by role
+   * Returns all users with the specified role
+   */
+  private async getEligibleVotersByRole(
+    tx: DB,
+    approverRole: string,
+  ): Promise<any[]> {
+    // Get role ID first
+    const roleRecord = await tx.query.roles.findFirst({
+      where: eq(schema.roles.name, approverRole),
+    });
+
+    if (!roleRecord) {
+      return [];
+    }
+
+    // Get all users with that role
+    const voterRoles = await tx.query.userRoles.findMany({
+      where: eq(schema.userRoles.roleId, roleRecord.id),
+      with: { user: true },
+    });
+
+    return voterRoles.map((ur) => ur.user).filter((u) => u != null);
+  }
+
+  /**
+   * Check if vote threshold is met
+   * Returns true if threshold condition is satisfied
+   */
+  private async checkVoteThreshold(
+    currentVotes: Record<string, string>,
+    eligibleVoterCount: number,
+    voteThreshold: number | null | undefined,
+    voteThresholdStrategy: string | null | undefined,
+  ): Promise<boolean> {
+    const votesCount = Object.keys(currentVotes).length;
+
+    if (voteThresholdStrategy === 'ALL') {
+      // All eligible voters must vote
+      return votesCount === eligibleVoterCount;
+    } else if (voteThresholdStrategy === 'MAJORITY') {
+      // Majority of eligible voters must vote
+      const majorityThreshold = Math.ceil(eligibleVoterCount / 2);
+      return votesCount >= majorityThreshold;
+    } else if (voteThresholdStrategy === 'NUMBER') {
+      // Specific number of votes required
+      return votesCount >= (voteThreshold || 1);
+    }
+
+    return false;
+  }
+
+  /**
+   * UUID validation helper
+   */
+  private isValidUUID(value: string): boolean {
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(value);
+  }
 
   /**
    * Helper: Fetch proposal with active approval step
@@ -298,7 +715,7 @@ export class WorkflowService {
     newProposalStatus: string,
     isEditable: boolean,
     comment?: string,
-  ): Promise<{ success: boolean }> {
+  ): Promise<{ success: boolean; isComplete: boolean }> {
     return await this.drizzle.db.transaction(async (tx) => {
       // 1. Get proposal and validate
       const { proposal, activeStep } = await this.getProposalWithActiveStep(
@@ -360,7 +777,7 @@ export class WorkflowService {
         changedAt: new Date(),
       });
 
-      return { success: true };
+      return { success: true, isComplete: false };
     });
   }
 
@@ -446,6 +863,7 @@ export class WorkflowService {
 
   /**
    * Helper: Generate all approval steps from routing_rules on first submission
+   * Copies stepType, voteThreshold, voteThresholdStrategy, dynamicFieldsJson for VOTE and FORM steps
    */
   private async generateApprovalStepsFromRules(
     tx: DB,
@@ -474,6 +892,7 @@ export class WorkflowService {
         routingRuleId: rule.id,
         stepOrder: rule.stepOrder,
         approverRole: rule.approverRole,
+        stepType: rule.stepType, // Copy from routing rule
         decision: 'Pending' as any,
         isActive: rule.stepOrder === sortedRules[0].stepOrder, // Activate first step
         createdAt: new Date(),

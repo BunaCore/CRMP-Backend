@@ -8,9 +8,13 @@ export const proposalStatusEnum = pgEnum('proposal_status', [
   'Rejected',
 ]);
 
-export const stepTypeEnum = pgEnum('step_type', ['APPROVAL', 'VOTE', 'INPUT']);
+export const stepTypeEnum = pgEnum('step_type', ['APPROVAL', 'VOTE', 'FORM']);
 
-export const voteStrategyEnum = pgEnum('vote_strategy', ['MAJORITY', 'ALL']);
+export const voteThresholdStrategyEnum = pgEnum('vote_threshold_strategy', [
+  'MAJORITY',
+  'ALL',
+  'NUMBER',
+]);
 
 export const approvalDecisionEnum = pgEnum('approval_decision', [
   'Pending',

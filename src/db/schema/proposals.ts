@@ -113,9 +113,11 @@ export const proposalApprovals = pgTable('proposal_approvals', {
   decisionAt: timestamp('decision_at', { withTimezone: true }),
 
   // VOTE steps: { userId: 'Accepted' | 'Rejected' | 'Needs_Revision' }
+  // Tracks votes cast by eligible voters
   voteJson: jsonb('vote_json'),
 
-  // INPUT steps: form fields + fileIds
+  // FORM steps: form field values + fileIds
+  // Example: { "field1": "value1", "file_field": "file-uuid-123" }
   submittedJson: jsonb('submitted_json'),
 
   // Parallel step grouping

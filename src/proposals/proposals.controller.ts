@@ -24,6 +24,7 @@ import { FilesService } from 'src/common/files/files.service';
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import {
   ApprovalActionDto,
+  SubmitStepActionDto,
   WorkflowActionResponseDto,
 } from './dto/workflow.dto';
 import {
@@ -262,6 +263,40 @@ export class ProposalsController {
         'Revision requested. Creator can now edit and resubmit proposal.',
       proposalId,
       newStatus: 'Needs_Revision',
+    };
+  }
+
+  /**
+   * POST /proposals/:id/action
+   * Unified endpoint for all step actions (VOTE, FORM submission)
+   * Routes to appropriate handler based on step type and action
+   * For VOTE steps: validate eligible voter, track vote, check threshold
+   * For FORM steps: validate/store form data, attach files, mark complete
+   */
+  @Post(':id/action')
+  async submitAction(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: SubmitStepActionDto,
+  ): Promise<WorkflowActionResponseDto> {
+    const result = await this.workflowService.submitAction(
+      proposalId,
+      user.id,
+      {
+        action: dto.action,
+        decision: dto.decision,
+        submittedData: dto.submittedData,
+        comment: dto.comment,
+      },
+    );
+
+    return {
+      success: result.success,
+      message: `Action "${dto.action}" completed successfully`,
+      proposalId,
+      newStatus: 'Under_Review', // Will be updated based on actual step outcome
+      nextStep: result.nextStep,
+      isComplete: result.isComplete,
     };
   }
 

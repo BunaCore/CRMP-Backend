@@ -15,6 +15,13 @@
       "when": 1775550222220,
       "tag": "0001_colorful_power_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775584365517,
+      "tag": "0002_fresh_umar",
+      "breakpoints": true
     }
   ]
 }
