@@ -37,6 +37,7 @@ export class ProposalsService {
   async create(
     user: AuthenticatedUser,
     dto: CreateProposalDto,
+    // @ts-ignore
     file: Express.Multer.File,
     shouldSubmit: boolean = false,
   ) {

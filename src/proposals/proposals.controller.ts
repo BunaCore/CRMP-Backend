@@ -122,7 +122,8 @@ export class ProposalsController {
         ],
       }),
     )
-    file: Express.Multer.File,
+    file // @ts-ignore
+    : Express.Multer.File,
     @Query('submit') submit?: string,
   ) {
     const shouldSubmit = submit === 'true';
