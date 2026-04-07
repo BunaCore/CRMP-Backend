@@ -8,3 +8,4 @@ export * from './verification';
 export * from './project';
 export * from './department';
 export * from './refresh-tokens';
+export * from './files';

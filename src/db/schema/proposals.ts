@@ -17,6 +17,7 @@ import { users } from './user';
 import { projects } from './project';
 import { departments } from './department';
 import { ProjectProgramEnum, projectRoleEnum } from './project';
+import { stepTypeEnum } from './routing';
 export const degreeLevelEnum = pgEnum('degree_level', ['Master', 'PhD', 'NA']);
 export const proposalStatusEnum = pgEnum('proposal_status', [
   'Draft',
@@ -111,10 +112,25 @@ export const proposalApprovals = pgTable('proposal_approvals', {
   stepOrder: integer('step_order').notNull(),
   approverRole: varchar('approver_role', { length: 50 }).notNull(),
   approverUserId: uuid('approver_user_id').references(() => users.id),
+
+  // Step type (runtime copy from routingRules)
+  stepType: stepTypeEnum('step_type').notNull().default('APPROVAL'),
+
+  // Decision info
   decision: approvalDecisionEnum('decision').default('Pending'),
   isActive: boolean('is_active').default(false),
   comment: text('comment'),
   decisionAt: timestamp('decision_at', { withTimezone: true }),
+
+  // VOTE steps: { userId: 'Accepted' | 'Rejected' | 'Needs_Revision' }
+  voteJson: jsonb('vote_json'),
+
+  // INPUT steps: form fields + fileIds
+  submittedJson: jsonb('submitted_json'),
+
+  // Parallel step grouping
+  parallelGroupId: uuid('parallel_group_id'),
+
   notifiedAt: timestamp('notified_at', { withTimezone: true }),
   versionId: uuid('version_id').references(() => proposalVersions.id),
   attachmentFileId: uuid('attachment_file_id').references(
