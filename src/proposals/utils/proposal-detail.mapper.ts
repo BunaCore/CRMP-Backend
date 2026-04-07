@@ -20,6 +20,25 @@ export type WorkflowStep = {
   role: string;
   status: string;
   isActive: boolean;
+  comment?: string;          // Feedback left by the approver
+  approverUserId?: string;   // Who gave this decision
+};
+
+export type CommentPreview = {
+  id: string;
+  commentText: string;
+  authorId: string;
+  isResolved: boolean;
+  createdAt: string;
+};
+
+export type DefenceSchedule = {
+  id: string;
+  defenceDate: string;
+  location: string;
+  note?: string | null;
+  scheduledBy?: string | null;
+  createdAt: string;
 };
 
 export type ProposalDetailResponse = {
@@ -39,6 +58,9 @@ export type ProposalDetailResponse = {
     currentStepOrder: number | null;
     steps: WorkflowStep[];
   };
+
+  comments: CommentPreview[];
+  defenceSchedules: DefenceSchedule[];
 
   createdAt: string;
 };
@@ -92,10 +114,12 @@ export function mapApprovalsToWorkflowSteps(approvals: any[]): {
 } {
   const steps: WorkflowStep[] = approvals.map((approval) => ({
     stepOrder: approval.stepOrder,
-    label: `Step ${approval.stepOrder}`, // Can be extended with routing_rules label
+    label: `Step ${approval.stepOrder}`,
     role: approval.approverRole || 'Unknown',
     status: approval.decision || 'Pending',
     isActive: approval.isActive === true,
+    comment: approval.comment ?? undefined,
+    approverUserId: approval.approverUserId ?? undefined,
   }));
 
   const currentStep = approvals.find((a) => a.isActive === true);
@@ -113,6 +137,8 @@ export function mapProposalToDetailResponse(
   usersMap: Map<string, any>,
   department: any,
   approvals: any[],
+  comments: any[] = [],
+  defenceSchedules: any[] = [],
 ): ProposalDetailResponse {
   // Extract members by role
   const { pi, advisors, evaluators, teamMembers } =
@@ -155,6 +181,23 @@ export function mapProposalToDetailResponse(
       currentStepOrder,
       steps,
     },
+
+    comments: comments.map((c) => ({
+      id: c.id,
+      commentText: c.commentText,
+      authorId: c.authorId,
+      isResolved: c.isResolved ?? false,
+      createdAt: c.createdAt?.toISOString() || new Date().toISOString(),
+    })),
+
+    defenceSchedules: defenceSchedules.map((d) => ({
+      id: d.id,
+      defenceDate: d.defenceDate?.toISOString(),
+      location: d.location,
+      note: d.note ?? null,
+      scheduledBy: d.scheduledBy ?? null,
+      createdAt: d.createdAt?.toISOString() || new Date().toISOString(),
+    })),
 
     createdAt: proposal.createdAt?.toISOString() || new Date().toISOString(),
   };

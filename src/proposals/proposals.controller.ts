@@ -68,6 +68,19 @@ export class ProposalsController {
    * GET /proposals?status=Under_Review&page=1&limit=20
    * GET /proposals?search=malaria&departmentId=dept-123
    */
+
+  /**
+   * GET /proposals/detail
+   * Fetch all proposals for the currently logged-in researcher
+   * This hides the User ID from the browser address bar for privacy.
+   * Scoped: only returns proposals where the logged-in user is creator or member
+   * Includes: full details, workflow feedback, comments, and defence schedules
+   */
+  @Get('detail')
+  async getMyDetailedProposals(@CurrentUser() user: AuthenticatedUser) {
+    return this.proposalsService.getResearcherProposals(user.id);
+  }
+
   @Get()
   async getAllProposals(
     @Query() query: GetProposalsQueryDto,

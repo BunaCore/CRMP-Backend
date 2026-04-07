@@ -581,13 +581,65 @@ export class ProposalsService {
     const proposalApprovals =
       await this.approvalService.getProposalApprovals(proposalId);
 
-    // 6. Map to detailed response
+    // 6. Fetch comments for this proposal
+    const comments = await this.repository.getCommentsByProposalId(proposalId);
+
+    // 7. Fetch defence schedules for this proposal
+    const defenceSchedules =
+      await this.repository.getDefencesByProposalId(proposalId);
+
+    // 8. Map to detailed response
     return mapProposalToDetailResponse(
       proposal,
       members,
       usersMap,
       department,
       proposalApprovals,
+      comments,
+      defenceSchedules,
     );
+  }
+
+  /**
+   * Get all proposals for a specific researcher (by userId)
+   * Returns full detail per proposal: members, workflow (with feedback),
+   * comments, and defence schedules
+   * Access: any authenticated user — results are scoped to proposals
+   * where the userId is the creator or a member
+   *
+   * @param userId - The researcher's user ID
+   * @returns Array of ProposalDetailResponse
+   */
+  async getResearcherProposals(userId: string): Promise<ProposalDetailResponse[]> {
+    // 1. Fetch proposals where user is creator
+    const createdProposals =
+      await this.repository.findProposalsByCreator(userId);
+
+    // 2. Fetch proposals where user is a member
+    const membershipRecords =
+      await this.repository.findProposalsByMembership(userId);
+    const memberProposals = membershipRecords.map((r: any) => r.proposal);
+
+    // 3. Deduplicate (user may be both creator and member)
+    const proposalMap = new Map<string, any>();
+    createdProposals.forEach((p: any) => proposalMap.set(p.id, p));
+    memberProposals.forEach((p: any) => {
+      if (!proposalMap.has(p.id)) {
+        proposalMap.set(p.id, p);
+      }
+    });
+
+    if (proposalMap.size === 0) {
+      return [];
+    }
+
+    // 4. Fetch detailed info for each proposal (includes comments + defences)
+    const detailedProposals = await Promise.all(
+      Array.from(proposalMap.keys()).map((proposalId) =>
+        this.getProposalByIdDetailed(proposalId),
+      ),
+    );
+
+    return detailedProposals;
   }
 }

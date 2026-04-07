@@ -14,6 +14,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponse } from 'src/types/auth-response';
 import { UserWithPermissions } from 'src/types/user-with-permissions';
+
 import * as bcrypt from 'bcrypt';
 import { DB } from 'src/db/db.type';
 
@@ -26,7 +27,7 @@ export class AuthService {
     private drizzleService: DrizzleService,
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * Register a new user with transactional role assignment
@@ -129,6 +130,7 @@ export class AuthService {
    */
   async login(dto: LoginDto): Promise<AuthResponse> {
     const user = await this.usersRepository.findByEmail(dto.email);
+    console.log('🔍 DEBUG - User fetched from DB:', user);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -172,6 +174,7 @@ export class AuthService {
    */
   async getCurrentUser(userId: string): Promise<UserWithPermissions> {
     const user = await this.usersRepository.findById(userId);
+
     if (!user) {
       throw new NotFoundException('User not found');
     }
