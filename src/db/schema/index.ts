@@ -1,3 +1,4 @@
+export * from './enums';
 export * from './user';
 export * from './roles';
 export * from './proposals';

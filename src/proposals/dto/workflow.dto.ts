@@ -7,6 +7,15 @@ import {
 } from 'class-validator';
 
 /**
+ * Request DTO for existing approval actions (approve, reject, request-revision)
+ */
+export class ApprovalActionDto {
+  @IsString()
+  @IsOptional()
+  note?: string;
+}
+
+/**
  * Unified request DTO for step actions (approve, reject, vote, submit form)
  */
 export class SubmitStepActionDto {

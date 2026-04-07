@@ -13,11 +13,14 @@ import {
   ParseUUIDPipe,
   BadRequestException,
   Query,
+  Response,
+  StreamableFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProposalsService } from './proposals.service';
 import { ProposalMembersService } from './proposal-members.service';
 import { WorkflowService } from './workflow.service';
+import { FilesService } from 'src/common/files/files.service';
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import {
   ApprovalActionDto,
@@ -46,6 +49,7 @@ export class ProposalsController {
     private readonly proposalsService: ProposalsService,
     private readonly proposalMembersService: ProposalMembersService,
     private readonly workflowService: WorkflowService,
+    private readonly filesService: FilesService,
   ) {}
 
   /**
@@ -134,9 +138,8 @@ export class ProposalsController {
           new FileTypeValidator({ fileType: 'application/pdf' }),
         ],
       }),
-    )
-    file // @ts-ignore
-    : Express.Multer.File,
+    ) // @ts-ignore
+    file: Express.Multer.File,
     @Query('submit') submit?: string,
   ) {
     const shouldSubmit = submit === 'true';
@@ -378,6 +381,49 @@ export class ProposalsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.proposalMembersService.getAllMembersGrouped(proposalId);
+  }
+
+  /**
+   * POST /proposals/files/upload
+   * Upload a file for use in forms/attachments
+   * Returns fileId for use in step submissions
+   */
+  @Post('files/upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadFile(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB
+        ],
+      }),
+    )
+    file: any,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.filesService.uploadFile(file, user.id);
+  }
+
+  /**
+   * GET /proposals/files/:id
+   * Download/stream file by ID
+   * No auth required for now
+   */
+  @Get('files/:id')
+  async downloadFile(
+    @Param('id', new ParseUUIDPipe()) fileId: string,
+    @Response() res: any,
+  ) {
+    const file = await this.filesService.getFileById(fileId);
+    if (!file) {
+      throw new BadRequestException(`File ${fileId} not found`);
+    }
+
+    res.set({
+      'Content-Type': file.mimetype,
+      'Content-Disposition': `attachment; filename="${file.originalname}"`,
+    });
+    res.send(file.buffer);
   }
 }
 

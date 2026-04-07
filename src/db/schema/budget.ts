@@ -9,7 +9,8 @@ import {
   timestamp,
 } from 'drizzle-orm/pg-core';
 import { users } from './user';
-import { proposalStatusEnum, proposals } from './proposals';
+import { proposals } from './proposals';
+import { proposalStatusEnum } from './enums';
 import { projects } from './project';
 
 export const fundReleaseStatusEnum = pgEnum('fund_release_status', [

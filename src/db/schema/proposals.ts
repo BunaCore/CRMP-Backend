@@ -1,6 +1,5 @@
 import {
   pgTable,
-  pgEnum,
   uuid,
   varchar,
   text,
@@ -17,21 +16,12 @@ import { users } from './user';
 import { projects } from './project';
 import { departments } from './department';
 import { ProjectProgramEnum, projectRoleEnum } from './project';
-import { stepTypeEnum } from './routing';
-export const degreeLevelEnum = pgEnum('degree_level', ['Master', 'PhD', 'NA']);
-export const proposalStatusEnum = pgEnum('proposal_status', [
-  'Draft',
-  'Under_Review',
-  'Needs_Revision',
-  'Approved',
-  'Rejected',
-]);
-export const approvalDecisionEnum = pgEnum('approval_decision', [
-  'Pending',
-  'Accepted',
-  'Rejected',
-  'Needs_Revision',
-]);
+import {
+  stepTypeEnum,
+  degreeLevelEnum,
+  proposalStatusEnum,
+  approvalDecisionEnum,
+} from './enums';
 
 export const proposals = pgTable('proposals', {
   id: uuid('id').primaryKey().defaultRandom(),

@@ -1,6 +1,5 @@
 import {
   pgTable,
-  pgEnum,
   uuid,
   varchar,
   integer,
@@ -9,12 +8,9 @@ import {
   jsonb,
 } from 'drizzle-orm/pg-core';
 import { users } from './user';
-import { proposalApprovals, proposalStatusEnum } from './proposals';
+import { proposalApprovals } from './proposals';
 import { ProjectProgramEnum } from './project';
-
-export const stepTypeEnum = pgEnum('step_type', ['APPROVAL', 'VOTE', 'INPUT']);
-
-export const voteStrategyEnum = pgEnum('vote_strategy', ['MAJORITY', 'ALL']);
+import { proposalStatusEnum, stepTypeEnum, voteStrategyEnum } from './enums';
 
 export const routingRules = pgTable('routing_rules', {
   id: uuid('id').primaryKey().defaultRandom(),
