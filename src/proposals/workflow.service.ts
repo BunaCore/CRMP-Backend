@@ -1070,7 +1070,8 @@ export class WorkflowService {
         stepOrder: rule.stepOrder,
         approverRole: rule.approverRole,
         stepType: rule.stepType,
-        branchId: rule.branchId, // Track which branch this step came from
+        branchKey: rule.branchKey,
+        conditionGroup: rule.conditionGroup,
         decision: 'Pending' as any,
         isActive: rule.stepOrder === matchingRules[0].stepOrder, // Activate first step
         createdAt: new Date(),

@@ -23,7 +23,6 @@ export class ProposalApprovalRepository {
       .where(
         and(
           eq(schema.routingRules.proposalProgram, proposalProgram as any),
-          eq(schema.routingRules.currentStatus, currentStatus as any),
           eq(schema.routingRules.stepOrder, stepOrder),
         ),
       );

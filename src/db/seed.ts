@@ -241,8 +241,6 @@ async function seed() {
       // 1. Department review
       {
         proposalProgram: 'PG',
-        currentStatus: 'Under_Review',
-        nextRole: 'PG_OFFICE',
         stepOrder: 1,
         approverRole: 'DGC_MEMBER',
         stepLabel: 'Department Initial Review',
@@ -253,8 +251,6 @@ async function seed() {
       // 2. PG Office final approval
       {
         proposalProgram: 'PG',
-        currentStatus: 'Under_Review',
-        nextRole: null,
         stepOrder: 2,
         approverRole: 'PG_OFFICE',
         stepLabel: 'PG Office Final Approval',
@@ -267,8 +263,6 @@ async function seed() {
       // 1. Coordinator screens, plagiarism check, assigns advisor
       {
         proposalProgram: 'UG',
-        currentStatus: 'Draft',
-        nextRole: null,
         stepOrder: 1,
         approverRole: 'COORDINATOR',
         stepLabel: 'Coordinator Screening (Final Approval)',
@@ -280,8 +274,6 @@ async function seed() {
       // --- Funded Project Flow ---
       {
         proposalProgram: 'GENERAL',
-        currentStatus: 'Draft',
-        nextRole: null,
         stepOrder: 1,
         approverRole: 'RAD',
         stepLabel: 'RAD Pre-screening & Assignment',
@@ -291,8 +283,6 @@ async function seed() {
       },
       {
         proposalProgram: 'GENERAL',
-        currentStatus: 'Draft',
-        nextRole: null,
         stepOrder: 2,
         approverRole: 'EVALUATOR',
         stepLabel: 'Peer Evaluation Review',
@@ -302,8 +292,6 @@ async function seed() {
       },
       {
         proposalProgram: 'GENERAL',
-        currentStatus: 'Draft',
-        nextRole: null,
         stepOrder: 3,
         approverRole: 'FINANCE',
         stepLabel: 'Finance Budget Integrity Check',
@@ -313,8 +301,6 @@ async function seed() {
       },
       {
         proposalProgram: 'GENERAL',
-        currentStatus: 'Draft',
-        nextRole: null,
         stepOrder: 4,
         approverRole: 'VPRTT',
         stepLabel: 'VP Research Final Authorization',
@@ -324,8 +310,6 @@ async function seed() {
       },
       {
         proposalProgram: 'GENERAL',
-        currentStatus: 'Draft',
-        nextRole: null,
         stepOrder: 5,
         approverRole: 'AC',
         stepLabel: 'Academic Council Approval (>500k)',
@@ -337,8 +321,6 @@ async function seed() {
       // --- Unfunded Project Flow ---
       {
         proposalProgram: 'GENERAL',
-        currentStatus: 'Draft',
-        nextRole: null,
         stepOrder: 1,
         approverRole: 'RAD',
         stepLabel: 'RAD Final Approval',
@@ -554,12 +536,7 @@ async function seed() {
       });
 
       const matchingRules = routingRules
-        .filter(
-          (rule) =>
-            rule.proposalProgram === proposal.proposalProgram &&
-            (rule.currentStatus === proposal.currentStatus ||
-              rule.currentStatus === null),
-        )
+        .filter((rule) => rule.proposalProgram === proposal.proposalProgram)
         .sort((a, b) => a.stepOrder - b.stepOrder);
 
       if (matchingRules.length === 0) {

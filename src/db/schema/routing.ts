@@ -19,10 +19,8 @@ import {
 export const routingRules = pgTable('routing_rules', {
   id: uuid('id').primaryKey().defaultRandom(),
   proposalProgram: ProjectProgramEnum('proposal_program'),
-  currentStatus: proposalStatusEnum('current_status'),
   stepOrder: integer('step_order').notNull(),
   approverRole: varchar('approver_role', { length: 50 }).notNull(),
-  nextRole: varchar('next_role', { length: 50 }),
   stepLabel: varchar('step_label', { length: 100 }),
   isParallel: boolean('is_parallel').default(false),
   isFinal: boolean('is_final').default(false),
@@ -41,11 +39,12 @@ export const routingRules = pgTable('routing_rules', {
   dynamicFieldsJson: jsonb('dynamic_fields_json'),
 
   // Branching fields: conditional workflow steps
-  // branchId groups alternative workflow paths (e.g., high-budget vs low-budget flow)
+  // branchKey identifies which branch this step belongs to (e.g., "LOW_BUDGET", "HIGH_BUDGET")
+  // conditionGroup groups alternative branches together (e.g., "budget_threshold")
+  // Only ONE branch per conditionGroup should evaluate true at step generation time
   // branchConditionJson defines when this step should be included
-  // Example: { operator: 'gt', field: 'budgetAmount', value: 500000 }
-  // During proposal creation, only steps where condition evaluates true are inserted
-  branchId: uuid('branch_id'),
+  branchKey: varchar('branch_key', { length: 50 }),
+  conditionGroup: varchar('condition_group', { length: 50 }),
   branchConditionJson: jsonb('branch_condition_json'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),

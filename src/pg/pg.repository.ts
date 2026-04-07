@@ -249,16 +249,15 @@ export class PgRepository {
     actorRole: string;
   }) {
     const [row] = await this.drizzle.db
-      .select({ nextRole: schema.routingRules.nextRole })
+      .select({ nextStep: schema.routingRules.stepOrder })
       .from(schema.routingRules)
       .where(
         and(
           eq(schema.routingRules.proposalProgram, data.proposalProgram as any),
-          eq(schema.routingRules.currentStatus, data.currentStatus as any),
           eq(schema.routingRules.approverRole, data.actorRole),
         ),
       );
-    return row?.nextRole ?? null;
+    return row?.nextStep ?? null;
   }
 
   async updateApprovalDecision(
