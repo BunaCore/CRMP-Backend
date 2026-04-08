@@ -1247,10 +1247,11 @@ export class WorkflowService {
 
   /**
    * PRIVATE: Build approval timeline for frontend display
-   * Returns all steps with user-specific metadata (canAct, userAction, voteSummary)
+   * Returns all steps with unified structure:
+   * - Top level: canAct, userAction (consistent across all types)
+   * - Type-specific: decision/vote/form objects
    *
    * Does NOT query DB directly—accepts pre-fetched approvals and routing rules
-   * Reuses existing helpers: resolveApprover()
    */
   private async buildApprovalTimeline(
     approvals: any[], // All proposalApprovals records for this proposal
@@ -1274,6 +1275,7 @@ export class WorkflowService {
         const userAction = this.getUserAction(approval, currentUserId);
         const isFinal = approval.stepOrder === approvals.length;
 
+        // Base step structure (all steps have these)
         const step: any = {
           id: approval.id,
           stepOrder: approval.stepOrder,
@@ -1284,47 +1286,36 @@ export class WorkflowService {
           isActive: approval.isActive,
           isFinal,
           canAct,
+          userAction, // UNIFIED: always present at top level
         };
 
-        // Add user action if present
-        if (userAction) {
-          step.userAction = userAction;
+        // Type-specific data structures
+        if (approval.stepType === 'APPROVAL') {
+          step.decision = {
+            value: approval.decision !== 'Pending' ? approval.decision : null,
+            by: approval.approverUserId || undefined,
+            at: approval.decisionAt || undefined,
+            comment: approval.comment || undefined,
+          };
         }
 
-        // Add vote summary for VOTE steps
         if (approval.stepType === 'VOTE') {
-          // For vote summary, we need eligible voters count
-          // In a transaction context, use getEligibleVotersByRole
-          // For timeline view, caller should provide this separately
-          // For now, pass 0 as placeholder (caller can override)
-          step.voteSummary = this.buildVoteSummary(
-            approval,
-            routingRule,
-            0, // TODO: get eligible voters count from caller or service
-          );
+          step.vote = this.buildVoteData(approval, routingRule);
         }
 
-        // Add form schema for FORM steps (so frontend knows what to render)
-        // Prefer snapshot from approval (audit trail); fallback to current rule
         if (approval.stepType === 'FORM') {
-          const formSchema =
-            approval.dynamicFieldsJson || routingRule?.dynamicFieldsJson;
-          if (formSchema) {
-            step.requiredFields = formSchema;
-          }
-        }
-
-        // Add submitted info if step is completed
-        if (
-          approval.decision !== 'Pending' &&
-          approval.approverUserId &&
-          approval.decisionAt
-        ) {
-          step.submitted = {
-            action: approval.decision,
-            by: approval.approverUserId,
-            at: approval.decisionAt,
-            data: approval.submittedJson || null,
+          step.form = {
+            schema:
+              approval.dynamicFieldsJson ||
+              routingRule?.dynamicFieldsJson ||
+              null,
+            submission: approval.submittedJson
+              ? {
+                  submittedBy: approval.approverUserId,
+                  submittedAt: approval.decisionAt,
+                  values: approval.submittedJson,
+                }
+              : null,
           };
         }
 
@@ -1386,27 +1377,22 @@ export class WorkflowService {
   }
 
   /**
-   * Build vote summary for VOTE steps
-   * Aggregates vote counts and individual votes
-   * Does NOT query eligible voters; caller provides count
-   *
-   * @param step ProposalApprovals record with voteJson
-   * @param routingRule Routing rule with threshold config
-   * @param eligibleVotersCount Total voters eligible for this step (provided by caller)
+   * Build vote data structure for VOTE steps (unified format)
+   * Returns votes as array + counts for frontend rendering
    */
-  private buildVoteSummary(
+  private buildVoteData(
     step: any,
     routingRule: any,
-    eligibleVotersCount: number = 0,
   ): {
     threshold: number | null;
     strategy: string | null;
-    current: number;
-    approved: number;
-    rejected: number;
-    abstained: number;
-    votes: Record<string, string>;
-    eligibleVotersCount: number;
+    counts: {
+      approved: number;
+      rejected: number;
+      abstained: number;
+      total: number;
+    };
+    votes: Array<{ userId: string; decision: string }>;
   } {
     const voteJson = step.voteJson || {};
 
@@ -1432,53 +1418,58 @@ export class WorkflowService {
     return {
       threshold: threshold || null,
       strategy: strategy || null,
-      current: Object.keys(voteJson).length,
-      approved: approvedCount,
-      rejected: rejectedCount,
-      abstained: abstainedCount,
-      votes: voteJson,
-      eligibleVotersCount,
+      counts: {
+        approved: approvedCount,
+        rejected: rejectedCount,
+        abstained: abstainedCount,
+        total: Object.keys(voteJson).length,
+      },
+      votes: Object.entries(voteJson).map(([userId, decision]) => ({
+        userId,
+        decision: decision as string,
+      })),
     };
   }
 
   /**
    * Get user's action on this step (if already submitted)
-   * For VOTE: their vote decision from voteJson
-   * For FORM: their submission if they're the submitter
-   * For APPROVAL: their decision if they're the approver
+   * UNIFIED across all step types:
+   * - APPROVAL: APPROVED | REJECTED | NEEDS_REVISION | null
+   * - VOTE: APPROVED | REJECTED | NEEDS_REVISION | null
+   * - FORM: SUBMITTED | null
    */
-  private getUserAction(step: any, userId: string): any {
+  private getUserAction(
+    step: any,
+    userId: string,
+  ): 'APPROVED' | 'REJECTED' | 'NEEDS_REVISION' | 'SUBMITTED' | null {
     // VOTE step: return their vote if present
     if (step.stepType === 'VOTE') {
       const voteJson = step.voteJson || {};
       if (voteJson[userId]) {
-        return {
-          action: 'VOTE',
-          decision: voteJson[userId],
-        };
+        // Map decision to unified format
+        const decision = voteJson[userId];
+        if (decision === 'Accepted') return 'APPROVED';
+        if (decision === 'Rejected') return 'REJECTED';
+        if (decision === 'Needs_Revision') return 'NEEDS_REVISION';
       }
       return null;
     }
 
-    // FORM step: return submission if user is the submitter
+    // FORM step: return SUBMITTED if user is the submitter
     if (step.stepType === 'FORM') {
       if (step.approverUserId === userId && step.submittedJson) {
-        return {
-          action: 'FORM_SUBMIT',
-          data: step.submittedJson,
-        };
+        return 'SUBMITTED';
       }
       return null;
     }
 
-    // APPROVAL step: return if they approved/rejected
+    // APPROVAL step: return unified decision if they acted
     if (step.stepType === 'APPROVAL') {
       if (step.approverUserId === userId && step.decision !== 'Pending') {
-        return {
-          action: 'APPROVAL',
-          decision: step.decision,
-          comment: step.comment,
-        };
+        // Map decision enum to unified format
+        if (step.decision === 'Accepted') return 'APPROVED';
+        if (step.decision === 'Rejected') return 'REJECTED';
+        if (step.decision === 'Needs_Revision') return 'NEEDS_REVISION';
       }
       return null;
     }
@@ -1491,6 +1482,7 @@ export class WorkflowService {
    * Pure logic: no DB queries
    */
   private getStepStatus(step: any): 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' {
+    console.log(step);
     if (step.decision && step.decision !== 'Pending') {
       return 'COMPLETED';
     }

@@ -243,7 +243,7 @@ async function seed() {
         stepOrder: 1,
         approverRole: 'DGC_MEMBER',
         stepLabel: 'DGC Committee Review',
-        stepType: 'APPROVAL',
+        stepType: 'FORM',
         isParallel: false,
         dynamicFieldsJson: {
           fields: [
@@ -335,7 +335,7 @@ async function seed() {
         stepOrder: 3,
         approverRole: 'VPRTT',
         stepLabel: 'VPRTT Approval (<500k)',
-        stepType: 'APPROVAL',
+        stepType: 'FORM',
         conditionGroup: 'BUDGET',
         branchKey: 'LOW_BUDGET',
         branchConditionJson: {
@@ -471,7 +471,7 @@ async function seed() {
         ],
       },
       {
-        title: 'Funded Research Project',
+        title: 'Funded Research Project (Large Budget)',
         proposalProgram: 'GENERAL' as const,
         isFunded: true,
         currentStatus: 'Draft' as const,
@@ -479,17 +479,18 @@ async function seed() {
         projectId: null,
         promoteToProject: true,
         abstract:
-          'This is a test funded project proposal for development and testing purposes.',
+          'This is a test funded project proposal with large budget (>500k) for development and testing purposes.',
         submittedAt: new Date('2024-03-15'),
         durationMonths: 36,
         degreeLevel: 'NA' as const,
+        budgetAmount: 750000,
         members: [
           { email: 'student@crmp.edu', role: 'PI' as const },
           { email: 'evaluator@crmp.edu', role: 'EVALUATOR' as const },
         ],
       },
       {
-        title: 'Unfunded Research Plan',
+        title: 'Unfunded Research Plan (Small Budget)',
         proposalProgram: 'GENERAL' as const,
         isFunded: false,
         currentStatus: 'Draft' as const,
@@ -497,10 +498,11 @@ async function seed() {
         projectId: null,
         promoteToProject: false,
         abstract:
-          'This is a test unfunded project proposal for development and testing purposes.',
+          'This is a test unfunded project proposal with small budget (<500k) for development and testing purposes.',
         submittedAt: null,
         durationMonths: 12,
         degreeLevel: 'NA' as const,
+        budgetAmount: 250000,
         members: [
           { email: 'student@crmp.edu', role: 'PI' as const },
           { email: 'advisor@crmp.edu', role: 'ADVISOR' as const },
@@ -580,9 +582,57 @@ async function seed() {
         promoteToProject,
       });
 
-      const matchingRules = routingRules
+      // Evaluate branch conditions and filter matching rules
+      const budgetAmount = proposal.budgetAmount
+        ? parseFloat(String(proposal.budgetAmount))
+        : 0;
+
+      const evaluateCondition = (condition: any): boolean => {
+        if (!condition) return true; // No condition = include step
+
+        const field = condition.field as string;
+        const operator = condition.operator as string;
+        const value = condition.value;
+
+        let fieldValue: any;
+        if (field === 'budgetAmount') {
+          fieldValue = budgetAmount;
+        } else if (field === 'degreeLevel') {
+          fieldValue = proposal.degreeLevel || '';
+        } else if (field === 'proposalProgram') {
+          fieldValue = proposal.proposalProgram;
+        } else {
+          return true; // Unknown field, include step
+        }
+
+        switch (operator) {
+          case 'gt':
+            return fieldValue > value;
+          case 'gte':
+            return fieldValue >= value;
+          case 'lt':
+            return fieldValue < value;
+          case 'lte':
+            return fieldValue <= value;
+          case 'eq':
+            return fieldValue === value;
+          case 'neq':
+            return fieldValue !== value;
+          case 'in':
+            return Array.isArray(value) && value.includes(fieldValue);
+          default:
+            return true;
+        }
+      };
+
+      const programRules = routingRules
         .filter((rule) => rule.proposalProgram === proposal.proposalProgram)
         .sort((a, b) => a.stepOrder - b.stepOrder);
+
+      // Filter based on branch conditions
+      const matchingRules = programRules.filter((rule) =>
+        evaluateCondition(rule.branchConditionJson),
+      );
 
       if (matchingRules.length === 0) {
         throw new Error(

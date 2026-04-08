@@ -155,6 +155,7 @@ export class ProposalsRepository {
       degreeLevel: string;
       researchArea?: string;
       durationMonths?: number;
+      budgetAmount?: number;
       departmentId?: string;
     },
   ) {
@@ -821,4 +822,3 @@ export class ProposalsRepository {
       .orderBy(asc(schema.proposalDefences.defenceDate));
   }
 }
-

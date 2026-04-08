@@ -93,6 +93,12 @@ export class ProposalsService {
 
     // 2. Create proposal (independent transaction)
     const proposal = await this.drizzle.db.transaction(async (tx) => {
+      // 2.0 Calculate total budget from items
+      const totalBudgetAmount = dto.budget.reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0,
+      );
+
       // 2.1 Create master proposal
       const created = await this.repository.createProposal(tx, {
         createdBy: user.id,
@@ -103,6 +109,7 @@ export class ProposalsService {
         degreeLevel: (dto.degreeLevel || 'NA') as any,
         researchArea: dto.researchArea,
         durationMonths: dto.durationMonths,
+        budgetAmount: totalBudgetAmount,
         departmentId: dto.departmentId,
       });
 
@@ -142,6 +149,7 @@ export class ProposalsService {
       });
 
       // 2.5 Create budget request and items
+      console.log(dto.budget);
       await this.repository.createBudgetRequest(tx, {
         proposalId: created.id,
         requestedBy: user.id,
@@ -157,6 +165,7 @@ export class ProposalsService {
         metadata: {
           title: created.title,
           program: created.proposalProgram,
+          budgetAmount: totalBudgetAmount,
         },
       });
 
@@ -611,7 +620,9 @@ export class ProposalsService {
    * @param userId - The researcher's user ID
    * @returns Array of ProposalDetailResponse
    */
-  async getResearcherProposals(userId: string): Promise<ProposalDetailResponse[]> {
+  async getResearcherProposals(
+    userId: string,
+  ): Promise<ProposalDetailResponse[]> {
     // 1. Fetch proposals where user is creator
     const createdProposals =
       await this.repository.findProposalsByCreator(userId);

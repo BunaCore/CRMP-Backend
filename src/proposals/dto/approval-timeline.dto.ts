@@ -1,54 +1,84 @@
 /**
  * Approval Timeline Response DTOs
- * Frontend-compatible structures for rendering approval step interactions
+ * Unified structure: all steps have canAct + userAction at top level
+ * Type-specific data nested per stepType
  */
 
 export type StepStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
 
-export type VoteSummaryDto = {
-  threshold: number | null;
-  strategy: 'MAJORITY' | 'ALL' | 'NUMBER' | null;
-  current: number; // Votes cast so far
-  approved: number;
-  rejected: number;
-  abstained: number;
-  votes: Record<string, 'Accepted' | 'Rejected' | 'Needs_Revision'>;
-  eligibleVotersCount: number;
-};
+/**
+ * Unified user action across all step types
+ * APPROVAL: APPROVED | REJECTED | NEEDS_REVISION
+ * VOTE: APPROVED | REJECTED | NEEDS_REVISION
+ * FORM: SUBMITTED
+ */
+export type UserAction =
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'NEEDS_REVISION'
+  | 'SUBMITTED'
+  | null;
 
-export type UserActionDto = {
-  action: 'VOTE' | 'FORM_SUBMIT' | 'APPROVAL';
-  decision?: 'Accepted' | 'Rejected' | 'Needs_Revision';
-  data?: Record<string, any>;
+// ============================================================================
+// Type-Specific Data Structures
+// ============================================================================
+
+export type ApprovalDecision = {
+  value: 'Accepted' | 'Rejected' | 'Needs_Revision' | null;
+  by?: string; // userId
   at?: Date;
   comment?: string;
 };
 
-export type SubmittedDto = {
-  action: 'Accepted' | 'Rejected' | 'Needs_Revision';
-  by: string; // userId of the approver
-  at: Date;
-  data?: Record<string, any> | null;
+export type VoteData = {
+  threshold: number | null;
+  strategy: 'MAJORITY' | 'ALL' | 'NUMBER' | null;
+  counts: {
+    approved: number;
+    rejected: number;
+    abstained: number;
+    total: number;
+  };
+  votes: Array<{
+    userId: string;
+    decision: 'Accepted' | 'Rejected' | 'Needs_Revision';
+  }>;
 };
 
+export type FormData = {
+  schema: Record<string, any> | null; // dynamicFieldsJson from routing rule
+  submission?: {
+    submittedBy: string; // userId
+    submittedAt: Date;
+    values: Record<string, any>; // submittedJson
+  } | null;
+};
+
+// ============================================================================
+// Unified Step Structure
+// ============================================================================
+
 export type ApprovalTimelineStepDto = {
+  // Identity
   id: string;
   stepOrder: number;
-  stepLabel: string; // e.g., "Initial Screening", "Budget Review"
+  stepLabel: string;
   stepType: 'APPROVAL' | 'VOTE' | 'FORM';
   approverRole: string;
 
+  // Global step state
   status: StepStatus;
   isActive: boolean;
   isFinal: boolean;
 
-  canAct: boolean; // Can current user act on this step?
-  userAction?: UserActionDto | null; // What user already did
+  // User-specific state (UNIFIED across all types)
+  canAct: boolean; // Can current user act?
+  userAction: UserAction; // What did user do? (null if nothing yet)
 
-  voteSummary?: VoteSummaryDto | null; // For VOTE steps only
-  requiredFields?: Record<string, any> | null; // For FORM steps: form schema from routing rule
-
-  submitted?: SubmittedDto | null; // Only if step is completed
+  // Type-specific data
+  decision?: ApprovalDecision; // For APPROVAL
+  vote?: VoteData; // For VOTE
+  form?: FormData; // For FORM
 };
 
 export type ApprovalTimelineDto = {
