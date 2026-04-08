@@ -58,8 +58,10 @@ export class MailService {
         template: 'base',
         context: { body, ...context },
       });
+      this.logger.log(`Email sent successfully to ${to}`);
     } catch (error) {
-      this.logger.warn(`Failed to send email of type ${type} to ${to}: ${error?.message || error}`);
+      this.logger.error(`Failed to send email of type ${type} to ${to}: ${error?.message || error}`);
+      throw error;
     }
   }
 }
