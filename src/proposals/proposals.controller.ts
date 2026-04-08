@@ -111,6 +111,23 @@ export class ProposalsController {
   }
 
   /**
+   * GET /proposals/:id/approval-timeline
+   * Fetch approval workflow timeline with user-specific metadata
+   * Returns all steps with canAct, userAction, voteSummary, etc.
+   * Frontend-compatible structure for rendering workflow UI
+   */
+  @Get(':id/approval-timeline')
+  async getApprovalTimeline(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.workflowService.getApprovalTimelineForFrontend(
+      proposalId,
+      user.id,
+    );
+  }
+
+  /**
    * GET /proposals/:id
    * Fetch detailed proposal view
    * Includes members, workflow steps, and department info

@@ -106,6 +106,15 @@ export const proposalApprovals = pgTable('proposal_approvals', {
   // Step type (runtime copy from routingRules)
   stepType: stepTypeEnum('step_type').notNull().default('APPROVAL'),
 
+  // Form schema snapshot (for FORM steps)
+  // Copied at step creation for audit trail
+  dynamicFieldsJson: jsonb('dynamic_fields_json'),
+
+  // Vote configuration snapshot (for VOTE steps)
+  // Copied at step creation for audit trail and threshold checking
+  voteThreshold: integer('vote_threshold'),
+  voteThresholdStrategy: varchar('vote_threshold_strategy', { length: 50 }), // MAJORITY | ALL | NUMBER
+
   // Decision info
   decision: approvalDecisionEnum('decision').default('Pending'),
   isActive: boolean('is_active').default(false),

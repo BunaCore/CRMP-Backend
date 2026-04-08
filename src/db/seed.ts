@@ -339,7 +339,7 @@ async function seed() {
         conditionGroup: 'BUDGET',
         branchKey: 'LOW_BUDGET',
         branchConditionJson: {
-          field: 'budget',
+          field: 'budgetAmount',
           operator: 'lt',
           value: 500000,
         },
@@ -366,7 +366,7 @@ async function seed() {
         conditionGroup: 'BUDGET',
         branchKey: 'HIGH_BUDGET',
         branchConditionJson: {
-          field: 'budget',
+          field: 'budgetAmount',
           operator: 'gte',
           value: 500000,
         },
@@ -602,6 +602,12 @@ async function seed() {
           routingRuleId: rule.id,
           stepOrder: rule.stepOrder,
           approverRole: rule.approverRole,
+          stepType: rule.stepType, // Copy step type from routing rule
+          dynamicFieldsJson: rule.dynamicFieldsJson || null, // Copy form schema snapshot
+          voteThreshold: rule.voteThreshold || null, // Copy vote threshold
+          voteThresholdStrategy: rule.voteThresholdStrategy || null, // Copy strategy
+          branchKey: rule.branchKey || null, // Copy branching info
+          conditionGroup: rule.conditionGroup || null,
           decision: 'Pending',
           isActive: rule.stepOrder === activeStepOrder,
         });
