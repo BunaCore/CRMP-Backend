@@ -29,6 +29,7 @@ import {
   AssignAdvisorDto,
   AssignEvaluatorsDto,
 } from './dto/manage-members.dto';
+import { SubmitEvaluationScoresDto } from './dto/evaluation.dto';
 import { GetProposalsQueryDto } from './dto/get-proposals-query.dto';
 import { JwtAuthGuard } from 'src/auth/jwt.guard';
 import {
@@ -378,6 +379,30 @@ export class ProposalsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.proposalMembersService.getAllMembersGrouped(proposalId);
+  }
+
+  /**
+   * GET /proposals/:id/evaluations
+   * Fetch evaluation rubrics and their awarded scores for this proposal
+   */
+  @Get(':id/evaluations')
+  async getEvaluations(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+  ) {
+    return this.proposalsService.getEvaluationOverview(proposalId);
+  }
+
+  /**
+   * POST /proposals/:id/evaluations
+   * Submit or update an evaluation score
+   */
+  @Post(':id/evaluations')
+  async submitEvaluation(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: SubmitEvaluationScoresDto,
+  ) {
+    return this.proposalsService.submitEvaluationScore(proposalId, user.id, dto);
   }
 }
 

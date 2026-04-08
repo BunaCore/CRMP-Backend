@@ -24,7 +24,7 @@ import {
 } from './utils/proposal-detail.mapper';
 import { ProposalResponse } from 'src/types/proposal-response.type';
 import { GetProposalsQueryDto } from './dto/get-proposals-query.dto';
-
+import { SubmitEvaluationScoresDto } from './dto/evaluation.dto';
 @Injectable()
 export class ProposalsService {
   constructor(
@@ -33,7 +33,7 @@ export class ProposalsService {
     private readonly approvalService: ProposalApprovalService,
     private readonly usersService: UsersService,
     private readonly workflowService: WorkflowService,
-  ) {}
+  ) { }
   async create(
     user: AuthenticatedUser,
     dto: CreateProposalDto,
@@ -110,13 +110,13 @@ export class ProposalsService {
       const allMembers =
         supervisorMember !== null
           ? ([...dto.members, supervisorMember] as Array<{
-              userId: string;
-              role: string;
-            }>)
+            userId: string;
+            role: string;
+          }>)
           : (dto.members as unknown as Array<{
-              userId: string;
-              role: string;
-            }>);
+            userId: string;
+            role: string;
+          }>);
       await this.repository.addProposalMembers(
         tx,
         created.id,
@@ -323,6 +323,39 @@ export class ProposalsService {
       pendingForUser.push(dto);
     }
 
+    if (pendingForUser.length === 0) {
+      return [];
+    }
+
+    // 5. Fetch additional context: creators and members
+    const proposalIds = pendingForUser.map((p) => p.id);
+    const creatorIds = pendingForUser.map((p) => p.createdBy);
+    const uniqueCreatorIds = Array.from(new Set(creatorIds));
+
+    const [creators, allMembers] = await Promise.all([
+      this.usersService.findByIds(uniqueCreatorIds),
+      this.repository.getMembersByProposalIds(proposalIds),
+    ]);
+
+    const creatorsMap = new Map(creators.map((c) => [c.id, c.fullName]));
+
+    // Group members by proposal
+    const membersByProposal = new Map<string, any[]>();
+    for (const m of allMembers) {
+      if (!membersByProposal.has(m.proposalId)) {
+        membersByProposal.set(m.proposalId, []);
+      }
+      membersByProposal.get(m.proposalId)!.push(m);
+    }
+
+    // Embed data
+    for (const dto of pendingForUser) {
+      dto.createdByName = creatorsMap.get(dto.createdBy) || 'Unknown';
+      const members = membersByProposal.get(dto.id) || [];
+      dto.evaluatorAssigned = members.some((m) => m.role === 'EVALUATOR');
+      dto.advisorAssigned = members.some((m) => m.role === 'ADVISOR');
+    }
+
     return pendingForUser;
   }
 
@@ -518,10 +551,10 @@ export class ProposalsService {
           role: m.role,
           user: m.user
             ? {
-                id: m.user.id,
-                fullName: m.user.fullName ?? undefined,
-                email: m.user.email,
-              }
+              id: m.user.id,
+              fullName: m.user.fullName ?? undefined,
+              email: m.user.email,
+            }
             : undefined,
         })),
         usersMap,
@@ -589,7 +622,20 @@ export class ProposalsService {
     const defenceSchedules =
       await this.repository.getDefencesByProposalId(proposalId);
 
-    // 8. Map to detailed response
+    // 8. Fetch budget for this proposal
+    const budgetsRaw = await this.repository.getBudgetsByProposalIds([
+      proposalId,
+    ]);
+    const totalBudget =
+      budgetsRaw.length > 0 && budgetsRaw[0].totalAmount != null
+        ? parseFloat(budgetsRaw[0].totalAmount)
+        : null;
+
+    // 9. Fetch budget items for this proposal
+    const budgetItems =
+      await this.repository.getBudgetItemsByProposalId(proposalId);
+
+    // 10. Map to detailed response
     return mapProposalToDetailResponse(
       proposal,
       members,
@@ -598,6 +644,8 @@ export class ProposalsService {
       proposalApprovals,
       comments,
       defenceSchedules,
+      totalBudget,
+      budgetItems,
     );
   }
 
@@ -642,5 +690,92 @@ export class ProposalsService {
     );
 
     return detailedProposals;
+  }
+
+  /**
+   * Get formatted evaluation overview for a proposal
+   */
+  async getEvaluationOverview(proposalId: string) {
+    const rubrics = await this.repository.getEvaluationRubrics();
+    const scores = await this.repository.getEvaluationScoresByProposal(proposalId);
+
+    // Group awarded scores by rubric for frontend mapping
+    return {
+      proposalId,
+      rubrics: rubrics.map(rubric => ({
+        id: rubric.id,
+        name: rubric.name,
+        phase: rubric.phase,
+        type: rubric.type,
+        maxPoints: parseFloat(rubric.maxPoints as string),
+        awardedScores: scores
+          .filter(s => s.rubricId === rubric.id)
+          .map(s => ({
+            id: s.id,
+            studentId: s.studentId,
+            evaluatorId: s.evaluatorId,
+            score: parseFloat(s.score as string),
+            feedback: s.feedback,
+            projectId: s.projectId,
+            updatedAt: s.updatedAt,
+          }))
+      }))
+    };
+  }
+
+  /**
+   * Submit evaluation score
+   */
+  async submitEvaluationScore(proposalId: string, evaluatorId: string, dto: SubmitEvaluationScoresDto) {
+    // 1. Verify existence of proposal
+    const proposal = await this.repository.findById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException(`Proposal not found`);
+    }
+
+    // Guard: reject empty submissions
+    if (!dto.scores || dto.scores.length === 0) {
+      throw new BadRequestException(
+        `No scores provided. Make sure the proposal has members and rubrics loaded before submitting.`,
+      );
+    }
+
+    // 2. Validate all studentIds are real user IDs (not the proposalId)
+    const uniqueStudentIds = Array.from(new Set(dto.scores.map((s) => s.studentId)));
+
+    for (const sid of uniqueStudentIds) {
+      if (sid === proposalId) {
+        throw new BadRequestException(
+          `Invalid studentId "${sid}": the proposalId was sent as studentId. Check your frontend payload.`,
+        );
+      }
+    }
+
+    const foundUserIds = await this.repository.validateUsersExist(uniqueStudentIds);
+    const missingIds = uniqueStudentIds.filter((id) => !foundUserIds.includes(id));
+    if (missingIds.length > 0) {
+      throw new BadRequestException(
+        `Invalid studentId(s): not found in the system: ${missingIds.join(', ')}`,
+      );
+    }
+
+    console.debug(`Upserting ${dto.scores.length} scores for proposal ${proposalId}`);
+
+    // 3. Upsert all scores — one row per (rubricId, proposalId, studentId)
+    // ON CONFLICT → update score, feedback, evaluatorId, updatedAt
+    const results = await Promise.all(
+      dto.scores.map((s) =>
+        this.repository.upsertEvaluationScore({
+          rubricId: s.rubricId,
+          proposalId,
+          projectId: s.projectId ?? undefined,
+          studentId: s.studentId,
+          evaluatorId,
+          score: s.score.toString(),
+          feedback: s.feedback ?? '',
+        }),
+      ),
+    );
+    return { message: `${results.length} evaluation scores saved successfully` };
   }
 }

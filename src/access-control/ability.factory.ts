@@ -167,6 +167,11 @@ export class AbilityFactory {
       [Permission.BUDGET_VIEW]: [{ action: 'read', subject: 'Budget' }],
       [Permission.BUDGET_MANAGE]: [{ action: 'manage', subject: 'Budget' }],
 
+      // --- Defence ---
+      [Permission.DEFENCE_SCHEDULE]: [
+        { action: 'schedule', subject: 'Defence' },
+      ],
+
       // --- System & Platform ---
       [Permission.SYSTEM_CONFIG]: [{ action: 'manage', subject: 'System' }],
       [Permission.AUDIT_LOG_VIEW]: [{ action: 'read', subject: 'AuditLog' }],

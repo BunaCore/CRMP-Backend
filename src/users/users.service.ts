@@ -5,7 +5,7 @@ import { UserSelectorDto } from 'src/types/selector';
 
 @Injectable()
 export class UsersService {
-  constructor(private usersRepository: UsersRepository) {}
+  constructor(private usersRepository: UsersRepository) { }
 
   async findByEmail(email: string): Promise<User | null> {
     return this.usersRepository.findByEmail(email);
