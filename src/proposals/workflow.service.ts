@@ -12,6 +12,8 @@ import { ProposalsRepository } from './proposals.repository';
 import { ProposalApprovalService } from './proposal-approval.service';
 import { UsersService } from 'src/users/users.service';
 import { ApproverResolution } from './types/proposal';
+import { MailService } from 'src/mail/mail.service';
+import { EmailType } from 'src/mail/dto/email-type.enum';
 
 type DecisionOutcome = 'Accepted' | 'Rejected' | 'Needs_Revision';
 
@@ -34,6 +36,7 @@ export class WorkflowService {
     private readonly repository: ProposalsRepository,
     private readonly approvalService: ProposalApprovalService,
     private readonly usersService: UsersService,
+    private readonly mailService: MailService,
   ) {}
 
   /**
@@ -125,7 +128,7 @@ export class WorkflowService {
     userId: string,
     comment?: string,
   ): Promise<{ success: boolean; nextStep?: number; isComplete: boolean }> {
-    return await this.drizzle.db.transaction(async (tx) => {
+    const result = await this.drizzle.db.transaction(async (tx) => {
       // 1. Get proposal and validate active step
       const { proposal, activeStep } = await this.getProposalWithActiveStep(
         tx,
@@ -188,7 +191,7 @@ export class WorkflowService {
         // Create project and migrate members
         await this.createProjectFromApprovedProposal(tx, proposal, userId);
 
-        return { success: true, isComplete: true };
+        return { success: true, isComplete: true, proposal };
       }
 
       // Activate next step
@@ -217,8 +220,23 @@ export class WorkflowService {
         success: true,
         nextStep: nextStep.stepOrder,
         isComplete: false,
+        proposal,
       };
     });
+
+    // Send email after transaction
+    if (result.isComplete) {
+      const creator = await this.usersService.findById(result.proposal.createdBy);
+      if (creator) {
+        this.mailService.sendEmail(EmailType.PROPOSAL_STATUS_CHANGED, creator.email, {
+          recipientName: creator.fullName,
+          proposalTitle: result.proposal.title,
+          status: 'Approved',
+        });
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -230,7 +248,7 @@ export class WorkflowService {
     userId: string,
     comment?: string,
   ): Promise<{ success: boolean }> {
-    return await this.transitionStep(
+    const result = await this.transitionStep(
       proposalId,
       userId,
       'Rejected',
@@ -238,6 +256,22 @@ export class WorkflowService {
       false,
       comment,
     );
+
+    if (result.success) {
+      const proposal = await this.repository.findById(proposalId);
+      if (proposal) {
+        const creator = await this.usersService.findById(proposal.createdBy);
+        if (creator) {
+          this.mailService.sendEmail(EmailType.PROPOSAL_STATUS_CHANGED, creator.email, {
+            recipientName: creator.fullName,
+            proposalTitle: proposal.title,
+            status: 'Rejected',
+          });
+        }
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -249,7 +283,7 @@ export class WorkflowService {
     userId: string,
     comment?: string,
   ): Promise<{ success: boolean }> {
-    return await this.transitionStep(
+    const result = await this.transitionStep(
       proposalId,
       userId,
       'Needs_Revision',
@@ -257,6 +291,22 @@ export class WorkflowService {
       true,
       comment,
     );
+
+    if (result.success) {
+      const proposal = await this.repository.findById(proposalId);
+      if (proposal) {
+        const creator = await this.usersService.findById(proposal.createdBy);
+        if (creator) {
+          this.mailService.sendEmail(EmailType.PROPOSAL_STATUS_CHANGED, creator.email, {
+            recipientName: creator.fullName,
+            proposalTitle: proposal.title,
+            status: 'Needs Revision',
+          });
+        }
+      }
+    }
+
+    return result;
   }
 
   // ============================================================================
