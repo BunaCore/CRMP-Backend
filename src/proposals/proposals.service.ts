@@ -10,6 +10,8 @@ import { ProposalsRepository } from './proposals.repository';
 import { ProposalApprovalService } from './proposal-approval.service';
 import { UsersService } from 'src/users/users.service';
 import { WorkflowService } from './workflow.service';
+import { MailService } from 'src/mail/mail.service';
+import { EmailType } from 'src/mail/dto/email-type.enum';
 import {
   PendingApprovalDto,
   ProposalListItemDto,
@@ -33,6 +35,7 @@ export class ProposalsService {
     private readonly approvalService: ProposalApprovalService,
     private readonly usersService: UsersService,
     private readonly workflowService: WorkflowService,
+    private readonly mailService: MailService,
   ) { }
   async create(
     user: AuthenticatedUser,
@@ -778,4 +781,17 @@ export class ProposalsService {
     );
     return { message: `${results.length} evaluation scores saved successfully` };
   }
+
+  // Placeholder for defence scheduling - not implemented yet
+  // When implemented, add mail call after successful scheduling:
+  // const student = await this.usersService.findById(proposal.createdBy);
+  // if (student) {
+  //   this.mailService.sendEmail(EmailType.DEFENSE_SCHEDULED, student.email, {
+  //     recipientName: student.fullName,
+  //     defenseDate: dto.defenseDate,
+  //     defenseTime: dto.defenseTime,
+  //     proposalTitle: proposal.title,
+  //     location: dto.location,
+  //   });
+  // }
 }

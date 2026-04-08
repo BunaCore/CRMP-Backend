@@ -14,6 +14,8 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponse } from 'src/types/auth-response';
 import { UserWithPermissions } from 'src/types/user-with-permissions';
+import { MailService } from 'src/mail/mail.service';
+import { EmailType } from 'src/mail/dto/email-type.enum';
 
 import * as bcrypt from 'bcrypt';
 import { DB } from 'src/db/db.type';
@@ -27,6 +29,7 @@ export class AuthService {
     private drizzleService: DrizzleService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private mailService: MailService,
   ) { }
 
   /**
@@ -97,6 +100,11 @@ export class AuthService {
         return { user: createdUser, tokens: generatedTokens };
       },
     );
+
+    // Send welcome email after successful registration
+    this.mailService.sendEmail(EmailType.WELCOME, user.email, {
+      recipientName: user.fullName,
+    });
 
     // Fetch permissions and build response
     const permissions = await this.usersRepository.getUserPermissions(user.id);

@@ -10,6 +10,7 @@ import { ProposalsModule } from './proposals/proposals.module';
 import { UndergradModule } from './undergrad/undergrad.module';
 import { PgModule } from './pg/pg.module';
 import { DepartmentsModule } from './departments/departments.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { DepartmentsModule } from './departments/departments.module';
     UndergradModule,
     PgModule,
     DepartmentsModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],
