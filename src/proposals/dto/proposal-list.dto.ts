@@ -47,6 +47,14 @@ export class ProposalListItemDto {
   @IsOptional()
   createdByName?: string;
 
+  @IsBoolean()
+  @IsOptional()
+  evaluatorAssigned?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  advisorAssigned?: boolean;
+
   // Workflow context (for pending approvals)
   @IsNumber()
   @IsOptional()
