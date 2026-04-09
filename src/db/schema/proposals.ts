@@ -103,7 +103,9 @@ export const proposalApprovals = pgTable('proposal_approvals', {
   approverRole: varchar('approver_role', { length: 50 }).notNull(),
   approverUserId: uuid('approver_user_id').references(() => users.id),
 
-  // Step type (runtime copy from routingRules)
+  // Step metadata copies (audit trail - don't change during workflow)
+  // Snapshot from routingRule at step creation time
+  stepLabel: varchar('step_label', { length: 100 }),
   stepType: stepTypeEnum('step_type').notNull().default('APPROVAL'),
 
   // Form schema snapshot (for FORM steps)

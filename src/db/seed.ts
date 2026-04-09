@@ -290,7 +290,7 @@ async function seed() {
         stepType: 'VOTE',
         voteThreshold: 3,
         voteThresholdStrategy: 'MAJORITY',
-        isParallel: true,
+        isParallel: false,
         isFinal: false,
         dynamicFieldsJson: {
           fields: [

@@ -45,3 +45,22 @@ export const rolePermissions = pgTable('role_permissions', {
     .references(() => permissions.id, { onDelete: 'cascade' }),
   grantedAt: timestamp('granted_at', { withTimezone: true }).defaultNow(),
 });
+
+import { relations } from 'drizzle-orm';
+
+export const userRolesRelations = relations(userRoles, ({ one }) => ({
+  user: one(users, {
+    fields: [userRoles.userId],
+    references: [users.id],
+  }),
+
+  role: one(roles, {
+    fields: [userRoles.roleId],
+    references: [roles.id],
+  }),
+
+  grantedByUser: one(users, {
+    fields: [userRoles.grantedBy],
+    references: [users.id],
+  }),
+}));

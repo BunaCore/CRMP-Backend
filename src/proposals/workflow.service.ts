@@ -7,10 +7,11 @@ import {
 import { DrizzleService } from 'src/db/db.service';
 import { DB } from 'src/db/db.type';
 import * as schema from 'src/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, asc } from 'drizzle-orm';
 import { ProposalsRepository } from './proposals.repository';
 import { ProposalApprovalService } from './proposal-approval.service';
 import { UsersService } from 'src/users/users.service';
+import { FilesService } from 'src/common/files/files.service';
 import { ApproverResolution } from './types/proposal';
 import { EvaluationContext, BranchCondition } from './types/branch-condition';
 
@@ -41,6 +42,7 @@ export class WorkflowService {
     private readonly repository: ProposalsRepository,
     private readonly approvalService: ProposalApprovalService,
     private readonly usersService: UsersService,
+    private readonly filesService: FilesService,
   ) {}
 
   /**
@@ -81,6 +83,7 @@ export class WorkflowService {
       // 2. Generate or resume approval steps
       const existingApprovals = await tx.query.proposalApprovals.findMany({
         where: eq(schema.proposalApprovals.proposalId, proposalId),
+        orderBy: asc(schema.proposalApprovals.stepOrder),
       });
 
       if (existingApprovals.length === 0) {
@@ -166,68 +169,13 @@ export class WorkflowService {
         })
         .where(eq(schema.proposalApprovals.id, activeStep.id));
 
-      // 4. Find next pending step (dynamically, in case of parallel approvals later)
-      const nextStep = await tx.query.proposalApprovals.findFirst({
-        where: and(
-          eq(schema.proposalApprovals.proposalId, proposalId),
-          eq(schema.proposalApprovals.decision, 'Pending' as any),
-        ),
-      });
-
-      // If no next step, workflow is complete
-      if (!nextStep) {
-        await tx
-          .update(schema.proposals)
-          .set({
-            currentStatus: 'Approved' as any,
-            isEditable: false,
-            workspaceUnlocked: true,
-            currentStepOrder: 0,
-          })
-          .where(eq(schema.proposals.id, proposalId));
-
-        // Record completion
-        await tx.insert(schema.proposalStatusHistory).values({
-          proposalId,
-          changedBy: userId,
-          oldStatus: proposal.currentStatus as any,
-          newStatus: 'Approved' as any,
-          note: `Final approval by ${activeStep.approverRole}`,
-          changedAt: new Date(),
-        });
-
-        // Create project and migrate members
-        await this.createProjectFromApprovedProposal(tx, proposal, userId);
-
-        return { success: true, isComplete: true };
-      }
-
-      // Activate next step
-      await tx
-        .update(schema.proposalApprovals)
-        .set({ isActive: true })
-        .where(eq(schema.proposalApprovals.id, nextStep.id));
-
-      // Update proposal's current step
-      await tx
-        .update(schema.proposals)
-        .set({ currentStepOrder: nextStep.stepOrder })
-        .where(eq(schema.proposals.id, proposalId));
-
-      // Record step advancement
-      await tx.insert(schema.proposalStatusHistory).values({
-        proposalId,
-        changedBy: userId,
-        oldStatus: proposal.currentStatus as any,
-        newStatus: proposal.currentStatus as any,
-        note: `Step ${activeStep.stepOrder} approved by ${activeStep.approverRole}, advanced to Step ${nextStep.stepOrder}`,
-        changedAt: new Date(),
-      });
+      // 4. Phase 3 Refactor: Use centralized advanceWorkflow() for step advancement
+      const advancement = await this.advanceWorkflow(tx, proposalId, userId);
 
       return {
         success: true,
-        nextStep: nextStep.stepOrder,
-        isComplete: false,
+        nextStep: advancement.nextStep,
+        isComplete: advancement.isComplete,
       };
     });
   }
@@ -311,7 +259,7 @@ export class WorkflowService {
           `User does not have required role: ${activeStep.approverRole}`,
         );
       }
-
+      console.log(activeStep);
       // 3. Route by step type
       if (activeStep.stepType === 'VOTE') {
         return await this.handleVoteStep(
@@ -366,6 +314,7 @@ export class WorkflowService {
       tx,
       activeStep.approverRole,
     );
+    console.log(eligibleVoters);
     const eligibleVoterIds = eligibleVoters.map((v) => v.id);
 
     if (!eligibleVoterIds.includes(userId)) {
@@ -385,16 +334,10 @@ export class WorkflowService {
       })
       .where(eq(schema.proposalApprovals.id, activeStep.id));
 
-    // 3. Fetch routing rule to get threshold config
-    const routingRule = await tx.query.routingRules.findFirst({
-      where: eq(schema.routingRules.id, activeStep.routingRuleId),
-    });
-
-    if (!routingRule) {
-      throw new InternalServerErrorException('Routing rule not found for step');
-    }
-
-    const { voteThreshold, voteThresholdStrategy } = routingRule;
+    // 3. Use vote threshold and strategy copied from routing rule at step creation
+    // No need to fetch routing rule - values are in the audit trail snapshot
+    const voteThreshold = activeStep.voteThreshold;
+    const voteThresholdStrategy = activeStep.voteThresholdStrategy;
 
     // 4. Check if threshold is met
     const votesMet = await this.checkVoteThreshold(
@@ -423,7 +366,7 @@ export class WorkflowService {
       finalDecision = 'Rejected';
     } else if (
       voteThresholdStrategy === 'MAJORITY' &&
-      rejectionsCount > approvalsCount
+      rejectionsCount >= approvalsCount
     ) {
       // If MAJORITY and more rejections than approvals
       finalDecision = 'Rejected';
@@ -440,48 +383,14 @@ export class WorkflowService {
       })
       .where(eq(schema.proposalApprovals.id, activeStep.id));
 
-    // 7. Handle advancement or rejection
+    // 7. Phase 3 Refactor: Use centralized advanceWorkflow() for step advancement
     if (finalDecision === 'Accepted') {
-      // Auto-advance to next pending step
-      const nextStep = await tx.query.proposalApprovals.findFirst({
-        where: and(
-          eq(schema.proposalApprovals.proposalId, proposal.id),
-          eq(schema.proposalApprovals.decision, 'Pending' as any),
-          eq(schema.proposalApprovals.stepOrder, activeStep.stepOrder + 1),
-        ),
-      });
-
-      if (!nextStep) {
-        // No more steps - mark proposal as approved
-        await tx
-          .update(schema.proposals)
-          .set({
-            currentStatus: 'Approved' as any,
-            currentStepOrder: 0,
-            workspaceUnlocked: true,
-          })
-          .where(eq(schema.proposals.id, proposal.id));
-
-        await this.createProjectFromApprovedProposal(tx, proposal, userId);
-
-        return { success: true, isComplete: true };
-      }
-
-      // Activate next step
-      await tx
-        .update(schema.proposalApprovals)
-        .set({ isActive: true })
-        .where(eq(schema.proposalApprovals.id, nextStep.id));
-
-      await tx
-        .update(schema.proposals)
-        .set({ currentStepOrder: nextStep.stepOrder })
-        .where(eq(schema.proposals.id, proposal.id));
+      const advancement = await this.advanceWorkflow(tx, proposal.id, userId);
 
       return {
         success: true,
-        nextStep: nextStep.stepOrder,
-        isComplete: false,
+        nextStep: advancement.nextStep,
+        isComplete: advancement.isComplete,
       };
     } else {
       // Rejected - mark proposal for revision
@@ -508,10 +417,18 @@ export class WorkflowService {
     userId: string,
     actionData: any,
   ): Promise<{ success: boolean; nextStep?: number; isComplete: boolean }> {
-    // 1. Validate form schema if present (deferred to controller for now)
     const submittedData = actionData.submittedData || {};
 
-    // 2. Store submitted data
+    // Phase 2 Refactor: Validate form submission against schema
+    // This checks required fields, type matching, and file ownership via database query
+    await this.validateFormSubmission(
+      submittedData,
+      activeStep.dynamicFieldsJson,
+      userId,
+      tx,
+    );
+
+    // Store submitted data
     await tx
       .update(schema.proposalApprovals)
       .set({
@@ -519,39 +436,31 @@ export class WorkflowService {
       })
       .where(eq(schema.proposalApprovals.id, activeStep.id));
 
-    // 3. Attach any files in the submission
-    for (const [fieldName, value] of Object.entries(submittedData)) {
-      // Check if value is a UUID (file ID)
-      if (typeof value === 'string' && this.isValidUUID(value)) {
-        // Validate file exists and belongs to user (if not owned by submitter, reject)
-        const file = await tx.query.files.findFirst({
-          where: eq(schema.files.id, value),
-        });
+    // Attach files explicitly typed as 'file' in schema
+    // Only process fields that the schema defined as file type (no guessing)
+    if (activeStep.dynamicFieldsJson?.fields) {
+      const fileFields = activeStep.dynamicFieldsJson.fields.filter(
+        (f: any) => f.type === 'file',
+      );
 
-        if (!file) {
-          throw new BadRequestException(
-            `File ${value} for field "${fieldName}" not found`,
-          );
+      for (const field of fileFields) {
+        const fileId = submittedData[field.name];
+        if (fileId && typeof fileId === 'string') {
+          // Attach file to this step (FilesService validates ownership in validateFormSubmission)
+          await tx
+            .update(schema.files)
+            .set({
+              resourceType: 'PROPOSAL_APPROVAL_STEP',
+              resourceId: activeStep.id,
+              purpose: field.name,
+              status: 'ATTACHED' as any,
+            })
+            .where(eq(schema.files.id, fileId));
         }
-
-        if (file.uploadedBy !== userId) {
-          throw new BadRequestException(`File ${value} does not belong to you`);
-        }
-
-        // Attach file to this step (TEMP → ATTACHED)
-        await tx
-          .update(schema.files)
-          .set({
-            resourceType: 'PROPOSAL_STEP',
-            resourceId: activeStep.id,
-            purpose: fieldName,
-            status: 'ATTACHED' as any,
-          })
-          .where(eq(schema.files.id, value));
       }
     }
 
-    // 4. Mark step as complete (Accepted for approval)
+    // Mark step as complete (Accepted for approval)
     const finalDecision: DecisionOutcome = actionData.decision || 'Accepted';
 
     await tx
@@ -565,47 +474,14 @@ export class WorkflowService {
       })
       .where(eq(schema.proposalApprovals.id, activeStep.id));
 
-    // 5. Advance or reject based on action
+    // Phase 3 Refactor: Use centralized advanceWorkflow() for next step handling
     if (finalDecision === 'Accepted') {
-      const nextStep = await tx.query.proposalApprovals.findFirst({
-        where: and(
-          eq(schema.proposalApprovals.proposalId, proposal.id),
-          eq(schema.proposalApprovals.decision, 'Pending' as any),
-          eq(schema.proposalApprovals.stepOrder, activeStep.stepOrder + 1),
-        ),
-      });
-
-      if (!nextStep) {
-        // No more steps - mark proposal as approved
-        await tx
-          .update(schema.proposals)
-          .set({
-            currentStatus: 'Approved' as any,
-            currentStepOrder: 0,
-            workspaceUnlocked: true,
-          })
-          .where(eq(schema.proposals.id, proposal.id));
-
-        await this.createProjectFromApprovedProposal(tx, proposal, userId);
-
-        return { success: true, isComplete: true };
-      }
-
-      // Activate next step
-      await tx
-        .update(schema.proposalApprovals)
-        .set({ isActive: true })
-        .where(eq(schema.proposalApprovals.id, nextStep.id));
-
-      await tx
-        .update(schema.proposals)
-        .set({ currentStepOrder: nextStep.stepOrder })
-        .where(eq(schema.proposals.id, proposal.id));
+      const advancement = await this.advanceWorkflow(tx, proposal.id, userId);
 
       return {
         success: true,
-        nextStep: nextStep.stepOrder,
-        isComplete: false,
+        nextStep: advancement.nextStep,
+        isComplete: advancement.isComplete,
       };
     } else {
       // Rejection or revision
@@ -613,11 +489,10 @@ export class WorkflowService {
         .update(schema.proposals)
         .set({
           currentStatus:
-            actionData.decision === 'Rejected'
+            finalDecision === 'Rejected'
               ? ('Rejected' as any)
               : ('Needs_Revision' as any),
           isEditable: true,
-          currentStepOrder: 0,
         })
         .where(eq(schema.proposals.id, proposal.id));
 
@@ -666,7 +541,12 @@ export class WorkflowService {
     voteThresholdStrategy: string | null | undefined,
   ): Promise<boolean> {
     const votesCount = Object.keys(currentVotes).length;
-
+    if (!voteThreshold)
+      throw new InternalServerErrorException(
+        'Vote threshold not defined for this step',
+      );
+    return votesCount >= voteThreshold;
+    //TODO: the vote threshold strategy is not fully defined for now just check if we met the threshold
     if (voteThresholdStrategy === 'ALL') {
       // All eligible voters must vote
       return votesCount === eligibleVoterCount;
@@ -1069,6 +949,7 @@ export class WorkflowService {
         routingRuleId: rule.id,
         stepOrder: rule.stepOrder,
         approverRole: rule.approverRole,
+        stepLabel: rule.stepLabel || null, // Audit trail: copy step label
         stepType: rule.stepType,
         dynamicFieldsJson: rule.dynamicFieldsJson || null, // Audit trail: copy form schema
         voteThreshold: rule.voteThreshold || null, // Audit trail: copy vote config
@@ -1220,27 +1101,18 @@ export class WorkflowService {
         throw new NotFoundException(`Proposal ${proposalId} not found`);
       }
 
-      // 2. Fetch all approvals for this proposal
+      // 2. Fetch all approvals for this proposal sorted by step order
       const approvals = await tx.query.proposalApprovals.findMany({
         where: eq(schema.proposalApprovals.proposalId, proposalId),
+        orderBy: asc(schema.proposalApprovals.stepOrder), // Sort by step order for correct timeline sequence
       });
 
-      // 3. Fetch routing rules for all steps
-      const rulesToFetch = approvals
-        .map((a) => a.routingRuleId)
-        .filter((id) => id != null);
-
-      const rules = await tx.query.routingRules.findMany();
-      const routingRuleMap = new Map(
-        rules.filter((r) => rulesToFetch.includes(r.id)).map((r) => [r.id, r]),
-      );
-
-      // 4. Delegate to buildApprovalTimeline (no DB queries there)
+      // 3. Delegate to buildApprovalTimeline (no DB queries needed)
+      // All metadata is already copied into approvals at step creation time
       return await this.buildApprovalTimeline(
         approvals,
         proposal,
         currentUserId,
-        routingRuleMap,
       );
     });
   }
@@ -1251,13 +1123,13 @@ export class WorkflowService {
    * - Top level: canAct, userAction (consistent across all types)
    * - Type-specific: decision/vote/form objects
    *
-   * Does NOT query DB directly—accepts pre-fetched approvals and routing rules
+   * All metadata is pre-copied into approvals at step creation time (stepLabel, voteThreshold, etc.)
+   * No additional DB queries needed here
    */
   private async buildApprovalTimeline(
-    approvals: any[], // All proposalApprovals records for this proposal
+    approvals: any[], // All proposalApprovals records for this proposal (with copied metadata)
     proposal: any, // The proposal record
     currentUserId: string,
-    routingRuleMap: Map<string, any>, // Map of routingRuleId -> routingRule
   ): Promise<{
     proposalId: string;
     currentStepOrder: number | null;
@@ -1265,7 +1137,6 @@ export class WorkflowService {
   }> {
     const enrichedSteps = await Promise.all(
       approvals.map(async (approval) => {
-        const routingRule = routingRuleMap.get(approval.routingRuleId);
         const stepStatus = this.getStepStatus(approval);
         const canAct = await this.canUserActOnStep(
           approval,
@@ -1273,13 +1144,15 @@ export class WorkflowService {
           proposal,
         );
         const userAction = this.getUserAction(approval, currentUserId);
-        const isFinal = approval.stepOrder === approvals.length;
+        // Since approvals are sorted by stepOrder, last item is the final step
+        const isFinal =
+          approval.stepOrder === approvals[approvals.length - 1].stepOrder;
 
         // Base step structure (all steps have these)
         const step: any = {
           id: approval.id,
           stepOrder: approval.stepOrder,
-          stepLabel: routingRule?.stepLabel || `Step ${approval.stepOrder}`,
+          stepLabel: approval.stepLabel || `Step ${approval.stepOrder}`, // Use copied label
           stepType: approval.stepType,
           approverRole: approval.approverRole,
           status: stepStatus,
@@ -1300,15 +1173,12 @@ export class WorkflowService {
         }
 
         if (approval.stepType === 'VOTE') {
-          step.vote = this.buildVoteData(approval, routingRule);
+          step.vote = this.buildVoteData(approval);
         }
 
         if (approval.stepType === 'FORM') {
           step.form = {
-            schema:
-              approval.dynamicFieldsJson ||
-              routingRule?.dynamicFieldsJson ||
-              null,
+            schema: approval.dynamicFieldsJson || null, // Use copied schema
             submission: approval.submittedJson
               ? {
                   submittedBy: approval.approverUserId,
@@ -1379,11 +1249,9 @@ export class WorkflowService {
   /**
    * Build vote data structure for VOTE steps (unified format)
    * Returns votes as array + counts for frontend rendering
+   * Uses threshold + strategy copied from routing rule during step creation
    */
-  private buildVoteData(
-    step: any,
-    routingRule: any,
-  ): {
+  private buildVoteData(step: any): {
     threshold: number | null;
     strategy: string | null;
     counts: {
@@ -1407,17 +1275,13 @@ export class WorkflowService {
       (v: any) => v === 'Needs_Revision',
     ).length;
 
-    // Prefer snapshot from approval (audit trail); fallback to current rule
-    const threshold =
-      step.voteThreshold !== null
-        ? step.voteThreshold
-        : routingRule?.voteThreshold;
-    const strategy =
-      step.voteThresholdStrategy || routingRule?.voteThresholdStrategy;
+    // Use copied snapshot from approval (audit trail)
+    const threshold = step.voteThreshold || null;
+    const strategy = step.voteThresholdStrategy || null;
 
     return {
-      threshold: threshold || null,
-      strategy: strategy || null,
+      threshold,
+      strategy,
       counts: {
         approved: approvedCount,
         rejected: rejectedCount,
@@ -1482,7 +1346,6 @@ export class WorkflowService {
    * Pure logic: no DB queries
    */
   private getStepStatus(step: any): 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' {
-    console.log(step);
     if (step.decision && step.decision !== 'Pending') {
       return 'COMPLETED';
     }
@@ -1492,5 +1355,188 @@ export class WorkflowService {
     }
 
     return 'PENDING';
+  }
+
+  // ============================================================================
+  // Phase 1 Refactor: Form Validation & Centralized Advancement
+  // ============================================================================
+
+  /**
+   * Validate form submission against schema
+   * Checks:
+   * - Required fields present
+   * - Type matching (especially files)
+   * - File ownership via database query
+   * - No extra fields (data pollution prevention)
+   *
+   * Throws BadRequestException on validation failure
+   */
+  private async validateFormSubmission(
+    submittedData: Record<string, any>,
+    dynamicFieldsJson: any,
+    userId: string,
+    tx?: DB,
+  ): Promise<void> {
+    if (!dynamicFieldsJson || !dynamicFieldsJson.fields) {
+      throw new BadRequestException('Form schema not defined for this step');
+    }
+
+    const schemaFields = dynamicFieldsJson.fields as Array<{
+      name: string;
+      type: string;
+      required?: boolean;
+    }>;
+
+    // Create set of valid field names from schema
+    const validFieldNames = new Set(schemaFields.map((f) => f.name));
+
+    // Check for extra fields (data pollution prevention)
+    for (const fieldName of Object.keys(submittedData)) {
+      if (!validFieldNames.has(fieldName)) {
+        throw new BadRequestException(
+          `Unknown field "${fieldName}" not in form schema`,
+        );
+      }
+    }
+
+    // Validate each field
+    for (const schemaField of schemaFields) {
+      const value = submittedData[schemaField.name];
+
+      // Check required
+      if (
+        schemaField.required &&
+        (value === undefined || value === null || value === '')
+      ) {
+        throw new BadRequestException(
+          `Required field "${schemaField.name}" is missing`,
+        );
+      }
+
+      // Skip optional fields that are empty
+      if (
+        !schemaField.required &&
+        (value === undefined || value === null || value === '')
+      ) {
+        continue;
+      }
+
+      // Type-specific validation
+      if (schemaField.type === 'file') {
+        if (typeof value !== 'string' || !this.isValidUUID(value)) {
+          throw new BadRequestException(
+            `Field "${schemaField.name}" must be a valid file UUID`,
+          );
+        }
+
+        // Query file metadata (use transaction if provided, otherwise use main DB)
+        const db = tx || this.drizzle.db;
+        const file = await db.query.files.findFirst({
+          where: eq(schema.files.id, value),
+        });
+
+        if (!file) {
+          throw new BadRequestException(
+            `File for field "${schemaField.name}" not found`,
+          );
+        }
+
+        if (file.uploadedBy !== userId) {
+          throw new BadRequestException(
+            `File for field "${schemaField.name}" does not belong to you`,
+          );
+        }
+      }
+      // Add more type validations as needed (text, number, etc.)
+    }
+  }
+
+  /**
+   * Centralized workflow advancement
+   * Called after a step is completed (approved/form submitted/vote threshold met)
+   * - Finds next Pending step
+   * - If exists: activates and returns nextStep
+   * - If not: completes workflow and returns isComplete: true
+   * Eliminates duplication in acceptStep, handleVoteStep, handleFormStep
+   */
+  private async advanceWorkflow(
+    tx: DB,
+    proposalId: string,
+    userId: string,
+  ): Promise<{ nextStep?: number; isComplete: boolean }> {
+    const nextStep = await tx.query.proposalApprovals.findFirst({
+      where: and(
+        eq(schema.proposalApprovals.proposalId, proposalId),
+        eq(schema.proposalApprovals.decision, 'Pending' as any),
+      ),
+      orderBy: asc(schema.proposalApprovals.stepOrder),
+    });
+
+    if (!nextStep) {
+      // No more steps - complete workflow
+      return await this.completeWorkflow(tx, proposalId, userId);
+    }
+
+    // Activate next step
+    await tx
+      .update(schema.proposalApprovals)
+      .set({ isActive: true })
+      .where(eq(schema.proposalApprovals.id, nextStep.id));
+
+    // Update proposal's current step
+    await tx
+      .update(schema.proposals)
+      .set({ currentStepOrder: nextStep.stepOrder })
+      .where(eq(schema.proposals.id, proposalId));
+
+    return {
+      nextStep: nextStep.stepOrder,
+      isComplete: false,
+    };
+  }
+
+  /**
+   * Complete workflow: mark proposal as Approved and create project
+   * Called by advanceWorkflow when no more steps remain
+   */
+  private async completeWorkflow(
+    tx: DB,
+    proposalId: string,
+    userId: string,
+  ): Promise<{ isComplete: true }> {
+    // Fetch proposal for project creation
+    const proposal = await tx.query.proposals.findFirst({
+      where: eq(schema.proposals.id, proposalId),
+    });
+
+    if (!proposal) {
+      throw new NotFoundException(`Proposal ${proposalId} not found`);
+    }
+
+    // Mark proposal as approved
+    await tx
+      .update(schema.proposals)
+      .set({
+        currentStatus: 'Approved' as any,
+        isEditable: false,
+        workspaceUnlocked: true,
+        currentStepOrder: 0,
+      })
+      .where(eq(schema.proposals.id, proposalId));
+
+    // Record status change
+    await tx.insert(schema.proposalStatusHistory).values({
+      proposalId,
+      changedBy: userId,
+      oldStatus: proposal.currentStatus as any,
+      newStatus: 'Approved' as any,
+      note: 'Final approval. Workflow complete.',
+      changedAt: new Date(),
+    });
+
+    // Create project
+    await this.createProjectFromApprovedProposal(tx, proposal, userId);
+
+    return { isComplete: true };
   }
 }
