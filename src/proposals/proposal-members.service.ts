@@ -307,26 +307,15 @@ export class ProposalMembersService {
    */
   async getAllMembersGrouped(
     proposalId: string,
-  ): Promise<Record<string, any[]>> {
+  ): Promise<any[]> {
     // Verify proposal exists
     const proposal = await this.repository.findById(proposalId);
     if (!proposal) {
       throw new NotFoundException(`Proposal with ID "${proposalId}" not found`);
     }
 
-    // Fetch all members without role filter
-    const allMembers = await this.repository.getMembersByRoles(proposalId);
-
-    // Group by role
-    const grouped: Record<string, any[]> = {};
-    for (const member of allMembers) {
-      const role = member.role as string;
-      if (!grouped[role]) {
-        grouped[role] = [];
-      }
-      grouped[role].push(member);
-    }
-
-    return grouped;
+    // Fetch all members without role filter and return as flat array
+    // Includes: userId, role, user { id, fullName, email, department }
+    return this.repository.getMembersByRoles(proposalId);
   }
 }

@@ -55,6 +55,7 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
     Permission.EVALUATION_ASSIGN,
     Permission.EVALUATION_READ,
+    Permission.EVALUATION_SUBMIT,
 
     Permission.DEFENCE_SCHEDULE, // ✅ Can schedule PI defences
 

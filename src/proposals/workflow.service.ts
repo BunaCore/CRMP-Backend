@@ -14,6 +14,8 @@ import { UsersService } from 'src/users/users.service';
 import { FilesService } from 'src/common/files/files.service';
 import { ApproverResolution } from './types/proposal';
 import { EvaluationContext, BranchCondition } from './types/branch-condition';
+import { MailService } from 'src/mail/mail.service';
+import { EmailType } from 'src/mail/dto/email-type.enum';
 
 type DecisionOutcome = 'Accepted' | 'Rejected' | 'Needs_Revision';
 
@@ -43,6 +45,7 @@ export class WorkflowService {
     private readonly approvalService: ProposalApprovalService,
     private readonly usersService: UsersService,
     private readonly filesService: FilesService,
+    private readonly mailService: MailService,
   ) {}
 
   /**
@@ -139,7 +142,7 @@ export class WorkflowService {
     userId: string,
     comment?: string,
   ): Promise<{ success: boolean; nextStep?: number; isComplete: boolean }> {
-    return await this.drizzle.db.transaction(async (tx) => {
+    const result = await this.drizzle.db.transaction(async (tx) => {
       // 1. Get proposal and validate active step
       const { proposal, activeStep } = await this.getProposalWithActiveStep(
         tx,
@@ -172,12 +175,38 @@ export class WorkflowService {
       // 4. Phase 3 Refactor: Use centralized advanceWorkflow() for step advancement
       const advancement = await this.advanceWorkflow(tx, proposalId, userId);
 
+      // Fetch updated proposal for email notification
+      const updatedProposal = await tx.query.proposals.findFirst({
+        where: eq(schema.proposals.id, proposalId),
+      });
+
       return {
         success: true,
         nextStep: advancement.nextStep,
         isComplete: advancement.isComplete,
+        proposal: updatedProposal,
       };
     });
+
+    // Send email after transaction
+    if (result.isComplete && result.proposal) {
+      const creator = await this.usersService.findById(
+        result.proposal.createdBy,
+      );
+      if (creator) {
+        this.mailService.sendEmail(
+          EmailType.PROPOSAL_STATUS_CHANGED,
+          creator.email,
+          {
+            recipientName: creator.fullName,
+            proposalTitle: result.proposal.title,
+            status: 'Approved',
+          },
+        );
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -188,8 +217,8 @@ export class WorkflowService {
     proposalId: string,
     userId: string,
     comment?: string,
-  ): Promise<{ success: boolean; isComplete: boolean }> {
-    return await this.transitionStep(
+  ): Promise<{ success: boolean }> {
+    const result = await this.transitionStep(
       proposalId,
       userId,
       'Rejected',
@@ -197,6 +226,26 @@ export class WorkflowService {
       false,
       comment,
     );
+
+    if (result.success) {
+      const proposal = await this.repository.findById(proposalId);
+      if (proposal) {
+        const creator = await this.usersService.findById(proposal.createdBy);
+        if (creator) {
+          this.mailService.sendEmail(
+            EmailType.PROPOSAL_STATUS_CHANGED,
+            creator.email,
+            {
+              recipientName: creator.fullName,
+              proposalTitle: proposal.title,
+              status: 'Rejected',
+            },
+          );
+        }
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -207,8 +256,8 @@ export class WorkflowService {
     proposalId: string,
     userId: string,
     comment?: string,
-  ): Promise<{ success: boolean; isComplete: boolean }> {
-    return await this.transitionStep(
+  ): Promise<{ success: boolean }> {
+    const result = await this.transitionStep(
       proposalId,
       userId,
       'Needs_Revision',
@@ -216,6 +265,26 @@ export class WorkflowService {
       true,
       comment,
     );
+
+    if (result.success) {
+      const proposal = await this.repository.findById(proposalId);
+      if (proposal) {
+        const creator = await this.usersService.findById(proposal.createdBy);
+        if (creator) {
+          this.mailService.sendEmail(
+            EmailType.PROPOSAL_STATUS_CHANGED,
+            creator.email,
+            {
+              recipientName: creator.fullName,
+              proposalTitle: proposal.title,
+              status: 'Needs Revision',
+            },
+          );
+        }
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -285,7 +354,13 @@ export class WorkflowService {
         ) {
           return await this.acceptStep(proposalId, userId, actionData.comment);
         } else {
-          return await this.rejectStep(proposalId, userId, actionData.comment);
+          // Rejection for APPROVAL steps
+          const result = await this.rejectStep(
+            proposalId,
+            userId,
+            actionData.comment,
+          );
+          return { success: result.success, isComplete: false };
         }
       }
 
@@ -731,7 +806,7 @@ export class WorkflowService {
     newProposalStatus: string,
     isEditable: boolean,
     comment?: string,
-  ): Promise<{ success: boolean; isComplete: boolean }> {
+  ): Promise<{ success: boolean }> {
     return await this.drizzle.db.transaction(async (tx) => {
       // 1. Get proposal and validate
       const { proposal, activeStep } = await this.getProposalWithActiveStep(

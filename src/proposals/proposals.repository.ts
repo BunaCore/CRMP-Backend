@@ -14,6 +14,7 @@ import {
   sql,
   SQL,
 } from 'drizzle-orm';
+import { evaluationRubrics, evaluationScores } from 'src/db/schema/evaluation';
 import { DB } from 'src/db/db.type';
 import { ProposalMemberRole } from './dto/proposal-member.dto';
 import { GetProposalsQueryDto } from './dto/get-proposals-query.dto';
@@ -761,6 +762,26 @@ export class ProposalsRepository {
   }
 
   /**
+   * Fetch budget items for a single proposal
+   * @param proposalId Proposal ID
+   * @returns Array of budget items
+   */
+  async getBudgetItemsByProposalId(proposalId: string) {
+    return this.drizzle.db
+      .select({
+        id: schema.budgetRequestItems.id,
+        description: schema.budgetRequestItems.description,
+        amount: schema.budgetRequestItems.requestedAmount,
+      })
+      .from(schema.budgetRequestItems)
+      .innerJoin(
+        schema.budgetRequests,
+        eq(schema.budgetRequests.id, schema.budgetRequestItems.budgetRequestId),
+      )
+      .where(eq(schema.budgetRequests.proposalId, proposalId));
+  }
+
+  /**
    * Fetch budgets for multiple proposals (bulk query)
    *
    * @param proposalIds Array of proposal IDs
@@ -820,5 +841,72 @@ export class ProposalsRepository {
       .from(schema.proposalDefences)
       .where(eq(schema.proposalDefences.proposalId, proposalId))
       .orderBy(asc(schema.proposalDefences.defenceDate));
+  }
+
+/**
+   * Fetch all evaluation rubrics (the rule book)
+   */
+  async getEvaluationRubrics() {
+    return this.drizzle.db.select().from(evaluationRubrics);
+  }
+
+  /**
+   * Fetch all evaluation scores across all rubrics for a single proposal
+   */
+  async getEvaluationScoresByProposal(proposalId: string) {
+    return this.drizzle.db
+      .select({
+        id: evaluationScores.id,
+        rubricId: evaluationScores.rubricId,
+        studentId: evaluationScores.studentId,
+        evaluatorId: evaluationScores.evaluatorId,
+        score: evaluationScores.score,
+        feedback: evaluationScores.feedback,
+        projectId: evaluationScores.projectId,
+        updatedAt: evaluationScores.updatedAt,
+      })
+      .from(evaluationScores)
+      .where(eq(evaluationScores.proposalId, proposalId));
+  }
+
+  /**
+   * Upsert a student's evaluation score for a specific rubric
+   */
+  async upsertEvaluationScore(data: {
+    rubricId: string;
+    proposalId: string;
+    projectId?: string;
+    studentId: string;
+    evaluatorId: string;
+    score: string;
+    feedback?: string;
+  }) {
+    // Perform an insert, but on conflict of the unique index (rubric, proposal, student, evaluator), update score
+    return this.drizzle.db
+      .insert(evaluationScores)
+      .values({
+        rubricId: data.rubricId,
+        proposalId: data.proposalId,
+        projectId: data.projectId,
+        studentId: data.studentId,
+        evaluatorId: data.evaluatorId,
+        score: data.score,
+        feedback: data.feedback,
+      })
+      .onConflictDoUpdate({
+        target: [
+          evaluationScores.rubricId,
+          evaluationScores.proposalId,
+          evaluationScores.studentId,
+        ],
+        set: {
+          score: data.score,
+          feedback: data.feedback,
+          projectId: data.projectId,
+          evaluatorId: data.evaluatorId,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
   }
 }

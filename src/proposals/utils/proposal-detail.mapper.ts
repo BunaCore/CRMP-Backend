@@ -59,6 +59,10 @@ export type ProposalDetailResponse = {
     steps: WorkflowStep[];
   };
 
+  budget: {
+    total: number | null;
+    items: Array<{ description: string; amount: number }>;
+  };
   comments: CommentPreview[];
   defenceSchedules: DefenceSchedule[];
 
@@ -139,6 +143,8 @@ export function mapProposalToDetailResponse(
   approvals: any[],
   comments: any[] = [],
   defenceSchedules: any[] = [],
+  totalBudget: number | null = null,
+  budgetItems: any[] = [],
 ): ProposalDetailResponse {
   // Extract members by role
   const { pi, advisors, evaluators, teamMembers } =
@@ -180,6 +186,14 @@ export function mapProposalToDetailResponse(
     workflow: {
       currentStepOrder,
       steps,
+    },
+
+    budget: {
+      total: totalBudget,
+      items: budgetItems.map((bi) => ({
+        description: bi.description,
+        amount: parseFloat(bi.amount),
+      })),
     },
 
     comments: comments.map((c) => ({
