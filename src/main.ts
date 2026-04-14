@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { json, urlencoded } from 'express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { validationExceptionFactory } from './common/validation/validation-exception.factory';
@@ -12,6 +13,11 @@ async function bootstrap() {
   app.enableCors({
     origin: '*',
   });
+
+  // Increase payload limit for Base64 images
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ extended: true, limit: '50mb' }));
+
 
   // Global exception filter - handles all errors at the edge
   app.useGlobalFilters(new GlobalExceptionFilter());
