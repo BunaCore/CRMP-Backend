@@ -1,0 +1,1 @@
+ALTER TYPE "public"."source_action" ADD VALUE 'autosave' BEFORE 'import';

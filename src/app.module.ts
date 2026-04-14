@@ -11,6 +11,9 @@ import { UndergradModule } from './undergrad/undergrad.module';
 import { PgModule } from './pg/pg.module';
 import { DepartmentsModule } from './departments/departments.module';
 import { MailModule } from './mail/mail.module';
+import { DocumentsModule } from './documents/documents.module';
+import { ProjectsModule } from './projects/projects.module';
+import { WorkspacesModule } from './workspaces/workspaces.module';
 
 @Module({
   imports: [
@@ -26,6 +29,9 @@ import { MailModule } from './mail/mail.module';
     PgModule,
     DepartmentsModule,
     MailModule,
+    DocumentsModule,
+    ProjectsModule,
+    WorkspacesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
