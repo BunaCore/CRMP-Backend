@@ -1,3 +1,4 @@
+export * from './enums';
 export * from './user';
 export * from './roles';
 export * from './proposals';
@@ -8,6 +9,7 @@ export * from './verification';
 export * from './project';
 export * from './department';
 export * from './refresh-tokens';
+export * from './files';
 export * from './evaluation';
 export * from './workspace';
 export * from './document';

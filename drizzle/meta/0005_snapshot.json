@@ -1,6 +1,6 @@
 {
-  "id": "cbeebcf1-916b-4c31-b974-b6ce4421c62e",
-  "prevId": "089c935e-e03e-4bdc-8388-841cf5bc1de4",
+  "id": "b73cfb4d-b144-48e3-999b-7e0d2fb41090",
+  "prevId": "9a2424fa-dc95-418b-a2e0-a621c1093a46",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -80,8 +80,12 @@
           "name": "budget_installments_budget_request_id_budget_requests_id_fk",
           "tableFrom": "budget_installments",
           "tableTo": "budget_requests",
-          "columnsFrom": ["budget_request_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "budget_request_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -89,8 +93,12 @@
           "name": "budget_installments_released_by_users_id_fk",
           "tableFrom": "budget_installments",
           "tableTo": "users",
-          "columnsFrom": ["released_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "released_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -156,8 +164,12 @@
           "name": "budget_ledger_budget_request_id_budget_requests_id_fk",
           "tableFrom": "budget_ledger",
           "tableTo": "budget_requests",
-          "columnsFrom": ["budget_request_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "budget_request_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -165,8 +177,12 @@
           "name": "budget_ledger_installment_id_budget_installments_id_fk",
           "tableFrom": "budget_ledger",
           "tableTo": "budget_installments",
-          "columnsFrom": ["installment_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "installment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -174,8 +190,12 @@
           "name": "budget_ledger_released_by_users_id_fk",
           "tableFrom": "budget_ledger",
           "tableTo": "users",
-          "columnsFrom": ["released_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "released_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -229,8 +249,12 @@
           "name": "budget_request_items_budget_request_id_budget_requests_id_fk",
           "tableFrom": "budget_request_items",
           "tableTo": "budget_requests",
-          "columnsFrom": ["budget_request_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "budget_request_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -316,8 +340,12 @@
           "name": "budget_requests_proposal_id_proposals_id_fk",
           "tableFrom": "budget_requests",
           "tableTo": "proposals",
-          "columnsFrom": ["proposal_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -325,8 +353,12 @@
           "name": "budget_requests_project_id_projects_project_id_fk",
           "tableFrom": "budget_requests",
           "tableTo": "projects",
-          "columnsFrom": ["project_id"],
-          "columnsTo": ["project_id"],
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "project_id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -334,8 +366,12 @@
           "name": "budget_requests_requested_by_users_id_fk",
           "tableFrom": "budget_requests",
           "tableTo": "users",
-          "columnsFrom": ["requested_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "requested_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -343,8 +379,12 @@
           "name": "budget_requests_finance_approved_by_users_id_fk",
           "tableFrom": "budget_requests",
           "tableTo": "users",
-          "columnsFrom": ["finance_approved_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "finance_approved_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -392,8 +432,12 @@
           "name": "department_coordinators_department_id_departments_id_fk",
           "tableFrom": "department_coordinators",
           "tableTo": "departments",
-          "columnsFrom": ["department_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "department_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -401,8 +445,12 @@
           "name": "department_coordinators_user_id_users_id_fk",
           "tableFrom": "department_coordinators",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -458,15 +506,17 @@
         "departments_code_unique": {
           "name": "departments_code_unique",
           "nullsNotDistinct": false,
-          "columns": ["code"]
+          "columns": [
+            "code"
+          ]
         }
       },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.documents": {
-      "name": "documents",
+    "public.files": {
+      "name": "files",
       "schema": "",
       "columns": {
         "id": {
@@ -476,180 +526,61 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "workspace_id": {
-          "name": "workspace_id",
+        "storage_path": {
+          "name": "storage_path",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uploaded_by": {
+          "name": "uploaded_by",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "current_content": {
-          "name": "current_content",
-          "type": "jsonb",
+        "resource_type": {
+          "name": "resource_type",
+          "type": "varchar(50)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
-        "current_version_id": {
-          "name": "current_version_id",
+        "resource_id": {
+          "name": "resource_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
+        "purpose": {
+          "name": "purpose",
+          "type": "varchar(50)",
           "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "documents_workspace_id_workspaces_id_fk": {
-          "name": "documents_workspace_id_workspaces_id_fk",
-          "tableFrom": "documents",
-          "tableTo": "workspaces",
-          "columnsFrom": ["workspace_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "notNull": false
         },
-        "documents_current_version_id_document_versions_id_fk": {
-          "name": "documents_current_version_id_document_versions_id_fk",
-          "tableFrom": "documents",
-          "tableTo": "document_versions",
-          "columnsFrom": ["current_version_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.document_versions": {
-      "name": "document_versions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "document_id": {
-          "name": "document_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "version_number": {
-          "name": "version_number",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "content": {
-          "name": "content",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "source_action": {
-          "name": "source_action",
-          "type": "source_action",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "content_hash": {
-          "name": "content_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "document_versions_document_id_documents_id_fk": {
-          "name": "document_versions_document_id_documents_id_fk",
-          "tableFrom": "document_versions",
-          "tableTo": "documents",
-          "columnsFrom": ["document_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "document_versions_created_by_users_id_fk": {
-          "name": "document_versions_created_by_users_id_fk",
-          "tableFrom": "document_versions",
-          "tableTo": "users",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.evaluation_rubrics": {
-      "name": "evaluation_rubrics",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "name": {
-          "name": "name",
+        "original_name": {
+          "name": "original_name",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
         },
-        "phase": {
-          "name": "phase",
-          "type": "evaluation_phase",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'PROPOSAL'"
-        },
-        "type": {
-          "name": "type",
-          "type": "evaluation_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'continuous'"
-        },
-        "max_points": {
-          "name": "max_points",
-          "type": "numeric(5, 2)",
+        "mime_type": {
+          "name": "mime_type",
+          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": true
+        },
+        "size": {
+          "name": "size",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "file_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'TEMP'"
         },
         "created_at": {
           "name": "created_at",
@@ -660,154 +591,18 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.evaluation_scores": {
-      "name": "evaluation_scores",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "rubric_id": {
-          "name": "rubric_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "proposal_id": {
-          "name": "proposal_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "student_id": {
-          "name": "student_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "evaluator_id": {
-          "name": "evaluator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "score": {
-          "name": "score",
-          "type": "numeric(5, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "feedback": {
-          "name": "feedback",
-          "type": "varchar(1000)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_eval_score_unique": {
-          "name": "idx_eval_score_unique",
-          "columns": [
-            {
-              "expression": "rubric_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "proposal_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "student_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
       "foreignKeys": {
-        "evaluation_scores_rubric_id_evaluation_rubrics_id_fk": {
-          "name": "evaluation_scores_rubric_id_evaluation_rubrics_id_fk",
-          "tableFrom": "evaluation_scores",
-          "tableTo": "evaluation_rubrics",
-          "columnsFrom": ["rubric_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "evaluation_scores_proposal_id_proposals_id_fk": {
-          "name": "evaluation_scores_proposal_id_proposals_id_fk",
-          "tableFrom": "evaluation_scores",
-          "tableTo": "proposals",
-          "columnsFrom": ["proposal_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "evaluation_scores_project_id_projects_project_id_fk": {
-          "name": "evaluation_scores_project_id_projects_project_id_fk",
-          "tableFrom": "evaluation_scores",
-          "tableTo": "projects",
-          "columnsFrom": ["project_id"],
-          "columnsTo": ["project_id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "evaluation_scores_student_id_users_id_fk": {
-          "name": "evaluation_scores_student_id_users_id_fk",
-          "tableFrom": "evaluation_scores",
+        "files_uploaded_by_users_id_fk": {
+          "name": "files_uploaded_by_users_id_fk",
+          "tableFrom": "files",
           "tableTo": "users",
-          "columnsFrom": ["student_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "evaluation_scores_evaluator_id_users_id_fk": {
-          "name": "evaluation_scores_evaluator_id_users_id_fk",
-          "tableFrom": "evaluation_scores",
-          "tableTo": "users",
-          "columnsFrom": ["evaluator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
+          "columnsFrom": [
+            "uploaded_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -905,8 +700,12 @@
           "name": "users_department_id_departments_id_fk",
           "tableFrom": "users",
           "tableTo": "departments",
-          "columnsFrom": ["department_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "department_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -916,7 +715,9 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": ["email"]
+          "columns": [
+            "email"
+          ]
         }
       },
       "policies": {},
@@ -961,7 +762,9 @@
         "permissions_key_unique": {
           "name": "permissions_key_unique",
           "nullsNotDistinct": false,
-          "columns": ["key"]
+          "columns": [
+            "key"
+          ]
         }
       },
       "policies": {},
@@ -1005,8 +808,12 @@
           "name": "role_permissions_role_id_roles_id_fk",
           "tableFrom": "role_permissions",
           "tableTo": "roles",
-          "columnsFrom": ["role_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "role_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1014,8 +821,12 @@
           "name": "role_permissions_permission_id_permissions_id_fk",
           "tableFrom": "role_permissions",
           "tableTo": "permissions",
-          "columnsFrom": ["permission_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "permission_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1057,7 +868,9 @@
         "roles_name_unique": {
           "name": "roles_name_unique",
           "nullsNotDistinct": false,
-          "columns": ["name"]
+          "columns": [
+            "name"
+          ]
         }
       },
       "policies": {},
@@ -1107,8 +920,12 @@
           "name": "user_roles_user_id_users_id_fk",
           "tableFrom": "user_roles",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1116,8 +933,12 @@
           "name": "user_roles_role_id_roles_id_fk",
           "tableFrom": "user_roles",
           "tableTo": "roles",
-          "columnsFrom": ["role_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "role_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1125,8 +946,12 @@
           "name": "user_roles_granted_by_users_id_fk",
           "tableFrom": "user_roles",
           "tableTo": "users",
-          "columnsFrom": ["granted_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "granted_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1178,6 +1003,38 @@
           "primaryKey": false,
           "notNull": false
         },
+        "step_label": {
+          "name": "step_label",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "step_type": {
+          "name": "step_type",
+          "type": "step_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'APPROVAL'"
+        },
+        "dynamic_fields_json": {
+          "name": "dynamic_fields_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vote_threshold": {
+          "name": "vote_threshold",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vote_threshold_strategy": {
+          "name": "vote_threshold_strategy",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "decision": {
           "name": "decision",
           "type": "approval_decision",
@@ -1202,6 +1059,36 @@
         "decision_at": {
           "name": "decision_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vote_json": {
+          "name": "vote_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "submitted_json": {
+          "name": "submitted_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parallel_group_id": {
+          "name": "parallel_group_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "branch_key": {
+          "name": "branch_key",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "condition_group": {
+          "name": "condition_group",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false
         },
@@ -1237,8 +1124,12 @@
           "name": "proposal_approvals_proposal_id_proposals_id_fk",
           "tableFrom": "proposal_approvals",
           "tableTo": "proposals",
-          "columnsFrom": ["proposal_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1246,8 +1137,12 @@
           "name": "proposal_approvals_approver_user_id_users_id_fk",
           "tableFrom": "proposal_approvals",
           "tableTo": "users",
-          "columnsFrom": ["approver_user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "approver_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1255,8 +1150,12 @@
           "name": "proposal_approvals_version_id_proposal_versions_id_fk",
           "tableFrom": "proposal_approvals",
           "tableTo": "proposal_versions",
-          "columnsFrom": ["version_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "version_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1264,8 +1163,12 @@
           "name": "proposal_approvals_attachment_file_id_proposal_files_id_fk",
           "tableFrom": "proposal_approvals",
           "tableTo": "proposal_files",
-          "columnsFrom": ["attachment_file_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "attachment_file_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1350,8 +1253,12 @@
           "name": "proposal_comments_proposal_id_proposals_id_fk",
           "tableFrom": "proposal_comments",
           "tableTo": "proposals",
-          "columnsFrom": ["proposal_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1359,8 +1266,12 @@
           "name": "proposal_comments_version_id_proposal_versions_id_fk",
           "tableFrom": "proposal_comments",
           "tableTo": "proposal_versions",
-          "columnsFrom": ["version_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "version_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1368,8 +1279,12 @@
           "name": "proposal_comments_file_id_proposal_files_id_fk",
           "tableFrom": "proposal_comments",
           "tableTo": "proposal_files",
-          "columnsFrom": ["file_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "file_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1377,8 +1292,12 @@
           "name": "proposal_comments_author_id_users_id_fk",
           "tableFrom": "proposal_comments",
           "tableTo": "users",
-          "columnsFrom": ["author_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1444,8 +1363,12 @@
           "name": "proposal_defences_proposal_id_proposals_id_fk",
           "tableFrom": "proposal_defences",
           "tableTo": "proposals",
-          "columnsFrom": ["proposal_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1453,8 +1376,12 @@
           "name": "proposal_defences_scheduled_by_users_id_fk",
           "tableFrom": "proposal_defences",
           "tableTo": "users",
-          "columnsFrom": ["scheduled_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "scheduled_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1532,8 +1459,12 @@
           "name": "proposal_files_proposal_id_proposals_id_fk",
           "tableFrom": "proposal_files",
           "tableTo": "proposals",
-          "columnsFrom": ["proposal_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1541,8 +1472,12 @@
           "name": "proposal_files_uploaded_by_users_id_fk",
           "tableFrom": "proposal_files",
           "tableTo": "users",
-          "columnsFrom": ["uploaded_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "uploaded_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1597,8 +1532,12 @@
           "name": "proposal_members_proposal_id_proposals_id_fk",
           "tableFrom": "proposal_members",
           "tableTo": "proposals",
-          "columnsFrom": ["proposal_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1606,8 +1545,12 @@
           "name": "proposal_members_user_id_users_id_fk",
           "tableFrom": "proposal_members",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1675,8 +1618,12 @@
           "name": "proposal_status_history_proposal_id_proposals_id_fk",
           "tableFrom": "proposal_status_history",
           "tableTo": "proposals",
-          "columnsFrom": ["proposal_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1684,8 +1631,12 @@
           "name": "proposal_status_history_changed_by_users_id_fk",
           "tableFrom": "proposal_status_history",
           "tableTo": "users",
-          "columnsFrom": ["changed_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "changed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1765,8 +1716,12 @@
           "name": "proposal_versions_proposal_id_proposals_id_fk",
           "tableFrom": "proposal_versions",
           "tableTo": "proposals",
-          "columnsFrom": ["proposal_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1774,8 +1729,12 @@
           "name": "proposal_versions_created_by_users_id_fk",
           "tableFrom": "proposal_versions",
           "tableTo": "users",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1783,8 +1742,12 @@
           "name": "proposal_versions_file_id_proposal_files_id_fk",
           "tableFrom": "proposal_versions",
           "tableTo": "proposal_files",
-          "columnsFrom": ["file_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "file_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1943,8 +1906,12 @@
           "name": "proposals_created_by_users_id_fk",
           "tableFrom": "proposals",
           "tableTo": "users",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1952,8 +1919,12 @@
           "name": "proposals_project_id_projects_project_id_fk",
           "tableFrom": "proposals",
           "tableTo": "projects",
-          "columnsFrom": ["project_id"],
-          "columnsTo": ["project_id"],
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "project_id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1961,8 +1932,12 @@
           "name": "proposals_department_id_departments_id_fk",
           "tableFrom": "proposals",
           "tableTo": "departments",
-          "columnsFrom": ["department_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "department_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2028,8 +2003,12 @@
           "name": "evaluator_assignments_evaluator_user_id_users_id_fk",
           "tableFrom": "evaluator_assignments",
           "tableTo": "users",
-          "columnsFrom": ["evaluator_user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "evaluator_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2037,8 +2016,12 @@
           "name": "evaluator_assignments_assigned_by_users_id_fk",
           "tableFrom": "evaluator_assignments",
           "tableTo": "users",
-          "columnsFrom": ["assigned_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "assigned_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2046,8 +2029,12 @@
           "name": "evaluator_assignments_proposal_approval_id_proposal_approvals_id_fk",
           "tableFrom": "evaluator_assignments",
           "tableTo": "proposal_approvals",
-          "columnsFrom": ["proposal_approval_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "proposal_approval_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2076,13 +2063,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "current_status": {
-          "name": "current_status",
-          "type": "proposal_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
         "step_order": {
           "name": "step_order",
           "type": "integer",
@@ -2094,12 +2074,6 @@
           "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true
-        },
-        "next_role": {
-          "name": "next_role",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
         },
         "step_label": {
           "name": "step_label",
@@ -2127,6 +2101,66 @@
           "primaryKey": false,
           "notNull": false,
           "default": true
+        },
+        "step_type": {
+          "name": "step_type",
+          "type": "step_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'APPROVAL'"
+        },
+        "vote_threshold": {
+          "name": "vote_threshold",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vote_threshold_strategy": {
+          "name": "vote_threshold_strategy",
+          "type": "vote_threshold_strategy",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'MAJORITY'"
+        },
+        "dynamic_fields_json": {
+          "name": "dynamic_fields_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "branch_key": {
+          "name": "branch_key",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "condition_group": {
+          "name": "condition_group",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "branch_condition_json": {
+          "name": "branch_condition_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
         }
       },
       "indexes": {},
@@ -2193,8 +2227,12 @@
           "name": "audit_logs_actor_user_id_users_id_fk",
           "tableFrom": "audit_logs",
           "tableTo": "users",
-          "columnsFrom": ["actor_user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "actor_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2286,8 +2324,12 @@
           "name": "notifications_recipient_user_id_users_id_fk",
           "tableFrom": "notifications",
           "tableTo": "users",
-          "columnsFrom": ["recipient_user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "recipient_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2295,8 +2337,12 @@
           "name": "notifications_sender_user_id_users_id_fk",
           "tableFrom": "notifications",
           "tableTo": "users",
-          "columnsFrom": ["sender_user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "sender_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2304,8 +2350,12 @@
           "name": "notifications_proposal_id_proposals_id_fk",
           "tableFrom": "notifications",
           "tableTo": "proposals",
-          "columnsFrom": ["proposal_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "proposal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2313,8 +2363,12 @@
           "name": "notifications_project_id_projects_project_id_fk",
           "tableFrom": "notifications",
           "tableTo": "projects",
-          "columnsFrom": ["project_id"],
-          "columnsTo": ["project_id"],
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "project_id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2380,8 +2434,12 @@
           "name": "verification_uploads_user_id_users_id_fk",
           "tableFrom": "verification_uploads",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2389,8 +2447,12 @@
           "name": "verification_uploads_file_id_proposal_files_id_fk",
           "tableFrom": "verification_uploads",
           "tableTo": "proposal_files",
-          "columnsFrom": ["file_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "file_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2398,8 +2460,12 @@
           "name": "verification_uploads_reviewed_by_users_id_fk",
           "tableFrom": "verification_uploads",
           "tableTo": "users",
-          "columnsFrom": ["reviewed_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "reviewed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2447,8 +2513,12 @@
           "name": "project_members_project_id_projects_project_id_fk",
           "tableFrom": "project_members",
           "tableTo": "projects",
-          "columnsFrom": ["project_id"],
-          "columnsTo": ["project_id"],
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "project_id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2456,8 +2526,12 @@
           "name": "project_members_user_id_users_id_fk",
           "tableFrom": "project_members",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2465,7 +2539,10 @@
       "compositePrimaryKeys": {
         "project_members_project_id_user_id_pk": {
           "name": "project_members_project_id_user_id_pk",
-          "columns": ["project_id", "user_id"]
+          "columns": [
+            "project_id",
+            "user_id"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -2574,8 +2651,12 @@
           "name": "projects_department_id_departments_id_fk",
           "tableFrom": "projects",
           "tableTo": "departments",
-          "columnsFrom": ["department_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "department_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2635,8 +2716,12 @@
           "name": "refresh_tokens_user_id_users_id_fk",
           "tableFrom": "refresh_tokens",
           "tableTo": "users",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2646,73 +2731,11 @@
         "refresh_tokens_token_unique": {
           "name": "refresh_tokens_token_unique",
           "nullsNotDistinct": false,
-          "columns": ["token"]
+          "columns": [
+            "token"
+          ]
         }
       },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.workspaces": {
-      "name": "workspaces",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "workspaces_project_id_projects_project_id_fk": {
-          "name": "workspaces_project_id_projects_project_id_fk",
-          "tableFrom": "workspaces",
-          "tableTo": "projects",
-          "columnsFrom": ["project_id"],
-          "columnsTo": ["project_id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "workspaces_created_by_users_id_fk": {
-          "name": "workspaces_created_by_users_id_fk",
-          "tableFrom": "workspaces",
-          "tableTo": "users",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -2722,42 +2745,38 @@
     "public.fund_release_status": {
       "name": "fund_release_status",
       "schema": "public",
-      "values": ["Pending", "Released", "Cancelled"]
+      "values": [
+        "Pending",
+        "Released",
+        "Cancelled"
+      ]
     },
     "public.installment_trigger": {
       "name": "installment_trigger",
       "schema": "public",
-      "values": ["Auto", "Manual"]
-    },
-    "public.source_action": {
-      "name": "source_action",
-      "schema": "public",
-      "values": ["initial", "save", "import", "restore"]
-    },
-    "public.evaluation_phase": {
-      "name": "evaluation_phase",
-      "schema": "public",
-      "values": ["PROPOSAL", "PROJECT"]
-    },
-    "public.evaluation_type": {
-      "name": "evaluation_type",
-      "schema": "public",
-      "values": ["continuous", "final"]
-    },
-    "public.account_status": {
-      "name": "account_status",
-      "schema": "public",
-      "values": ["active", "deactive", "suspended"]
+      "values": [
+        "Auto",
+        "Manual"
+      ]
     },
     "public.approval_decision": {
       "name": "approval_decision",
       "schema": "public",
-      "values": ["Pending", "Accepted", "Rejected", "Needs_Revision"]
+      "values": [
+        "Pending",
+        "Accepted",
+        "Rejected",
+        "Needs_Revision"
+      ]
     },
     "public.degree_level": {
       "name": "degree_level",
       "schema": "public",
-      "values": ["Master", "PhD", "NA"]
+      "values": [
+        "Master",
+        "PhD",
+        "NA"
+      ]
     },
     "public.proposal_status": {
       "name": "proposal_status",
@@ -2768,6 +2787,41 @@
         "Needs_Revision",
         "Approved",
         "Rejected"
+      ]
+    },
+    "public.step_type": {
+      "name": "step_type",
+      "schema": "public",
+      "values": [
+        "APPROVAL",
+        "VOTE",
+        "FORM"
+      ]
+    },
+    "public.vote_threshold_strategy": {
+      "name": "vote_threshold_strategy",
+      "schema": "public",
+      "values": [
+        "MAJORITY",
+        "ALL",
+        "NUMBER"
+      ]
+    },
+    "public.file_status": {
+      "name": "file_status",
+      "schema": "public",
+      "values": [
+        "TEMP",
+        "ATTACHED"
+      ]
+    },
+    "public.account_status": {
+      "name": "account_status",
+      "schema": "public",
+      "values": [
+        "active",
+        "deactive",
+        "suspended"
       ]
     },
     "public.audit_action": {
@@ -2799,12 +2853,20 @@
     "public.ethical_clearance_status": {
       "name": "ethical_clearance_status",
       "schema": "public",
-      "values": ["Pending", "Approved", "Rejected"]
+      "values": [
+        "Pending",
+        "Approved",
+        "Rejected"
+      ]
     },
     "public.project_program": {
       "name": "project_program",
       "schema": "public",
-      "values": ["UG", "PG", "GENERAL"]
+      "values": [
+        "UG",
+        "PG",
+        "GENERAL"
+      ]
     },
     "public.project_stage": {
       "name": "project_stage",
@@ -2820,7 +2882,13 @@
     "public.project_role": {
       "name": "project_role",
       "schema": "public",
-      "values": ["MEMBER", "PI", "SUPERVISOR", "EVALUATOR", "ADVISOR"]
+      "values": [
+        "MEMBER",
+        "PI",
+        "SUPERVISOR",
+        "EVALUATOR",
+        "ADVISOR"
+      ]
     }
   },
   "schemas": {},

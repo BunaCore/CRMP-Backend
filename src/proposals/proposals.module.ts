@@ -9,9 +9,10 @@ import { WorkflowService } from './workflow.service';
 import { AccessControlModule } from 'src/access-control/access-control.module';
 import { DbModule } from 'src/db/db.module';
 import { UsersModule } from 'src/users/users.module';
+import { FilesModule } from 'src/common/files/files.module';
 
 @Module({
-  imports: [AccessControlModule, DbModule, UsersModule],
+  imports: [AccessControlModule, DbModule, UsersModule, FilesModule],
   controllers: [ProposalsController],
   providers: [
     ProposalsService,

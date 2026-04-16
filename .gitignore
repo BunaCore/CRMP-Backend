@@ -29,3 +29,6 @@ coverage/
 docker-compose.db.yml
 .env.example
 .env.example
+
+# uploaded documents
+uploads/

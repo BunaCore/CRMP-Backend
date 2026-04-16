@@ -1,6 +1,5 @@
 import {
   pgTable,
-  pgEnum,
   uuid,
   varchar,
   text,
@@ -17,20 +16,12 @@ import { users } from './user';
 import { projects } from './project';
 import { departments } from './department';
 import { ProjectProgramEnum, projectRoleEnum } from './project';
-export const degreeLevelEnum = pgEnum('degree_level', ['Master', 'PhD', 'NA']);
-export const proposalStatusEnum = pgEnum('proposal_status', [
-  'Draft',
-  'Under_Review',
-  'Needs_Revision',
-  'Approved',
-  'Rejected',
-]);
-export const approvalDecisionEnum = pgEnum('approval_decision', [
-  'Pending',
-  'Accepted',
-  'Rejected',
-  'Needs_Revision',
-]);
+import {
+  stepTypeEnum,
+  degreeLevelEnum,
+  proposalStatusEnum,
+  approvalDecisionEnum,
+} from './enums';
 
 export const proposals = pgTable('proposals', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -111,10 +102,42 @@ export const proposalApprovals = pgTable('proposal_approvals', {
   stepOrder: integer('step_order').notNull(),
   approverRole: varchar('approver_role', { length: 50 }).notNull(),
   approverUserId: uuid('approver_user_id').references(() => users.id),
+
+  // Step metadata copies (audit trail - don't change during workflow)
+  // Snapshot from routingRule at step creation time
+  stepLabel: varchar('step_label', { length: 100 }),
+  stepType: stepTypeEnum('step_type').notNull().default('APPROVAL'),
+
+  // Form schema snapshot (for FORM steps)
+  // Copied at step creation for audit trail
+  dynamicFieldsJson: jsonb('dynamic_fields_json'),
+
+  // Vote configuration snapshot (for VOTE steps)
+  // Copied at step creation for audit trail and threshold checking
+  voteThreshold: integer('vote_threshold'),
+  voteThresholdStrategy: varchar('vote_threshold_strategy', { length: 50 }), // MAJORITY | ALL | NUMBER
+
+  // Decision info
   decision: approvalDecisionEnum('decision').default('Pending'),
   isActive: boolean('is_active').default(false),
   comment: text('comment'),
   decisionAt: timestamp('decision_at', { withTimezone: true }),
+
+  // VOTE steps: { userId: 'Accepted' | 'Rejected' | 'Needs_Revision' }
+  // Tracks votes cast by eligible voters
+  voteJson: jsonb('vote_json'),
+
+  // FORM steps: form field values + fileIds
+  // Example: { "field1": "value1", "file_field": "file-uuid-123" }
+  submittedJson: jsonb('submitted_json'),
+
+  // Parallel step grouping
+  parallelGroupId: uuid('parallel_group_id'),
+
+  // Branching: track which branch path this step came from
+  branchKey: varchar('branch_key', { length: 50 }),
+  conditionGroup: varchar('condition_group', { length: 50 }),
+
   notifiedAt: timestamp('notified_at', { withTimezone: true }),
   versionId: uuid('version_id').references(() => proposalVersions.id),
   attachmentFileId: uuid('attachment_file_id').references(

@@ -239,113 +239,140 @@ async function seed() {
     console.log('Seeding routing rules...');
     await tx.insert(schema.routingRules).values([
       // --- Postgraduate Flow ---
-      // 1. Department review
       {
         proposalProgram: 'PG',
-        currentStatus: 'Under_Review',
-        nextRole: 'PG_OFFICE',
         stepOrder: 1,
         approverRole: 'DGC_MEMBER',
-        stepLabel: 'Department Initial Review',
+        stepLabel: 'DGC Committee Review',
+        stepType: 'FORM',
         isParallel: false,
-        isFinal: false,
-        required: true,
+        dynamicFieldsJson: {
+          fields: [
+            {
+              name: 'meetingMinutes',
+              type: 'file',
+              required: true,
+              multiple: false,
+            },
+          ],
+        },
       },
-      // 2. PG Office final approval
       {
         proposalProgram: 'PG',
-        currentStatus: 'Under_Review',
-        nextRole: null,
         stepOrder: 2,
+        approverRole: 'ADRPM',
+        stepLabel: 'ADRPM Approval',
+        stepType: 'APPROVAL',
+      },
+      {
+        proposalProgram: 'PG',
+        stepOrder: 3,
         approverRole: 'PG_OFFICE',
-        stepLabel: 'PG Office Final Approval',
-        isParallel: false,
+        stepLabel: 'PG Office Finalization',
+        stepType: 'APPROVAL',
         isFinal: true,
-        required: true,
       },
 
       // --- Undergraduate Flow ---
-      // 1. Coordinator screens, plagiarism check, assigns advisor
       {
         proposalProgram: 'UG',
-        currentStatus: 'Draft',
-        nextRole: null,
         stepOrder: 1,
         approverRole: 'COORDINATOR',
-        stepLabel: 'Coordinator Screening (Final Approval)',
+        stepLabel: 'Initial Screening',
+        stepType: 'APPROVAL',
+        isFinal: false,
+        // no fields – coordinator just approves
+      },
+      {
+        proposalProgram: 'UG',
+        stepOrder: 2,
+        approverRole: 'EVALUATOR',
+        stepLabel: 'Evaluation Review',
+        stepType: 'APPROVAL',
+        voteThreshold: 3,
+        voteThresholdStrategy: 'MAJORITY',
         isParallel: false,
+        isFinal: false,
+        dynamicFieldsJson: {
+          fields: [
+            {
+              name: 'evaluationReport',
+              type: 'file',
+              required: true,
+              multiple: false,
+            },
+            { name: 'comments', type: 'textarea', required: false },
+          ],
+        },
+      },
+      {
+        proposalProgram: 'UG',
+        stepOrder: 3,
+        approverRole: 'COORDINATOR',
+        stepLabel: 'Final Coordinator Approval',
+        stepType: 'APPROVAL',
         isFinal: true,
-        required: true,
       },
 
       // --- Funded Project Flow ---
       {
         proposalProgram: 'GENERAL',
-        currentStatus: 'Draft',
-        nextRole: null,
         stepOrder: 1,
         approverRole: 'RAD',
-        stepLabel: 'RAD Pre-screening & Assignment',
-        isParallel: false,
+        stepLabel: 'RAD Pre-screening',
+        stepType: 'APPROVAL',
         isFinal: false,
-        required: true,
       },
       {
         proposalProgram: 'GENERAL',
-        currentStatus: 'Draft',
-        nextRole: null,
         stepOrder: 2,
-        approverRole: 'EVALUATOR',
-        stepLabel: 'Peer Evaluation Review',
-        isParallel: true,
-        isFinal: false,
-        required: true,
+        approverRole: 'ADRPM',
+        stepLabel: 'ADRPM Review',
+        stepType: 'APPROVAL',
+        // no fields
       },
       {
         proposalProgram: 'GENERAL',
-        currentStatus: 'Draft',
-        nextRole: null,
         stepOrder: 3,
-        approverRole: 'FINANCE',
-        stepLabel: 'Finance Budget Integrity Check',
-        isParallel: false,
-        isFinal: false,
-        required: true,
-      },
-      {
-        proposalProgram: 'GENERAL',
-        currentStatus: 'Draft',
-        nextRole: null,
-        stepOrder: 4,
         approverRole: 'VPRTT',
-        stepLabel: 'VP Research Final Authorization',
-        isParallel: false,
+        stepLabel: 'VPRTT Approval (<500k)',
+        stepType: 'FORM',
+        conditionGroup: 'BUDGET',
+        branchKey: 'LOW_BUDGET',
+        branchConditionJson: {
+          field: 'budgetAmount',
+          operator: 'lt',
+          value: 500000,
+        },
         isFinal: false,
-        required: true,
+        dynamicFieldsJson: {
+          fields: [
+            {
+              name: 'approvalMemo',
+              type: 'file',
+              required: true,
+              multiple: false,
+            },
+          ],
+        },
       },
       {
         proposalProgram: 'GENERAL',
-        currentStatus: 'Draft',
-        nextRole: null,
-        stepOrder: 5,
-        approverRole: 'AC',
-        stepLabel: 'Academic Council Approval (>500k)',
-        isParallel: false,
+        stepOrder: 3,
+        approverRole: 'AC_MEMBER',
+        stepLabel: 'Academic Council Review (>=500k)',
+        stepType: 'VOTE',
+        voteThreshold: 7,
+        voteThresholdStrategy: 'MAJORITY',
+        conditionGroup: 'BUDGET',
+        branchKey: 'HIGH_BUDGET',
+        branchConditionJson: {
+          field: 'budgetAmount',
+          operator: 'gte',
+          value: 500000,
+        },
+        isParallel: true,
         isFinal: true,
-        required: true,
-      },
-
-      // --- Unfunded Project Flow ---
-      {
-        proposalProgram: 'GENERAL',
-        currentStatus: 'Draft',
-        nextRole: null,
-        stepOrder: 1,
-        approverRole: 'RAD',
-        stepLabel: 'RAD Final Approval',
-        isParallel: false,
-        isFinal: true,
-        required: true,
       },
     ]);
 
@@ -445,7 +472,7 @@ async function seed() {
         ],
       },
       {
-        title: 'Funded Research Project',
+        title: 'Funded Research Project (Large Budget)',
         proposalProgram: 'GENERAL' as const,
         isFunded: true,
         currentStatus: 'Draft' as const,
@@ -453,17 +480,18 @@ async function seed() {
         projectId: null,
         promoteToProject: true,
         abstract:
-          'This is a test funded project proposal for development and testing purposes.',
+          'This is a test funded project proposal with large budget (>500k) for development and testing purposes.',
         submittedAt: new Date('2024-03-15'),
         durationMonths: 36,
         degreeLevel: 'NA' as const,
+        budgetAmount: 750000,
         members: [
           { email: 'student@crmp.edu', role: 'PI' as const },
           { email: 'evaluator@crmp.edu', role: 'EVALUATOR' as const },
         ],
       },
       {
-        title: 'Unfunded Research Plan',
+        title: 'Unfunded Research Plan (Small Budget)',
         proposalProgram: 'GENERAL' as const,
         isFunded: false,
         currentStatus: 'Draft' as const,
@@ -471,10 +499,11 @@ async function seed() {
         projectId: null,
         promoteToProject: false,
         abstract:
-          'This is a test unfunded project proposal for development and testing purposes.',
+          'This is a test unfunded project proposal with small budget (<500k) for development and testing purposes.',
         submittedAt: null,
         durationMonths: 12,
         degreeLevel: 'NA' as const,
+        budgetAmount: 250000,
         members: [
           { email: 'student@crmp.edu', role: 'PI' as const },
           { email: 'advisor@crmp.edu', role: 'ADVISOR' as const },
@@ -554,14 +583,57 @@ async function seed() {
         promoteToProject,
       });
 
-      const matchingRules = routingRules
-        .filter(
-          (rule) =>
-            rule.proposalProgram === proposal.proposalProgram &&
-            (rule.currentStatus === proposal.currentStatus ||
-              rule.currentStatus === null),
-        )
+      // Evaluate branch conditions and filter matching rules
+      const budgetAmount = proposal.budgetAmount
+        ? parseFloat(String(proposal.budgetAmount))
+        : 0;
+
+      const evaluateCondition = (condition: any): boolean => {
+        if (!condition) return true; // No condition = include step
+
+        const field = condition.field as string;
+        const operator = condition.operator as string;
+        const value = condition.value;
+
+        let fieldValue: any;
+        if (field === 'budgetAmount') {
+          fieldValue = budgetAmount;
+        } else if (field === 'degreeLevel') {
+          fieldValue = proposal.degreeLevel || '';
+        } else if (field === 'proposalProgram') {
+          fieldValue = proposal.proposalProgram;
+        } else {
+          return true; // Unknown field, include step
+        }
+
+        switch (operator) {
+          case 'gt':
+            return fieldValue > value;
+          case 'gte':
+            return fieldValue >= value;
+          case 'lt':
+            return fieldValue < value;
+          case 'lte':
+            return fieldValue <= value;
+          case 'eq':
+            return fieldValue === value;
+          case 'neq':
+            return fieldValue !== value;
+          case 'in':
+            return Array.isArray(value) && value.includes(fieldValue);
+          default:
+            return true;
+        }
+      };
+
+      const programRules = routingRules
+        .filter((rule) => rule.proposalProgram === proposal.proposalProgram)
         .sort((a, b) => a.stepOrder - b.stepOrder);
+
+      // Filter based on branch conditions
+      const matchingRules = programRules.filter((rule) =>
+        evaluateCondition(rule.branchConditionJson),
+      );
 
       if (matchingRules.length === 0) {
         throw new Error(
@@ -581,6 +653,12 @@ async function seed() {
           routingRuleId: rule.id,
           stepOrder: rule.stepOrder,
           approverRole: rule.approverRole,
+          stepType: rule.stepType, // Copy step type from routing rule
+          dynamicFieldsJson: rule.dynamicFieldsJson || null, // Copy form schema snapshot
+          voteThreshold: rule.voteThreshold || null, // Copy vote threshold
+          voteThresholdStrategy: rule.voteThresholdStrategy || null, // Copy strategy
+          branchKey: rule.branchKey || null, // Copy branching info
+          conditionGroup: rule.conditionGroup || null,
           decision: 'Pending',
           isActive: rule.stepOrder === activeStepOrder,
         });

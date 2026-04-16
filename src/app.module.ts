@@ -10,6 +10,7 @@ import { ProposalsModule } from './proposals/proposals.module';
 import { UndergradModule } from './undergrad/undergrad.module';
 import { PgModule } from './pg/pg.module';
 import { DepartmentsModule } from './departments/departments.module';
+import { FilesModule } from './common/files/files.module';
 import { MailModule } from './mail/mail.module';
 import { DocumentsModule } from './documents/documents.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -24,6 +25,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     UsersModule,
     AuthModule,
     AccessControlModule,
+    FilesModule,
     ProposalsModule,
     UndergradModule,
     PgModule,

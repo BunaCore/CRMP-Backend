@@ -4,15 +4,15 @@ import {
   Get,
   Body,
   UseGuards,
+  Param,
+  ParseUUIDPipe,
+  BadRequestException,
+  Query,
   UseInterceptors,
   UploadedFile,
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
-  Param,
-  ParseUUIDPipe,
-  BadRequestException,
-  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProposalsService } from './proposals.service';
@@ -21,6 +21,7 @@ import { WorkflowService } from './workflow.service';
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import {
   ApprovalActionDto,
+  SubmitStepActionDto,
   WorkflowActionResponseDto,
 } from './dto/workflow.dto';
 import {
@@ -111,6 +112,23 @@ export class ProposalsController {
   }
 
   /**
+   * GET /proposals/:id/approval-timeline
+   * Fetch approval workflow timeline with user-specific metadata
+   * Returns all steps with canAct, userAction, voteSummary, etc.
+   * Frontend-compatible structure for rendering workflow UI
+   */
+  @Get(':id/approval-timeline')
+  async getApprovalTimeline(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.workflowService.getApprovalTimelineForFrontend(
+      proposalId,
+      user.id,
+    );
+  }
+
+  /**
    * GET /proposals/:id
    * Fetch detailed proposal view
    * Includes members, workflow steps, and department info
@@ -135,9 +153,8 @@ export class ProposalsController {
           new FileTypeValidator({ fileType: 'application/pdf' }),
         ],
       }),
-    )
-    file // @ts-ignore
-    : Express.Multer.File,
+    ) // @ts-ignore
+    file: any,
     @Query('submit') submit?: string,
   ) {
     const shouldSubmit = submit === 'true';
@@ -264,6 +281,39 @@ export class ProposalsController {
   }
 
   /**
+   * POST /proposals/:id/action
+   * Unified endpoint for all step actions (VOTE, FORM submission)
+   * Routes to appropriate handler based on step type and action
+   * For VOTE steps: validate eligible voter, track vote, check threshold
+   * For FORM steps: validate/store form data, attach files, mark complete
+   */
+  @Post(':id/action')
+  async submitAction(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: SubmitStepActionDto,
+  ): Promise<WorkflowActionResponseDto> {
+    const result = await this.workflowService.submitAction(
+      proposalId,
+      user.id,
+      {
+        decision: dto.decision,
+        input: dto.input,
+        comment: dto.comment,
+      },
+    );
+
+    return {
+      success: result.success,
+      message: `Step action completed successfully`,
+      proposalId,
+      newStatus: 'Under_Review', // Will be updated based on actual step outcome
+      nextStep: result.nextStep,
+      isComplete: result.isComplete,
+    };
+  }
+
+  /**
    * POST /proposals/:id/members/add
    * Add members to a proposal
    * Handles duplicate filtering and validates all users exist
@@ -386,9 +436,7 @@ export class ProposalsController {
    * Fetch evaluation rubrics and their awarded scores for this proposal
    */
   @Get(':id/evaluations')
-  async getEvaluations(
-    @Param('id', new ParseUUIDPipe()) proposalId: string,
-  ) {
+  async getEvaluations(@Param('id', new ParseUUIDPipe()) proposalId: string) {
     return this.proposalsService.getEvaluationOverview(proposalId);
   }
 
@@ -402,7 +450,11 @@ export class ProposalsController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: SubmitEvaluationScoresDto,
   ) {
-    return this.proposalsService.submitEvaluationScore(proposalId, user.id, dto);
+    return this.proposalsService.submitEvaluationScore(
+      proposalId,
+      user.id,
+      dto,
+    );
   }
 }
 
