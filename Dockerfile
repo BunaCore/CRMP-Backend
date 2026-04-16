@@ -4,8 +4,7 @@ WORKDIR /app
 RUN npm install -g pnpm
 
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install
-
+RUN pnpm install --frozen-lockfile
 COPY src ./src
 COPY tsconfig.json tsconfig.build.json drizzle.config.ts ./
 
@@ -18,7 +17,7 @@ WORKDIR /app
 RUN npm install -g pnpm
 
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --prod
+RUN pnpm install --frozen-lockfile --prod
 
 COPY --from=builder /app/dist ./dist
 
