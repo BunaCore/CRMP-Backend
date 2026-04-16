@@ -288,22 +288,28 @@ export class WorkflowService {
   }
 
   /**
-   * Phase 3: Submit action on active step (VOTE or FORM)
-   * VOTE: Track vote, check threshold, auto-advance if met
-   * FORM: Store form data, attach files, mark complete
+   * Unified workflow action entry point
+   * Routes to step-specific handlers based on stepType
+   * Single transaction encompasses entire workflow step
+   * Returns standardized outcome with proposal for notifications
    */
   async submitAction(
     proposalId: string,
     userId: string,
     actionData: {
-      action: 'VOTE' | 'SUBMIT'; // VOTE for voting steps, SUBMIT for form steps
-      decision?: 'Accepted' | 'Rejected' | 'Needs_Revision'; // For VOTE
-      submittedData?: Record<string, any>; // For FORM (field values + fileIds)
+      decision?: 'Accepted' | 'Rejected' | 'Needs_Revision';
+      input?: Record<string, any>; // For FORM: field values + fileIds
       comment?: string;
     },
-  ): Promise<{ success: boolean; nextStep?: number; isComplete: boolean }> {
+  ): Promise<{
+    success: boolean;
+    isComplete: boolean;
+    nextStep?: number;
+    outcome?: 'Accepted' | 'Rejected';
+    proposal?: any;
+  }> {
     return await this.drizzle.db.transaction(async (tx) => {
-      // 1. Get proposal and active step
+      // 1. Fetch proposal and active step
       const { proposal, activeStep } = await this.getProposalWithActiveStep(
         tx,
         proposalId,
@@ -317,7 +323,7 @@ export class WorkflowService {
         throw new BadRequestException('No active approval step found');
       }
 
-      // 2. Validate user has the step's approverRole
+      // 2. Validate user has required role
       const userRoles = await this.usersService.getUserRoles(userId);
       const roleNames = userRoles
         .map((ur) => ur.roleName)
@@ -328,51 +334,117 @@ export class WorkflowService {
           `User does not have required role: ${activeStep.approverRole}`,
         );
       }
-      console.log(activeStep);
-      // 3. Route by step type
-      if (activeStep.stepType === 'VOTE') {
-        return await this.handleVoteStep(
-          tx,
-          proposal,
-          activeStep,
-          userId,
-          actionData,
+
+      // 3. Check if user can act on this step
+      const canAct = await this.canUserActOnStep(activeStep, userId, proposal);
+      if (!canAct) {
+        throw new BadRequestException(
+          'User cannot act on this step at this time',
         );
-      } else if (activeStep.stepType === 'FORM') {
-        return await this.handleFormStep(
-          tx,
-          proposal,
-          activeStep,
-          userId,
-          actionData,
-        );
-      } else if (activeStep.stepType === 'APPROVAL') {
-        // For APPROVAL, accept means approve, else reject/revise
-        if (
-          actionData.action === 'VOTE' &&
-          actionData.decision === 'Accepted'
-        ) {
-          return await this.acceptStep(proposalId, userId, actionData.comment);
-        } else {
-          // Rejection for APPROVAL steps
-          const result = await this.rejectStep(
-            proposalId,
-            userId,
-            actionData.comment,
-          );
-          return { success: result.success, isComplete: false };
-        }
       }
 
-      throw new BadRequestException(
-        `Unknown step type: ${activeStep.stepType}`,
-      );
+      // 4. Route by step type using switch statement
+      switch (activeStep.stepType) {
+        case 'VOTE':
+          return await this.handleVoteStep(
+            tx,
+            proposal,
+            activeStep,
+            userId,
+            actionData,
+          );
+
+        case 'FORM':
+          return await this.handleFormStep(
+            tx,
+            proposal,
+            activeStep,
+            userId,
+            actionData,
+          );
+
+        case 'APPROVAL':
+          return await this.handleApprovalStep(
+            tx,
+            proposal,
+            activeStep,
+            userId,
+            actionData,
+          );
+
+        default:
+          throw new BadRequestException(
+            `Unknown step type: ${activeStep.stepType}`,
+          );
+      }
     });
   }
 
   // ============================================================================
   // Phase 3: Vote/Form Handling
   // ============================================================================
+
+  /**
+   * Handle APPROVAL step: Simple accept/reject/revise decision
+   */
+  private async handleApprovalStep(
+    tx: DB,
+    proposal: any,
+    activeStep: any,
+    userId: string,
+    actionData: any,
+  ): Promise<{
+    success: boolean;
+    isComplete: boolean;
+    nextStep?: number;
+    outcome?: 'Accepted' | 'Rejected';
+    proposal?: any;
+  }> {
+    // 1. Ensure decision is provided
+    const decision = actionData.decision;
+    if (!decision) throw new BadRequestException('decision must be provided');
+
+    // 2. Mark step with decision
+    await tx
+      .update(schema.proposalApprovals)
+      .set({
+        decision: decision as any,
+        approverUserId: userId,
+        decisionAt: new Date(),
+        comment: actionData.comment || null,
+        isActive: false,
+      })
+      .where(eq(schema.proposalApprovals.id, activeStep.id));
+
+    // 3. Route based on decision
+    if (decision === 'Accepted') {
+      // Fetch updated proposal for response
+      const updatedProposal = await tx.query.proposals.findFirst({
+        where: eq(schema.proposals.id, proposal.id),
+      });
+
+      // Advance workflow
+      const advancement = await this.advanceWorkflow(tx, proposal.id, userId);
+
+      return {
+        success: true,
+        isComplete: advancement.isComplete,
+        nextStep: advancement.nextStep,
+        outcome: 'Accepted',
+        proposal: updatedProposal,
+      };
+    } else {
+      // Rejection or revision request
+      await this.handleRejection(tx, proposal, activeStep, userId);
+
+      return {
+        success: true,
+        isComplete: false,
+        outcome: decision,
+        proposal,
+      };
+    }
+  }
 
   /**
    * Handle VOTE step: Track vote, check threshold, auto-advance if complete
@@ -383,7 +455,13 @@ export class WorkflowService {
     activeStep: any,
     userId: string,
     actionData: any,
-  ): Promise<{ success: boolean; nextStep?: number; isComplete: boolean }> {
+  ): Promise<{
+    success: boolean;
+    isComplete: boolean;
+    nextStep?: number;
+    outcome?: 'Accepted' | 'Rejected';
+    proposal?: any;
+  }> {
     // 1. Validate user eligible to vote
     const eligibleVoters = await this.getEligibleVotersByRole(
       tx,
@@ -423,11 +501,14 @@ export class WorkflowService {
     );
 
     if (!votesMet) {
-      // Threshold not met yet, just return success
-      return { success: true, isComplete: false };
+      // Threshold not met yet, just return success and wait for more votes
+      return {
+        success: true,
+        isComplete: false,
+      };
     }
 
-    // 5. Threshold is met - compute final decision
+    // 5. Threshold is met - compute final decision based on votes
     const approvalsCount = Object.values(currentVotes).filter(
       (d) => d === 'Accepted',
     ).length;
@@ -443,7 +524,7 @@ export class WorkflowService {
       voteThresholdStrategy === 'MAJORITY' &&
       rejectionsCount >= approvalsCount
     ) {
-      // If MAJORITY and more rejections than approvals
+      // If MAJORITY and more rejections than approvals (including ties), reject
       finalDecision = 'Rejected';
     }
 
@@ -458,32 +539,38 @@ export class WorkflowService {
       })
       .where(eq(schema.proposalApprovals.id, activeStep.id));
 
-    // 7. Phase 3 Refactor: Use centralized advanceWorkflow() for step advancement
+    // 7. Route by final decision outcome
     if (finalDecision === 'Accepted') {
+      // Fetch updated proposal
+      const updatedProposal = await tx.query.proposals.findFirst({
+        where: eq(schema.proposals.id, proposal.id),
+      });
+
+      // Advance to next step
       const advancement = await this.advanceWorkflow(tx, proposal.id, userId);
 
       return {
         success: true,
-        nextStep: advancement.nextStep,
         isComplete: advancement.isComplete,
+        nextStep: advancement.nextStep,
+        outcome: 'Accepted',
+        proposal: updatedProposal,
       };
     } else {
-      // Rejected - mark proposal for revision
-      await tx
-        .update(schema.proposals)
-        .set({
-          currentStatus: 'Needs_Revision' as any,
-          isEditable: true,
-          currentStepOrder: 0,
-        })
-        .where(eq(schema.proposals.id, proposal.id));
+      // Vote rejected - handle rejection
+      await this.handleRejection(tx, proposal, activeStep, userId);
 
-      return { success: true, isComplete: false };
+      return {
+        success: true,
+        isComplete: false,
+        outcome: 'Rejected',
+        proposal,
+      };
     }
   }
 
   /**
-   * Handle FORM step: Store form data, attach files, mark complete
+   * Handle FORM step: Validate input, store form data, attach files, mark complete
    */
   private async handleFormStep(
     tx: DB,
@@ -491,8 +578,14 @@ export class WorkflowService {
     activeStep: any,
     userId: string,
     actionData: any,
-  ): Promise<{ success: boolean; nextStep?: number; isComplete: boolean }> {
-    const submittedData = actionData.submittedData || {};
+  ): Promise<{
+    success: boolean;
+    isComplete: boolean;
+    nextStep?: number;
+    outcome?: 'Accepted' | 'Rejected';
+    proposal?: any;
+  }> {
+    const submittedData = actionData.input || {};
 
     // Phase 2 Refactor: Validate form submission against schema
     // This checks required fields, type matching, and file ownership via database query
@@ -549,32 +642,92 @@ export class WorkflowService {
       })
       .where(eq(schema.proposalApprovals.id, activeStep.id));
 
-    // Phase 3 Refactor: Use centralized advanceWorkflow() for next step handling
+    // Route by final decision
     if (finalDecision === 'Accepted') {
+      // Fetch updated proposal
+      const updatedProposal = await tx.query.proposals.findFirst({
+        where: eq(schema.proposals.id, proposal.id),
+      });
+
+      // Advance to next step
       const advancement = await this.advanceWorkflow(tx, proposal.id, userId);
 
       return {
         success: true,
-        nextStep: advancement.nextStep,
         isComplete: advancement.isComplete,
+        nextStep: advancement.nextStep,
+        outcome: 'Accepted',
+        proposal: updatedProposal,
       };
     } else {
-      // Rejection or revision
-      await tx
-        .update(schema.proposals)
-        .set({
-          currentStatus:
-            finalDecision === 'Rejected'
-              ? ('Rejected' as any)
-              : ('Needs_Revision' as any),
-          isEditable: true,
-        })
-        .where(eq(schema.proposals.id, proposal.id));
+      // Form submission rejected
+      await this.handleRejection(tx, proposal, activeStep, userId);
 
-      return { success: true, isComplete: false };
+      return {
+        success: true,
+        isComplete: false,
+        outcome: 'Rejected',
+        proposal,
+      };
     }
   }
 
+  /**
+   * Handle step rejection outcome
+   *
+   * Responsibilities:
+   * 1. Mark the current step explicitly as 'Rejected' with metadata
+   * 2. Deactivate ALL steps (guarantees zero active steps)
+   * 3. Update proposal to Needs_Revision for resubmission
+   * 4. Record status history for audit
+   *
+   * Does NOT advance workflow.
+   * Guarantees zero active steps after completion.
+   */
+  private async handleRejection(
+    tx: DB,
+    proposal: any,
+    activeStep: any,
+    userId: string,
+  ): Promise<void> {
+    // 1. Mark current step as rejected with full metadata
+    await tx
+      .update(schema.proposalApprovals)
+      .set({
+        decision: 'Rejected' as any,
+        isActive: false,
+        decisionAt: new Date(),
+        approverUserId: userId,
+        // Keep existing comment from actionData (already set by caller)
+      })
+      .where(eq(schema.proposalApprovals.id, activeStep.id));
+
+    // 2. Deactivate ALL steps (ensures zero active steps, not just pending)
+    await tx
+      .update(schema.proposalApprovals)
+      .set({ isActive: false })
+      .where(eq(schema.proposalApprovals.proposalId, proposal.id));
+
+    // 3. Mark proposal for revision
+    await tx
+      .update(schema.proposals)
+      .set({
+        currentStatus: 'Needs_Revision' as any,
+        isEditable: true,
+        currentStepOrder: 0,
+      })
+      .where(eq(schema.proposals.id, proposal.id));
+
+    // 4. Record status transition in history
+    await tx.insert(schema.proposalStatusHistory).values({
+      proposalId: proposal.id,
+      changedBy: userId,
+      oldStatus: proposal.currentStatus as any,
+      newStatus: 'Needs_Revision' as any,
+      note: `Rejected by ${activeStep.approverRole} at Step ${activeStep.stepOrder}`,
+      changedAt: new Date(),
+    });
+  }
   // ============================================================================
   // Vote Helper Methods
   // ============================================================================
@@ -1040,20 +1193,22 @@ export class WorkflowService {
 
   /**
    * Helper: Resume workflow by reactivating the step that was rejected/needs_revision
-   * Keeps all previous approvals intact for audit trail
+   *
+   * Guarantees exactly ONE active step after resumption.
+   * Selects the latest rejected/needs_revision step (highest stepOrder).
+   * Keeps all previous approvals intact for audit trail.
    */
   private async resumeWorkflowFromLastIncompleteStep(
     tx: DB,
     proposalId: string,
     existingApprovals: any[],
   ): Promise<void> {
-    // Find the step that needs to be redone
-    const incompleteStep = existingApprovals.find(
-      (a) =>
-        a.decision === 'Rejected' ||
-        a.decision === 'Needs_Revision' ||
-        a.decision === 'Pending',
-    );
+    // Find the LATEST rejected or needs_revision step (highest stepOrder)
+    const incompleteStep = existingApprovals
+      .filter(
+        (a) => a.decision === 'Rejected' || a.decision === 'Needs_Revision',
+      )
+      .sort((a, b) => b.stepOrder - a.stepOrder)[0];
 
     if (!incompleteStep) {
       throw new BadRequestException(
@@ -1061,7 +1216,13 @@ export class WorkflowService {
       );
     }
 
-    // Reset this step's decision to Pending and make it active
+    // 1. Deactivate ALL steps first (ensures no accidental active steps remain)
+    await tx
+      .update(schema.proposalApprovals)
+      .set({ isActive: false })
+      .where(eq(schema.proposalApprovals.proposalId, proposalId));
+
+    // 2. Reset the target step to Pending and activate it
     await tx
       .update(schema.proposalApprovals)
       .set({
@@ -1070,19 +1231,9 @@ export class WorkflowService {
         decisionAt: null,
         comment: null,
         approverUserId: null,
+        voteJson: null, // Reset any partial votes from previous attempt
       })
       .where(eq(schema.proposalApprovals.id, incompleteStep.id));
-
-    // Deactivate all other steps
-    await tx
-      .update(schema.proposalApprovals)
-      .set({ isActive: false })
-      .where(
-        and(
-          eq(schema.proposalApprovals.proposalId, proposalId),
-          eq(schema.proposalApprovals.isActive, true),
-        ),
-      );
   }
 
   /**

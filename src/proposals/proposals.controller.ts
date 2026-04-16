@@ -297,16 +297,15 @@ export class ProposalsController {
       proposalId,
       user.id,
       {
-        action: dto.action,
         decision: dto.decision,
-        submittedData: dto.submittedData,
+        input: dto.input,
         comment: dto.comment,
       },
     );
 
     return {
       success: result.success,
-      message: `Action "${dto.action}" completed successfully`,
+      message: `Step action completed successfully`,
       proposalId,
       newStatus: 'Under_Review', // Will be updated based on actual step outcome
       nextStep: result.nextStep,
@@ -437,9 +436,7 @@ export class ProposalsController {
    * Fetch evaluation rubrics and their awarded scores for this proposal
    */
   @Get(':id/evaluations')
-  async getEvaluations(
-    @Param('id', new ParseUUIDPipe()) proposalId: string,
-  ) {
+  async getEvaluations(@Param('id', new ParseUUIDPipe()) proposalId: string) {
     return this.proposalsService.getEvaluationOverview(proposalId);
   }
 
@@ -453,7 +450,11 @@ export class ProposalsController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: SubmitEvaluationScoresDto,
   ) {
-    return this.proposalsService.submitEvaluationScore(proposalId, user.id, dto);
+    return this.proposalsService.submitEvaluationScore(
+      proposalId,
+      user.id,
+      dto,
+    );
   }
 }
 

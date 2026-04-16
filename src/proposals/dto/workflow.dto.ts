@@ -16,24 +16,22 @@ export class ApprovalActionDto {
 }
 
 /**
- * Unified request DTO for step actions (vote, submit form, etc.)
+ * Unified request DTO for step actions (APPROVAL, VOTE, FORM)
+ * Behavior determined by stepType, not by action field
  * Used by POST /proposals/:id/action endpoint
  */
 export class SubmitStepActionDto {
-  @IsEnum(['VOTE', 'SUBMIT'])
-  action: 'VOTE' | 'SUBMIT';
+  @IsEnum(['Accepted', 'Rejected', 'Needs_Revision'])
+  @IsOptional()
+  decision?: 'Accepted' | 'Rejected' | 'Needs_Revision';
+
+  @IsObject()
+  @IsOptional()
+  input?: Record<string, any>; // For FORM: field values + fileIds
 
   @IsString()
   @IsOptional()
   comment?: string;
-
-  @IsEnum(['Accepted', 'Rejected', 'Needs_Revision'])
-  @IsOptional()
-  decision?: 'Accepted' | 'Rejected' | 'Needs_Revision'; // For VOTE steps
-
-  @IsObject()
-  @IsOptional()
-  submittedData?: Record<string, any>; // For FORM steps (field values + fileIds)
 }
 
 /**

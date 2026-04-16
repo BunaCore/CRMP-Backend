@@ -287,7 +287,7 @@ async function seed() {
         stepOrder: 2,
         approverRole: 'EVALUATOR',
         stepLabel: 'Evaluation Review',
-        stepType: 'VOTE',
+        stepType: 'APPROVAL',
         voteThreshold: 3,
         voteThresholdStrategy: 'MAJORITY',
         isParallel: false,
