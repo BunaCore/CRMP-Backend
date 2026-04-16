@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { sql } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
+import { createHash } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import * as schema from './schema';
 import 'dotenv/config';
@@ -757,9 +758,86 @@ async function seed() {
         })
         .where(sql`${schema.proposals.id} = ${seeded.proposal.id}`);
     }
-  });
 
-  console.log('✨ Seeding complete!');
+    // Seed sample data for testing
+    console.log('Seeding sample project and workspace for student...');
+
+    if (studentUser) {
+      const [project] = await tx
+        .insert(schema.projects)
+        .values({
+          projectTitle: 'Sample Student Project',
+          isFunded: false,
+          projectStage: 'Submitted',
+          projectDescription: 'A sample project for testing the document editor',
+          submissionDate: new Date().toISOString().split('T')[0],
+          researchArea: 'Computer Science',
+          projectProgram: 'UG',
+          departmentId: null,
+          durationMonths: 6,
+          ethicalClearanceStatus: 'Pending',
+        })
+        .returning();
+
+      await tx.insert(schema.projectMembers).values({
+        projectId: project.projectId,
+        userId: studentUser.id,
+        role: 'MEMBER',
+        addedAt: new Date(),
+      });
+
+      // Create workspace
+      const [workspace] = await tx
+        .insert(schema.workspaces)
+        .values({
+          projectId: project.projectId,
+          name: 'Main Document',
+          createdBy: studentUser.id,
+        })
+        .returning();
+
+      // Create initial document
+      const initialContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Start writing your document here...' }],
+          },
+        ],
+      };
+
+      const [document] = await tx
+        .insert(schema.documents)
+        .values({
+          workspaceId: workspace.id,
+          currentContent: initialContent,
+        })
+        .returning();
+
+      // Create initial version
+      const contentHash = createHash('sha256').update(JSON.stringify(initialContent)).digest('hex');
+      const [version] = await tx
+        .insert(schema.documentVersions)
+        .values({
+          documentId: document.id,
+          versionNumber: 1,
+          content: initialContent,
+          createdBy: studentUser.id,
+          sourceAction: 'initial',
+          contentHash,
+        })
+        .returning();
+
+      // Update document with current version
+      await tx
+        .update(schema.documents)
+        .set({ currentVersionId: version.id })
+        .where(eq(schema.documents.id, document.id));
+    }
+
+    console.log('✅ Database seeded successfully!');
+  });
 }
 
 seed()

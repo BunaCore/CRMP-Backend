@@ -19,29 +19,22 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1775584365517,
-      "tag": "0002_fresh_umar",
+      "when": 1776157456663,
+      "tag": "0002_round_ezekiel_stane",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "7",
-      "when": 1775595148589,
-      "tag": "0003_skinny_wolfpack",
+      "when": 1776157685687,
+      "tag": "0003_common_carnage",
       "breakpoints": true
     },
     {
       "idx": 4,
       "version": "7",
-      "when": 1775632964645,
-      "tag": "0004_stormy_ares",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1775665766151,
-      "tag": "0005_brave_carnage",
+      "when": 1776167701825,
+      "tag": "0004_early_lake",
       "breakpoints": true
     }
   ]
