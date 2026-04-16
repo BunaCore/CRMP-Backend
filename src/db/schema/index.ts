@@ -14,3 +14,4 @@ export * from './evaluation';
 export * from './workspace';
 export * from './document';
 export * from './document_version';
+export * from './chat';
