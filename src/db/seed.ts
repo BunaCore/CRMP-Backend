@@ -344,7 +344,7 @@ async function seed() {
           operator: 'lt',
           value: 500000,
         },
-        isFinal: false,
+        isFinal: true,
         dynamicFieldsJson: {
           fields: [
             {
@@ -371,7 +371,7 @@ async function seed() {
           operator: 'gte',
           value: 500000,
         },
-        isParallel: true,
+        isParallel: false,
         isFinal: true,
       },
     ]);
@@ -769,7 +769,8 @@ async function seed() {
           projectTitle: 'Sample Student Project',
           isFunded: false,
           projectStage: 'Submitted',
-          projectDescription: 'A sample project for testing the document editor',
+          projectDescription:
+            'A sample project for testing the document editor',
           submissionDate: new Date().toISOString().split('T')[0],
           researchArea: 'Computer Science',
           projectProgram: 'UG',
@@ -802,7 +803,9 @@ async function seed() {
         content: [
           {
             type: 'paragraph',
-            content: [{ type: 'text', text: 'Start writing your document here...' }],
+            content: [
+              { type: 'text', text: 'Start writing your document here...' },
+            ],
           },
         ],
       };
@@ -816,7 +819,9 @@ async function seed() {
         .returning();
 
       // Create initial version
-      const contentHash = createHash('sha256').update(JSON.stringify(initialContent)).digest('hex');
+      const contentHash = createHash('sha256')
+        .update(JSON.stringify(initialContent))
+        .digest('hex');
       const [version] = await tx
         .insert(schema.documentVersions)
         .values({

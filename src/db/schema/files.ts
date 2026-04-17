@@ -14,9 +14,9 @@ export const fileStatusEnum = pgEnum('file_status', ['TEMP', 'ATTACHED']);
 export const files = pgTable('files', {
   id: uuid('id').primaryKey().defaultRandom(),
   storagePath: varchar('storage_path', { length: 500 }).notNull(),
-  uploadedBy: uuid('uploaded_by')
-    .notNull()
-    .references(() => users.id, { onDelete: 'set null' }),
+  uploadedBy: uuid('uploaded_by').references(() => users.id, {
+    onDelete: 'set null',
+  }),
 
   // Resource context
   resourceType: varchar('resource_type', { length: 50 }), // 'PROPOSAL', 'STEP', etc

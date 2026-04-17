@@ -1,1 +1,0 @@
-ALTER TABLE "proposal_approvals" ADD COLUMN "step_label" varchar(100);
