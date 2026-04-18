@@ -16,12 +16,16 @@ import { MailModule } from 'src/mail/mail.module';
   imports: [
     BullModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        redis: {
-          host: configService.get<string>('REDIS_HOST', 'localhost'),
-          port: configService.get<number>('REDIS_PORT', 6379),
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const url = configService.get<string>('REDIS_URL');
+
+        return {
+          redis: {
+            url,
+            ...(url?.startsWith('rediss://') ? { tls: {} } : {}),
+          },
+        };
+      },
     }),
     BullModule.registerQueue({
       name: 'mail',
