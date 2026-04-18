@@ -31,23 +31,37 @@ export class MailService {
   constructor(private readonly mailerService: MailerService) {}
 
   private isValidEmail(email: string): boolean {
-    return typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    return (
+      typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    );
   }
 
-  async sendEmail(type: EmailType, to: string, context: Record<string, any>): Promise<void> {
+  async sendEmail(
+    type: EmailType,
+    to: string,
+    context: Record<string, any>,
+  ): Promise<void> {
     const config = this.emailConfigs[type];
     if (!config) {
-      this.logger.warn(`Skipped email send because unknown email type: ${type}`);
+      this.logger.warn(
+        `Skipped email send because unknown email type: ${type}`,
+      );
       return;
     }
 
     if (!this.isValidEmail(to)) {
-      this.logger.warn(`Skipped email send because invalid recipient email: ${to}`);
+      this.logger.warn(
+        `Skipped email send because invalid recipient email: ${to}`,
+      );
       return;
     }
 
     try {
-      const templatePath = path.join(__dirname, 'templates', `${config.template}.hbs`);
+      const templatePath = path.join(
+        __dirname,
+        'templates',
+        `${config.template}.hbs`,
+      );
       const templateSource = fs.readFileSync(templatePath, 'utf8');
       const template = handlebars.compile(templateSource);
       const body = template(context);
@@ -60,7 +74,11 @@ export class MailService {
       });
       this.logger.log(`Email sent successfully to ${to}`);
     } catch (error) {
-      this.logger.error(`Failed to send email of type ${type} to ${to}: ${error?.message || error}`);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to send email of type ${type} to ${to}: ${errorMessage}`,
+      );
       throw error;
     }
   }

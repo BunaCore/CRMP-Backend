@@ -467,7 +467,6 @@ export class WorkflowService {
       tx,
       activeStep.approverRole,
     );
-    console.log(eligibleVoters);
     const eligibleVoterIds = eligibleVoters.map((v) => v.id);
 
     if (!eligibleVoterIds.includes(userId)) {

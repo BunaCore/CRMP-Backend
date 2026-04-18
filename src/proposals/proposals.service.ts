@@ -36,7 +36,7 @@ export class ProposalsService {
     private readonly usersService: UsersService,
     private readonly workflowService: WorkflowService,
     private readonly mailService: MailService,
-  ) { }
+  ) {}
   async create(
     user: AuthenticatedUser,
     dto: CreateProposalDto,
@@ -120,13 +120,13 @@ export class ProposalsService {
       const allMembers =
         supervisorMember !== null
           ? ([...dto.members, supervisorMember] as Array<{
-            userId: string;
-            role: string;
-          }>)
+              userId: string;
+              role: string;
+            }>)
           : (dto.members as unknown as Array<{
-            userId: string;
-            role: string;
-          }>);
+              userId: string;
+              role: string;
+            }>);
       await this.repository.addProposalMembers(
         tx,
         created.id,
@@ -276,8 +276,6 @@ export class ProposalsService {
     // 1. Fetch all proposals with active pending approval steps
     const proposalsWithSteps =
       await this.approvalService.getProposalsWithActivePendingSteps();
-
-    console.log(proposalsWithSteps);
 
     if (proposalsWithSteps.length === 0) {
       return [];
@@ -563,10 +561,10 @@ export class ProposalsService {
           role: m.role,
           user: m.user
             ? {
-              id: m.user.id,
-              fullName: m.user.fullName ?? undefined,
-              email: m.user.email,
-            }
+                id: m.user.id,
+                fullName: m.user.fullName ?? undefined,
+                email: m.user.email,
+              }
             : undefined,
         })),
         usersMap,
@@ -711,20 +709,21 @@ export class ProposalsService {
    */
   async getEvaluationOverview(proposalId: string) {
     const rubrics = await this.repository.getEvaluationRubrics();
-    const scores = await this.repository.getEvaluationScoresByProposal(proposalId);
+    const scores =
+      await this.repository.getEvaluationScoresByProposal(proposalId);
 
     // Group awarded scores by rubric for frontend mapping
     return {
       proposalId,
-      rubrics: rubrics.map(rubric => ({
+      rubrics: rubrics.map((rubric) => ({
         id: rubric.id,
         name: rubric.name,
         phase: rubric.phase,
         type: rubric.type,
         maxPoints: parseFloat(rubric.maxPoints as string),
         awardedScores: scores
-          .filter(s => s.rubricId === rubric.id)
-          .map(s => ({
+          .filter((s) => s.rubricId === rubric.id)
+          .map((s) => ({
             id: s.id,
             studentId: s.studentId,
             evaluatorId: s.evaluatorId,
@@ -732,15 +731,19 @@ export class ProposalsService {
             feedback: s.feedback,
             projectId: s.projectId,
             updatedAt: s.updatedAt,
-          }))
-      }))
+          })),
+      })),
     };
   }
 
   /**
    * Submit evaluation score
    */
-  async submitEvaluationScore(proposalId: string, evaluatorId: string, dto: SubmitEvaluationScoresDto) {
+  async submitEvaluationScore(
+    proposalId: string,
+    evaluatorId: string,
+    dto: SubmitEvaluationScoresDto,
+  ) {
     // 1. Verify existence of proposal
     const proposal = await this.repository.findById(proposalId);
     if (!proposal) {
@@ -755,7 +758,9 @@ export class ProposalsService {
     }
 
     // 2. Validate all studentIds are real user IDs (not the proposalId)
-    const uniqueStudentIds = Array.from(new Set(dto.scores.map((s) => s.studentId)));
+    const uniqueStudentIds = Array.from(
+      new Set(dto.scores.map((s) => s.studentId)),
+    );
 
     for (const sid of uniqueStudentIds) {
       if (sid === proposalId) {
@@ -765,15 +770,20 @@ export class ProposalsService {
       }
     }
 
-    const foundUserIds = await this.repository.validateUsersExist(uniqueStudentIds);
-    const missingIds = uniqueStudentIds.filter((id) => !foundUserIds.includes(id));
+    const foundUserIds =
+      await this.repository.validateUsersExist(uniqueStudentIds);
+    const missingIds = uniqueStudentIds.filter(
+      (id) => !foundUserIds.includes(id),
+    );
     if (missingIds.length > 0) {
       throw new BadRequestException(
         `Invalid studentId(s): not found in the system: ${missingIds.join(', ')}`,
       );
     }
 
-    console.debug(`Upserting ${dto.scores.length} scores for proposal ${proposalId}`);
+    console.debug(
+      `Upserting ${dto.scores.length} scores for proposal ${proposalId}`,
+    );
 
     // 3. Upsert all scores — one row per (rubricId, proposalId, studentId)
     // ON CONFLICT → update score, feedback, evaluatorId, updatedAt
@@ -790,7 +800,9 @@ export class ProposalsService {
         }),
       ),
     );
-    return { message: `${results.length} evaluation scores saved successfully` };
+    return {
+      message: `${results.length} evaluation scores saved successfully`,
+    };
   }
 
   // Placeholder for defence scheduling - not implemented yet

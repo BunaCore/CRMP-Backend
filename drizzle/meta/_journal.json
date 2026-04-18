@@ -5,36 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1775510788659,
-      "tag": "0000_demonic_sleeper",
+      "when": 1776407201730,
+      "tag": "0000_wakeful_nick_fury",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1775550222220,
-      "tag": "0001_colorful_power_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1776157456663,
-      "tag": "0002_round_ezekiel_stane",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1776157685687,
-      "tag": "0003_common_carnage",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1776167701825,
-      "tag": "0004_early_lake",
+      "when": 1776407526148,
+      "tag": "0001_eager_wrecker",
       "breakpoints": true
     }
   ]

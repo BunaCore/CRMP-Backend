@@ -15,6 +15,9 @@ import { MailModule } from './mail/mail.module';
 import { DocumentsModule } from './documents/documents.module';
 import { ProjectsModule } from './projects/projects.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
+import { RealtimeModule } from './realtime/realtime.module';
+import { ChatModule } from './chat/chat.module';
+import { QueuesModule } from './queues/queues.module';
 
 @Module({
   imports: [
@@ -34,6 +37,9 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     DocumentsModule,
     ProjectsModule,
     WorkspacesModule,
+    ChatModule,
+    RealtimeModule,
+    QueuesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
