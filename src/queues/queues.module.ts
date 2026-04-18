@@ -21,10 +21,7 @@ import { MailModule } from 'src/mail/mail.module';
         console.log('REDIS_URL:', url);
 
         return {
-          redis: {
-            url,
-            ...(url?.startsWith('rediss://') ? { tls: {} } : {}),
-          },
+          redis: url,
         };
       },
     }),
