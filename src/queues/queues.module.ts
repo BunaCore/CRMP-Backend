@@ -18,7 +18,6 @@ import { MailModule } from 'src/mail/mail.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
         const url = configService.get<string>('REDIS_URL');
-        console.log('REDIS_URL:', url);
 
         return {
           redis: url,

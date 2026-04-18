@@ -58,7 +58,6 @@ export class RealtimeGateway
    */
   handleConnection(client: Socket) {
     const token = client.handshake.headers['authorization'];
-    console.log(client.handshake);
 
     if (!token) {
       this.logger.warn(`[${client.id}] Connection rejected: no token provided`);
