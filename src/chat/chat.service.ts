@@ -185,4 +185,33 @@ export class ChatService {
       throw new ForbiddenException('You are not a member of this chat');
     }
   }
+
+  /**
+   * Get all chat IDs for a user (used for auto-join on connection)
+   * Returns only IDs, not full chat objects (efficient)
+   */
+  async getUserChatIds(userId: string): Promise<string[]> {
+    return this.chatRepository.getChatIdsByUserId(userId);
+  }
+
+  /**
+   * Mark a chat as read
+   * Updates lastReadAt timestamp in chat_members
+   */
+  async markChatAsRead(chatId: string, userId: string): Promise<void> {
+    // Validate chat exists
+    const chat = await this.chatRepository.findChatById(chatId);
+    if (!chat) {
+      throw new NotFoundException(`Chat ${chatId} not found`);
+    }
+
+    // Validate user is member
+    const isMember = await this.chatRepository.isChatMember(chatId, userId);
+    if (!isMember) {
+      throw new ForbiddenException('You are not a member of this chat');
+    }
+
+    // Mark as read
+    await this.chatRepository.markChatAsRead(chatId, userId);
+  }
 }

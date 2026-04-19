@@ -195,4 +195,32 @@ export class ChatRepository {
 
     return null;
   }
+
+  /**
+   * Get all chat IDs for a user (efficient - only IDs, no full chat objects)
+   * Ordered by most recent message or join date
+   */
+  async getChatIdsByUserId(userId: string): Promise<string[]> {
+    const rows = await this.drizzle.db
+      .select({ chatId: chatMembers.chatId })
+      .from(chatMembers)
+      .where(eq(chatMembers.userId, userId))
+      .orderBy(desc(chatMembers.joinedAt));
+
+    return rows.map((r) => r.chatId);
+  }
+
+  /**
+   * Mark a chat as read by updating lastReadAt timestamp
+   */
+  async markChatAsRead(chatId: string, userId: string): Promise<void> {
+    await this.drizzle.db
+      .update(chatMembers)
+      .set({
+        lastReadAt: new Date(),
+      })
+      .where(
+        and(eq(chatMembers.chatId, chatId), eq(chatMembers.userId, userId)),
+      );
+  }
 }

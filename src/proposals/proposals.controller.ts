@@ -350,7 +350,7 @@ export class ProposalsController {
    * Replaces existing advisor if one exists
    * Requires PROPOSAL_MANAGE_MEMBERS permission
    */
-  @Post(':id/advisor/assign')
+  @Post(':id/advisor-assign')
   @RequirePermission(Permission.PROPOSAL_MANAGE_MEMBERS)
   async assignAdvisor(
     @Param('id', new ParseUUIDPipe()) proposalId: string,
@@ -366,7 +366,7 @@ export class ProposalsController {
    * Adds to existing evaluators (multiple allowed)
    * Requires PROPOSAL_MANAGE_MEMBERS permission
    */
-  @Post(':id/evaluators/assign')
+  @Post(':id/evaluator-assign')
   @RequirePermission(Permission.PROPOSAL_MANAGE_MEMBERS)
   async assignEvaluators(
     @Param('id', new ParseUUIDPipe()) proposalId: string,

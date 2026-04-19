@@ -12,6 +12,11 @@ import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { ChatService } from 'src/chat/chat.service';
+import {
+  PresenceUpdateEvent,
+  PresenceSyncEvent,
+  type MarkChatAsReadEvent,
+} from 'src/chat/types/presence.types';
 
 /**
  * JWT payload structure from AuthService
@@ -45,6 +50,7 @@ export class RealtimeGateway
   server: Server;
 
   private readonly logger = new Logger(RealtimeGateway.name);
+  private readonly activeUsers = new Map<string, Set<string>>(); // userId -> Set of socketIds
 
   constructor(
     private jwtService: JwtService,
@@ -56,7 +62,7 @@ export class RealtimeGateway
    * Handle client connection
    * Verify JWT token from handshake auth
    */
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
     const token = client.handshake.headers['authorization'];
 
     if (!token) {
@@ -70,6 +76,20 @@ export class RealtimeGateway
         secret: this.configService.get<string>('JWT_SECRET'),
       }) as JwtPayload;
 
+      const userId = payload.sub;
+      // 1. Track the socket
+      if (!this.activeUsers.has(userId)) {
+        this.activeUsers.set(userId, new Set());
+        // 2. FIRST TIME: This is the user's first tab. Broadcast they are ONLINE.
+        const presenceUpdate: PresenceUpdateEvent = {
+          userId,
+          status: 'online',
+          timestamp: new Date(),
+        };
+        this.server.emit('presence:update', presenceUpdate);
+      }
+
+      this.activeUsers.get(userId)!.add(client.id);
       // Attach user data to socket
       const socketData: SocketData = {
         userId: payload.sub,
@@ -80,6 +100,28 @@ export class RealtimeGateway
       this.logger.log(
         `[${client.id}] User ${payload.sub} (role: ${payload.role}) connected`,
       );
+
+      // Auto-join user to all their chat rooms
+      try {
+        const chatIds = await this.chatService.getUserChatIds(userId);
+        for (const chatId of chatIds) {
+          client.join(`chat:${chatId}`);
+        }
+        this.logger.debug(
+          `[${client.id}] User ${userId} auto-joined ${chatIds.length} chat rooms`,
+        );
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(
+          `[${client.id}] Failed to auto-join chats: ${errorMessage}`,
+        );
+      }
+
+      // Send presence sync - list of currently online users
+      const onlineUserIds = Array.from(this.activeUsers.keys());
+      const presenceSync: PresenceSyncEvent = { onlineUserIds };
+      client.emit('presence:sync', presenceSync);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
@@ -95,6 +137,20 @@ export class RealtimeGateway
    */
   handleDisconnect(client: Socket) {
     const userId = (client.data as SocketData)?.userId;
+    const userSockets = this.activeUsers.get(userId);
+    if (userSockets) {
+      userSockets.delete(client.id);
+      if (userSockets.size === 0) {
+        this.activeUsers.delete(userId);
+        // User has no more active connections, broadcast they are OFFLINE
+        const presenceUpdate: PresenceUpdateEvent = {
+          userId,
+          status: 'offline',
+          timestamp: new Date(),
+        };
+        this.server.emit('presence:update', presenceUpdate);
+      }
+    }
     this.logger.log(`[${client.id}] User ${userId || 'unknown'} disconnected`);
   }
 
@@ -120,13 +176,10 @@ export class RealtimeGateway
 
     try {
       // Validate membership and get history
-      const messages = await this.chatService.joinChat(chatId, userId);
+      await this.chatService.joinChat(chatId, userId);
 
       // Join Socket.IO room
       client.join(`chat:${chatId}`);
-
-      // Send message history
-      client.emit('chat:history', messages);
 
       // Notify others in room
       client.to(`chat:${chatId}`).emit('chat:userJoined', {
@@ -244,6 +297,38 @@ export class RealtimeGateway
     });
 
     this.logger.log(`[${client.id}] User ${userId} left chat ${chatId}`);
+  }
+
+  /**
+   * Event: chat:markAsRead
+   * Mark a chat as read - updates lastReadAt timestamp
+   */
+  @SubscribeMessage('chat:markAsRead')
+  async onMarkAsRead(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: MarkChatAsReadEvent,
+  ) {
+    const { userId } = client.data as SocketData;
+    const { chatId } = payload;
+
+    if (!chatId) {
+      client.emit('chat:error', { message: 'chatId is required' });
+      return;
+    }
+
+    try {
+      await this.chatService.markChatAsRead(chatId, userId);
+      this.logger.debug(
+        `[${client.id}] User ${userId} marked chat ${chatId} as read`,
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`[${client.id}] Mark as read failed: ${errorMessage}`);
+      client.emit('chat:error', {
+        message: errorMessage || 'Failed to mark chat as read',
+      });
+    }
   }
 
   // ========================= COLLAB EVENTS (for teammate) =========================
