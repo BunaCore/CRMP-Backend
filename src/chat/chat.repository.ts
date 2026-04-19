@@ -8,6 +8,10 @@ import {
   ChatMember,
   Message,
   MessageWithSender,
+  ChatWithMembers,
+  ChatMemberDetail,
+  CreateChatInput,
+  ChatWithLastMessage,
 } from './types/chat.types';
 
 @Injectable()
@@ -17,12 +21,7 @@ export class ChatRepository {
   /**
    * Create a new chat (group or DM)
    */
-  async createChat(data: {
-    type: 'group' | 'dm';
-    name?: string | null;
-    projectId?: string | null;
-    createdBy: string;
-  }): Promise<Chat> {
+  async createChat(data: CreateChatInput): Promise<Chat> {
     const [chat] = await this.drizzle.db
       .insert(chats)
       .values({
@@ -229,22 +228,9 @@ export class ChatRepository {
    * Returns flat structure optimized for REST API
    * For DMs, includes other member's basic info
    */
-  async findUserChatsWithLastMessage(userId: string): Promise<
-    Array<{
-      chatId: string;
-      chatType: 'group' | 'dm';
-      chatName: string | null;
-      lastReadAt: Date;
-      _lastMessageId: string | null;
-      _lastMessageContent: string | null;
-      _lastMessageCreatedAt: Date | null;
-      _lastMessageSenderId: string | null;
-      _lastMessageSenderName: string | null;
-      _unreadCount: number;
-      _otherUserId?: string | null; // For DMs only
-      _otherUserName?: string | null; // For DMs only
-    }>
-  > {
+  async findUserChatsWithLastMessage(
+    userId: string,
+  ): Promise<ChatWithLastMessage[]> {
     // Get user's chats with lastReadAt
     const userChats = await this.drizzle.db
       .select({
@@ -374,5 +360,39 @@ export class ChatRepository {
       senderId: row.senderId,
       senderName: row.senderName || 'Unknown',
     }));
+  }
+
+  /**
+   * Find a chat with all its members
+   * Useful for GET /chats/:id endpoint
+   */
+  async findChatWithMembers(chatId: string): Promise<ChatWithMembers | null> {
+    const chat = await this.findChatById(chatId);
+    if (!chat) {
+      return null;
+    }
+
+    // Get all members with user details
+    const memberRows = await this.drizzle.db
+      .select({
+        id: chatMembers.userId,
+        fullName: users.fullName,
+        email: users.email,
+      })
+      .from(chatMembers)
+      .leftJoin(users, eq(chatMembers.userId, users.id))
+      .where(eq(chatMembers.chatId, chatId));
+
+    return {
+      id: chat.id,
+      type: chat.type,
+      name: chat.name,
+      createdAt: chat.createdAt || new Date(),
+      members: memberRows.map((row) => ({
+        id: row.id,
+        fullName: row.fullName || 'Unknown',
+        email: row.email || 'unknown@example.com',
+      })),
+    };
   }
 }

@@ -40,3 +40,51 @@ export interface MessageWithSender extends Message {
   senderName?: string;
   senderEmail?: string;
 }
+
+/**
+ * Chat member detail for API responses
+ */
+export interface ChatMemberDetail {
+  id: string;
+  fullName: string;
+  email: string;
+}
+
+/**
+ * Chat with all members (for detail endpoints)
+ */
+export interface ChatWithMembers {
+  id: string;
+  type: 'group' | 'dm';
+  name: string | null;
+  createdAt: Date | null;
+  members: ChatMemberDetail[];
+}
+
+/**
+ * Input for creating a chat
+ */
+export interface CreateChatInput {
+  type: 'group' | 'dm';
+  name?: string | null;
+  projectId?: string | null;
+  createdBy: string;
+}
+
+/**
+ * Chat with last message (for sidebar queries)
+ */
+export interface ChatWithLastMessage {
+  chatId: string;
+  chatType: 'group' | 'dm';
+  chatName: string | null;
+  lastReadAt: Date;
+  _lastMessageId: string | null;
+  _lastMessageContent: string | null;
+  _lastMessageCreatedAt: Date | null;
+  _lastMessageSenderId: string | null;
+  _lastMessageSenderName: string | null;
+  _unreadCount: number;
+  _otherUserId?: string | null; // For DMs only
+  _otherUserName?: string | null; // For DMs only
+}
