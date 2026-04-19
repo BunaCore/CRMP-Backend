@@ -6,6 +6,12 @@ import {
 } from '@nestjs/common';
 import { ChatRepository } from './chat.repository';
 import { Chat, Message, MessageWithSender } from './types/chat.types';
+import { ChatSidebarItemDto, LastMessageDto } from './dto/chat-sidebar.dto';
+import {
+  ChatMessagesPageDto,
+  MessageDto,
+  SenderDto,
+} from './dto/chat-messages.dto';
 
 @Injectable()
 export class ChatService {
@@ -213,5 +219,115 @@ export class ChatService {
 
     // Mark as read
     await this.chatRepository.markChatAsRead(chatId, userId);
+  }
+
+  /**
+   * Get user's chats for sidebar with unread counts and last message
+   * Maps repository result to ChatSidebarItemDto[]
+   * Handles DM displayName + group displayName differently
+   */
+  async getUserChatsForSidebar(userId: string): Promise<ChatSidebarItemDto[]> {
+    const chats =
+      await this.chatRepository.findUserChatsWithLastMessage(userId);
+
+    return chats.map((chat) => {
+      const item: ChatSidebarItemDto = {
+        id: chat.chatId,
+        type: chat.chatType,
+        displayName: this.resolveDisplayName(
+          chat.chatType,
+          chat.chatName,
+          chat._otherUserName || null,
+        ),
+        displayImage: null, // TODO: add avatar support
+        unreadCount: chat._unreadCount,
+      };
+
+      // Add last message if exists
+      if (chat._lastMessageId) {
+        item.lastMessage = {
+          id: chat._lastMessageId,
+          content: chat._lastMessageContent || '',
+          createdAt: chat._lastMessageCreatedAt || new Date(),
+          senderName: chat._lastMessageSenderName || 'Unknown',
+        };
+      }
+
+      return item;
+    });
+  }
+
+  /**
+   * Get paginated messages for a chat
+   * Validates membership before returning
+   * Returns messages oldest-first with cursor for next page
+   */
+  async getChatMessagesPage(
+    chatId: string,
+    userId: string,
+    cursor?: string,
+    limit: number = 20,
+  ): Promise<ChatMessagesPageDto> {
+    // Validate chat exists
+    const chat = await this.chatRepository.findChatById(chatId);
+    if (!chat) {
+      throw new NotFoundException(`Chat ${chatId} not found`);
+    }
+
+    // Validate user is member
+    const isMember = await this.chatRepository.isChatMember(chatId, userId);
+    if (!isMember) {
+      throw new ForbiddenException('You are not a member of this chat');
+    }
+
+    // Fetch messages (limit + 1 to check if more exist)
+    const rows = await this.chatRepository.findMessagesByChatIdCursor(
+      chatId,
+      cursor,
+      limit,
+    );
+
+    // Determine if there are more messages
+    // If we fetched more than limit, there are more pages
+    const hasMore = rows.length > limit;
+    const messages = rows.slice(0, limit);
+
+    // Calculate nextCursor (createdAt of last message)
+    const nextCursor =
+      hasMore && messages.length > 0
+        ? messages[messages.length - 1].createdAt?.toISOString()
+        : null;
+
+    // Map to MessageDto with sender
+    const messageDtos: MessageDto[] = messages.map((msg) => ({
+      id: msg.id,
+      content: msg.content,
+      createdAt: msg.createdAt,
+      sender: {
+        id: msg.senderId,
+        name: msg.senderName,
+      },
+    }));
+
+    return {
+      messages: messageDtos,
+      nextCursor,
+    };
+  }
+
+  /**
+   * Resolve display name based on chat type
+   * - DM: use other member's name
+   * - Group: use chat.name (project name or custom name)
+   */
+  private resolveDisplayName(
+    type: 'dm' | 'group',
+    chatName: string | null,
+    otherUserName: string | null,
+  ): string {
+    if (type === 'dm') {
+      return otherUserName || 'Unknown User';
+    }
+    return chatName || 'Unnamed Group';
   }
 }

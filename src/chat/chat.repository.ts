@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql, gt, or, isNull } from 'drizzle-orm';
 import { DrizzleService } from 'src/db/db.service';
 import { chats, chatMembers, messages } from 'src/db/schema/chat';
 import { users } from 'src/db/schema/user';
@@ -222,5 +222,157 @@ export class ChatRepository {
       .where(
         and(eq(chatMembers.chatId, chatId), eq(chatMembers.userId, userId)),
       );
+  }
+
+  /**
+   * Find all chats for a user with sidebar data (last message, unread count)
+   * Returns flat structure optimized for REST API
+   * For DMs, includes other member's basic info
+   */
+  async findUserChatsWithLastMessage(userId: string): Promise<
+    Array<{
+      chatId: string;
+      chatType: 'group' | 'dm';
+      chatName: string | null;
+      lastReadAt: Date;
+      _lastMessageId: string | null;
+      _lastMessageContent: string | null;
+      _lastMessageCreatedAt: Date | null;
+      _lastMessageSenderId: string | null;
+      _lastMessageSenderName: string | null;
+      _unreadCount: number;
+      _otherUserId?: string | null; // For DMs only
+      _otherUserName?: string | null; // For DMs only
+    }>
+  > {
+    // Get user's chats with lastReadAt
+    const userChats = await this.drizzle.db
+      .select({
+        chatId: chats.id,
+        chatType: chats.type,
+        chatName: chats.name,
+        lastReadAt: chatMembers.lastReadAt,
+      })
+      .from(chatMembers)
+      .innerJoin(chats, eq(chatMembers.chatId, chats.id))
+      .where(eq(chatMembers.userId, userId))
+      .orderBy(desc(chatMembers.joinedAt));
+
+    // Fetch last message and unread count for each chat
+    const result = [];
+    for (const chat of userChats) {
+      // Get last message with sender name
+      const [lastMsg] = await this.drizzle.db
+        .select({
+          id: messages.id,
+          content: messages.content,
+          createdAt: messages.createdAt,
+          senderId: messages.senderId,
+          senderName: users.fullName,
+        })
+        .from(messages)
+        .leftJoin(users, eq(messages.senderId, users.id))
+        .where(eq(messages.chatId, chat.chatId))
+        .orderBy(desc(messages.createdAt))
+        .limit(1);
+
+      const whereClause = chat.lastReadAt
+        ? and(
+            eq(messages.chatId, chat.chatId),
+            gt(messages.createdAt, chat.lastReadAt),
+          )
+        : eq(messages.chatId, chat.chatId);
+      // Count unread messages (created after lastReadAt)
+      const unreadRows = await this.drizzle.db
+        .select({ count: sql<number>`count(*)` })
+        .from(messages)
+        .where(whereClause);
+      const unreadCount = unreadRows[0] ? Number(unreadRows[0].count || 0) : 0;
+
+      const row: any = {
+        chatId: chat.chatId,
+        chatType: chat.chatType,
+        chatName: chat.chatName,
+        lastReadAt: chat.lastReadAt,
+        _lastMessageId: lastMsg?.id || null,
+        _lastMessageContent: lastMsg?.content || null,
+        _lastMessageCreatedAt: lastMsg?.createdAt || null,
+        _lastMessageSenderId: lastMsg?.senderId || null,
+        _lastMessageSenderName: lastMsg?.senderName || null,
+        _unreadCount: unreadCount,
+      };
+
+      // For DMs, fetch the other member
+      if (chat.chatType === 'dm') {
+        const [otherMember] = await this.drizzle.db
+          .select({
+            userId: chatMembers.userId,
+            fullName: users.fullName,
+          })
+          .from(chatMembers)
+          .leftJoin(users, eq(chatMembers.userId, users.id))
+          .where(and(eq(chatMembers.chatId, chat.chatId)))
+          .then((rows) => rows.filter((r) => r.userId !== userId));
+
+        row._otherUserId = otherMember?.userId || null;
+        row._otherUserName = otherMember?.fullName || null;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Find messages in a chat with cursor-based pagination
+   * Cursor = message createdAt (ISO string)
+   * Returns messages ordered newest-first (reverse for display)
+   * Includes sender info
+   */
+  async findMessagesByChatIdCursor(
+    chatId: string,
+    cursor?: string,
+    limit: number = 20,
+  ): Promise<
+    Array<{
+      id: string;
+      content: string;
+      createdAt: Date | null;
+      senderId: string;
+      senderName: string;
+    }>
+  > {
+    const whereConditions = [eq(messages.chatId, chatId)];
+
+    // If cursor provided, fetch messages before that timestamp
+    if (cursor) {
+      const cursorDate = new Date(cursor);
+      whereConditions.push(sql`${messages.createdAt} < ${cursorDate}`);
+    }
+
+    const rows = await this.drizzle.db
+      .select({
+        id: messages.id,
+        content: messages.content,
+        createdAt: messages.createdAt,
+        senderId: messages.senderId,
+        senderName: users.fullName,
+      })
+      .from(messages)
+      .leftJoin(users, eq(messages.senderId, users.id))
+      .where(and(...whereConditions))
+      .orderBy(desc(messages.createdAt))
+      .limit(limit + 1); // Fetch one extra to determine if there are more
+
+    // Map results: slice to limit, return with nextCursor if more exist
+    const hasMore = rows.length > limit;
+    const paginatedRows = rows.slice(0, limit);
+
+    return paginatedRows.map((row) => ({
+      id: row.id,
+      content: row.content,
+      createdAt: row.createdAt,
+      senderId: row.senderId,
+      senderName: row.senderName || 'Unknown',
+    }));
   }
 }
