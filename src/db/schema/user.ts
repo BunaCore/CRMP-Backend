@@ -28,5 +28,6 @@ export const users = pgTable('users', {
   accountStatus: accountStatusEnum('account_status')
     .default('deactive')
     .notNull(),
+  avatarUrl: text('avatar_url'), // URL to user's avatar/profile picture
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });

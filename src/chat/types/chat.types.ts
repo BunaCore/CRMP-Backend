@@ -34,11 +34,20 @@ export interface Message {
 }
 
 /**
- * Extended message with sender info (for client responses)
+ * Sender info in messages (for client responses)
+ */
+export interface MessageSender {
+  id: string;
+  name: string;
+  avatar?: string | null;
+}
+
+/**
+ * Extended message with sender info (for REST and Socket responses)
+ * Used by both API endpoints and Socket.IO gates
  */
 export interface MessageWithSender extends Message {
-  senderName?: string;
-  senderEmail?: string;
+  sender: MessageSender;
 }
 
 /**
@@ -73,6 +82,7 @@ export interface CreateChatInput {
 
 /**
  * Chat with last message (for sidebar queries)
+ * View model optimized for REST response
  */
 export interface ChatWithLastMessage {
   chatId: string;
@@ -84,7 +94,9 @@ export interface ChatWithLastMessage {
   _lastMessageCreatedAt: Date | null;
   _lastMessageSenderId: string | null;
   _lastMessageSenderName: string | null;
+  _lastMessageSenderAvatar: string | null;
   _unreadCount: number;
   _otherUserId?: string | null; // For DMs only
   _otherUserName?: string | null; // For DMs only
+  _otherUserAvatar?: string | null; // For DMs only - used as displayImage
 }

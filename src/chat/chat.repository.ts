@@ -106,6 +106,48 @@ export class ChatRepository {
   }
 
   /**
+   * Create message and return with sender info in a single round trip
+   * Optimized for real-time messaging (hot path)
+   * Uses JOIN to avoid N+1 query
+   *
+   * Returns message with sender details for immediate broadcast
+   */
+  async createMessageWithSender(
+    chatId: string,
+    senderId: string,
+    content: string,
+  ): Promise<MessageWithSender> {
+    // Insert message and get all fields back
+    const [createdMessage] = await this.drizzle.db
+      .insert(messages)
+      .values({
+        chatId,
+        senderId,
+        content,
+      })
+      .returning();
+
+    // Single query to get sender info (name and avatar)
+    const [senderRow] = await this.drizzle.db
+      .select({
+        id: users.id,
+        fullName: users.fullName,
+        avatarUrl: users.avatarUrl,
+      })
+      .from(users)
+      .where(eq(users.id, senderId));
+
+    return {
+      ...createdMessage,
+      sender: {
+        id: senderRow?.id || senderId,
+        name: senderRow?.fullName || 'Unknown',
+        avatar: senderRow?.avatarUrl || null,
+      },
+    };
+  }
+
+  /**
    * Get last N messages for a chat, ordered newest first
    */
   async getMessages(chatId: string, take: number = 50): Promise<Message[]> {
@@ -118,7 +160,7 @@ export class ChatRepository {
   }
 
   /**
-   * Get messages with sender info (name, email)
+   * Get messages with sender info (name, avatar)
    */
   async getMessagesWithSender(
     chatId: string,
@@ -127,8 +169,9 @@ export class ChatRepository {
     const rows = await this.drizzle.db
       .select({
         message: messages,
+        senderId: users.id,
         senderName: users.fullName,
-        senderEmail: users.email,
+        senderAvatar: users.avatarUrl,
       })
       .from(messages)
       .leftJoin(users, eq(messages.senderId, users.id))
@@ -138,8 +181,11 @@ export class ChatRepository {
 
     return rows.map((row) => ({
       ...row.message,
-      senderName: row.senderName || 'Unknown',
-      senderEmail: row.senderEmail || 'unknown@example.com',
+      sender: {
+        id: row.senderId || row.message.senderId,
+        name: row.senderName || 'Unknown',
+        avatar: row.senderAvatar || null,
+      },
     }));
   }
 
@@ -225,8 +271,10 @@ export class ChatRepository {
 
   /**
    * Find all chats for a user with sidebar data (last message, unread count)
-   * Returns flat structure optimized for REST API
-   * For DMs, includes other member's basic info
+   * Returns flat structure optimized for REST API view model
+   * - Includes last message with full sender info (name, avatar)
+   * - For DMs, includes other member's avatar for displayImage
+   * - Sorted by last message creation date (descending) for proper sidebar ordering
    */
   async findUserChatsWithLastMessage(
     userId: string,
@@ -241,13 +289,12 @@ export class ChatRepository {
       })
       .from(chatMembers)
       .innerJoin(chats, eq(chatMembers.chatId, chats.id))
-      .where(eq(chatMembers.userId, userId))
-      .orderBy(desc(chatMembers.joinedAt));
+      .where(eq(chatMembers.userId, userId));
 
     // Fetch last message and unread count for each chat
-    const result = [];
+    const result: any = [];
     for (const chat of userChats) {
-      // Get last message with sender name
+      // Get last message with sender name and avatar
       const [lastMsg] = await this.drizzle.db
         .select({
           id: messages.id,
@@ -255,6 +302,7 @@ export class ChatRepository {
           createdAt: messages.createdAt,
           senderId: messages.senderId,
           senderName: users.fullName,
+          senderAvatar: users.avatarUrl,
         })
         .from(messages)
         .leftJoin(users, eq(messages.senderId, users.id))
@@ -268,6 +316,7 @@ export class ChatRepository {
             gt(messages.createdAt, chat.lastReadAt),
           )
         : eq(messages.chatId, chat.chatId);
+
       // Count unread messages (created after lastReadAt)
       const unreadRows = await this.drizzle.db
         .select({ count: sql<number>`count(*)` })
@@ -285,25 +334,42 @@ export class ChatRepository {
         _lastMessageCreatedAt: lastMsg?.createdAt || null,
         _lastMessageSenderId: lastMsg?.senderId || null,
         _lastMessageSenderName: lastMsg?.senderName || null,
+        _lastMessageSenderAvatar: lastMsg?.senderAvatar || null,
         _unreadCount: unreadCount,
       };
 
-      // For DMs, fetch the other member
+      // For DMs, fetch the other member with avatar
       if (chat.chatType === 'dm') {
-        const [otherMember] = await this.drizzle.db
+        const memberRows = await this.drizzle.db
           .select({
             userId: chatMembers.userId,
             fullName: users.fullName,
+            avatarUrl: users.avatarUrl,
           })
           .from(chatMembers)
           .leftJoin(users, eq(chatMembers.userId, users.id))
-          .where(and(eq(chatMembers.chatId, chat.chatId)))
-          .then((rows) => rows.filter((r) => r.userId !== userId));
+          .where(eq(chatMembers.chatId, chat.chatId));
 
+        const otherMember = memberRows.find((r) => r.userId !== userId);
         row._otherUserId = otherMember?.userId || null;
         row._otherUserName = otherMember?.fullName || null;
+        row._otherUserAvatar = otherMember?.avatarUrl || null;
       }
+
+      // Add row to result array
+      result.push(row);
     }
+
+    // Sort by last message creation date (DESC) so active chats bubble up
+    result.sort((a: any, b: any) => {
+      const aDate = a._lastMessageCreatedAt
+        ? new Date(a._lastMessageCreatedAt).getTime()
+        : 0;
+      const bDate = b._lastMessageCreatedAt
+        ? new Date(b._lastMessageCreatedAt).getTime()
+        : 0;
+      return bDate - aDate;
+    });
 
     return result;
   }
@@ -321,10 +387,12 @@ export class ChatRepository {
   ): Promise<
     Array<{
       id: string;
+      chatId: string;
       content: string;
       createdAt: Date | null;
       senderId: string;
       senderName: string;
+      senderAvatar: string | null;
     }>
   > {
     const whereConditions = [eq(messages.chatId, chatId)];
@@ -338,10 +406,12 @@ export class ChatRepository {
     const rows = await this.drizzle.db
       .select({
         id: messages.id,
+        chatId: messages.chatId,
         content: messages.content,
         createdAt: messages.createdAt,
         senderId: messages.senderId,
         senderName: users.fullName,
+        senderAvatar: users.avatarUrl,
       })
       .from(messages)
       .leftJoin(users, eq(messages.senderId, users.id))
@@ -355,10 +425,12 @@ export class ChatRepository {
 
     return paginatedRows.map((row) => ({
       id: row.id,
+      chatId: row.chatId,
       content: row.content,
       createdAt: row.createdAt,
       senderId: row.senderId,
       senderName: row.senderName || 'Unknown',
+      senderAvatar: row.senderAvatar || null,
     }));
   }
 

@@ -25,10 +25,29 @@ export interface AuthenticatedUser {
  *   getProfile(@CurrentUser() user: AuthenticatedUser) {
  *     return user;
  *   }
+ *
+ *   // Extract specific field
+ *   @Get('/profile')
+ *   getProfile(@CurrentUser('id') userId: string) {
+ *     return userId;
+ *   }
  */
 export const CurrentUser = createParamDecorator(
-  (data: unknown, ctx: ExecutionContext): AuthenticatedUser => {
+  (
+    data: string | undefined,
+    ctx: ExecutionContext,
+  ): AuthenticatedUser | string | string[] | undefined => {
     const request = ctx.switchToHttp().getRequest();
-    return request.user;
+    const user: AuthenticatedUser = request.user;
+
+    // If a specific field is requested, extract it
+    if (data && data in user) {
+      const value = user[data as keyof AuthenticatedUser];
+      // Return the value (could be string, string[], or undefined)
+      return value ?? '';
+    }
+
+    // Return full user object
+    return user;
   },
 );

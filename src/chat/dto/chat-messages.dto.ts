@@ -8,10 +8,12 @@ export class SenderDto {
 }
 
 /**
- * Single message with sender detailsCursor-based pagination
+ * Single message with sender details
+ * Used in REST API and Socket.IO messages
  */
 export class MessageDto {
   id: string;
+  chatId: string;
   content: string;
   createdAt: Date | null;
   sender: SenderDto;

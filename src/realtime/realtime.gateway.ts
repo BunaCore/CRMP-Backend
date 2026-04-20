@@ -202,31 +202,51 @@ export class RealtimeGateway
    * Event: chat:sendMessage
    * Send message to chat room
    * Validates user is member before sending
+   *
+   * Payload:
+   * {
+   *   chatId: string
+   *   content: string
+   *   tempId?: string (for optimistic UI reconciliation)
+   * }
+   *
+   * Broadcasts: chat:message to all users in room (including sender)
+   * On error: sends chat:error to sender only (with tempId for reconciliation)
    */
   @SubscribeMessage('chat:sendMessage')
   async onSendMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { chatId: string; content: string },
+    @MessageBody()
+    payload: {
+      chatId: string;
+      content: string;
+      tempId?: string;
+    },
   ) {
     const { userId } = client.data as SocketData;
-    const { chatId, content } = payload;
+    const { chatId, content, tempId } = payload;
 
+    // Validate required fields
     if (!chatId || !content) {
       client.emit('chat:error', {
+        tempId,
         message: 'chatId and content are required',
       });
       return;
     }
 
     try {
-      // Send message (validates membership internally)
+      // Send message with validation (membership, content length, etc)
+      // Returns message with sender info in single round trip
       const message = await this.chatService.sendMessage(
         chatId,
         userId,
         content,
+        tempId,
       );
 
       // Broadcast to all users in room (including sender)
+      // Message includes sender info so frontend doesn't need extra lookup
       this.server.to(`chat:${chatId}`).emit('chat:message', message);
 
       this.logger.debug(
@@ -235,8 +255,13 @@ export class RealtimeGateway
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
+
       this.logger.warn(`[${client.id}] Send message failed: ${errorMessage}`);
+
+      // Emit error to sender only (not to room)
+      // Include tempId for optimistic UI reconciliation
       client.emit('chat:error', {
+        tempId,
         message: errorMessage || 'Failed to send message',
       });
     }

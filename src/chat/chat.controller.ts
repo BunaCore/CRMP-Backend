@@ -53,7 +53,7 @@ export class ChatController {
   @Post()
   async createChat(
     @Body() dto: CreateChatDto,
-    @CurrentUser('sub') currentUserId: string,
+    @CurrentUser('id') currentUserId: string,
   ) {
     // Validate DM memberIds
     if (dto.type === 'dm' && dto.memberIds.length !== 1) {
@@ -81,7 +81,7 @@ export class ChatController {
    */
   @Get()
   async getSidebar(
-    @CurrentUser('sub') userId: string,
+    @CurrentUser('id') userId: string,
   ): Promise<ChatSidebarItemDto[]> {
     return this.chatService.getUserChatsForSidebar(userId);
   }
@@ -94,7 +94,7 @@ export class ChatController {
   @Get(':id')
   async getChat(
     @Param('id') chatId: string,
-    @CurrentUser('sub') userId: string,
+    @CurrentUser('id') userId: string,
   ): Promise<ChatDetailDto> {
     return this.chatService.getChatDetails(chatId, userId);
   }
@@ -102,6 +102,10 @@ export class ChatController {
   /**
    * POST /chats/:id/messages
    * Send a message to a chat
+   *
+   * Returns message with:
+   * - id, chatId, content, createdAt
+   * - sender: { id, name, avatar }
    *
    * Body:
    * {
@@ -112,7 +116,7 @@ export class ChatController {
   async sendMessage(
     @Param('id') chatId: string,
     @Body('content') content: string,
-    @CurrentUser('sub') userId: string,
+    @CurrentUser('id') userId: string,
   ) {
     if (
       !content ||
@@ -132,12 +136,13 @@ export class ChatController {
       content.trim(),
     );
 
+    // Return message with standardized sender shape (same as Socket.IO)
     return {
       id: message.id,
+      chatId: message.chatId,
       content: message.content,
       createdAt: message.createdAt,
-      senderId: message.senderId,
-      senderName: message.senderName,
+      sender: message.sender,
     };
   }
 
@@ -153,7 +158,7 @@ export class ChatController {
     @Param('id') chatId: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
-    @CurrentUser('sub') userId?: string,
+    @CurrentUser('id') userId?: string,
   ): Promise<ChatMessagesPageDto> {
     if (!userId) {
       throw new BadRequestException('User ID not found in token');
@@ -197,7 +202,7 @@ export class ChatController {
   async addMembers(
     @Param('id') chatId: string,
     @Body() dto: AddMembersDto,
-    @CurrentUser('sub') userId: string,
+    @CurrentUser('id') userId: string,
   ) {
     // Validate chat exists and is a group
     const chat = await this.chatService.findChatById(chatId);
@@ -237,7 +242,7 @@ export class ChatController {
   async removeMember(
     @Param('id') chatId: string,
     @Param('memberId') memberId: string,
-    @CurrentUser('sub') currentUserId: string,
+    @CurrentUser('id') currentUserId: string,
   ) {
     // Validate chat exists
     const chat = await this.chatService.findChatById(chatId);

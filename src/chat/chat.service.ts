@@ -185,6 +185,7 @@ export class ChatService {
     chatId: string,
     userId: string,
     content: string,
+    tempId?: string,
   ): Promise<MessageWithSender> {
     // Validate chat exists
     const chat = await this.chatRepository.findChatById(chatId);
@@ -207,18 +208,17 @@ export class ChatService {
       throw new BadRequestException('Message cannot exceed 5000 characters');
     }
 
-    // Create message
-    const message = await this.chatRepository.createMessage(
+    // Create message with sender info in single round trip
+    const messageWithSender = await this.chatRepository.createMessageWithSender(
       chatId,
       userId,
       content.trim(),
     );
 
-    // Fetch sender info for response
-    const [messageWithSender] = await this.chatRepository.getMessagesWithSender(
-      chatId,
-      1,
-    );
+    // Include tempId if provided (for optimistic UI reconciliation)
+    if (tempId) {
+      return { ...messageWithSender, tempId } as any;
+    }
 
     return messageWithSender;
   }
@@ -316,6 +316,12 @@ export class ChatService {
       await this.chatRepository.findUserChatsWithLastMessage(userId);
 
     return chats.map((chat) => {
+      // For DM: use other user's avatar; for group: use null (TODO: add group image support)
+      let displayImage: string | null = null;
+      if (chat.chatType === 'dm') {
+        displayImage = chat._otherUserAvatar || null;
+      }
+
       const item: ChatSidebarItemDto = {
         id: chat.chatId,
         type: chat.chatType,
@@ -324,17 +330,22 @@ export class ChatService {
           chat.chatName,
           chat._otherUserName || null,
         ),
-        displayImage: null, // TODO: add avatar support
+        displayImage,
         unreadCount: chat._unreadCount,
       };
 
-      // Add last message if exists
+      // Add last message if exists (with full sender info for consistency)
       if (chat._lastMessageId) {
         item.lastMessage = {
           id: chat._lastMessageId,
+          chatId: chat.chatId,
           content: chat._lastMessageContent || '',
           createdAt: chat._lastMessageCreatedAt || new Date(),
-          senderName: chat._lastMessageSenderName || 'Unknown',
+          sender: {
+            id: chat._lastMessageSenderId || '',
+            name: chat._lastMessageSenderName || 'Unknown',
+            avatar: chat._lastMessageSenderAvatar || null,
+          },
         };
       }
 
@@ -383,14 +394,16 @@ export class ChatService {
         ? messages[messages.length - 1].createdAt?.toISOString()
         : null;
 
-    // Map to MessageDto with sender
+    // Map to MessageDto with standardized sender shape
     const messageDtos: MessageDto[] = messages.map((msg) => ({
       id: msg.id,
+      chatId: msg.chatId,
       content: msg.content,
       createdAt: msg.createdAt,
       sender: {
         id: msg.senderId,
         name: msg.senderName,
+        avatar: msg.senderAvatar,
       },
     }));
 
