@@ -34,9 +34,70 @@ export interface Message {
 }
 
 /**
- * Extended message with sender info (for client responses)
+ * Sender info in messages (for client responses)
+ */
+export interface MessageSender {
+  id: string;
+  name: string;
+  avatar?: string | null;
+}
+
+/**
+ * Extended message with sender info (for REST and Socket responses)
+ * Used by both API endpoints and Socket.IO gates
  */
 export interface MessageWithSender extends Message {
-  senderName?: string;
-  senderEmail?: string;
+  sender: MessageSender;
+}
+
+/**
+ * Chat member detail for API responses
+ */
+export interface ChatMemberDetail {
+  id: string;
+  fullName: string;
+  email: string;
+}
+
+/**
+ * Chat with all members (for detail endpoints)
+ */
+export interface ChatWithMembers {
+  id: string;
+  type: 'group' | 'dm';
+  name: string | null;
+  createdAt: Date | null;
+  members: ChatMemberDetail[];
+}
+
+/**
+ * Input for creating a chat
+ */
+export interface CreateChatInput {
+  type: 'group' | 'dm';
+  name?: string | null;
+  projectId?: string | null;
+  createdBy: string;
+}
+
+/**
+ * Chat with last message (for sidebar queries)
+ * View model optimized for REST response
+ */
+export interface ChatWithLastMessage {
+  chatId: string;
+  chatType: 'group' | 'dm';
+  chatName: string | null;
+  lastReadAt: Date;
+  _lastMessageId: string | null;
+  _lastMessageContent: string | null;
+  _lastMessageCreatedAt: Date | null;
+  _lastMessageSenderId: string | null;
+  _lastMessageSenderName: string | null;
+  _lastMessageSenderAvatar: string | null;
+  _unreadCount: number;
+  _otherUserId?: string | null; // For DMs only - other participant
+  _otherUserName?: string | null; // For DMs only
+  _otherUserAvatar?: string | null; // For DMs only
+  _memberIds?: string[]; // For groups only - all member IDs for presence computation
 }

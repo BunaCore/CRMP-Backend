@@ -12,6 +12,12 @@ import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { ChatService } from 'src/chat/chat.service';
+import { UsersRepository } from 'src/users/users.repository';
+import {
+  PresenceUpdateEvent,
+  PresenceSyncEvent,
+  type MarkChatAsReadEvent,
+} from 'src/chat/types/presence.types';
 
 /**
  * JWT payload structure from AuthService
@@ -45,18 +51,20 @@ export class RealtimeGateway
   server: Server;
 
   private readonly logger = new Logger(RealtimeGateway.name);
+  private readonly activeUsers = new Map<string, Set<string>>(); // userId -> Set of socketIds
 
   constructor(
     private jwtService: JwtService,
     private configService: ConfigService,
     private chatService: ChatService,
+    private usersRepository: UsersRepository,
   ) {}
 
   /**
    * Handle client connection
-   * Verify JWT token from handshake auth
+   * Verify JWT token from handshake auth and check user exists in database
    */
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
     const token = client.handshake.headers['authorization'];
 
     if (!token) {
@@ -70,6 +78,34 @@ export class RealtimeGateway
         secret: this.configService.get<string>('JWT_SECRET'),
       }) as JwtPayload;
 
+      const userId = payload.sub;
+
+      // Verify user exists in database before allowing connection
+      const user = await this.usersRepository.findById(userId);
+      if (!user) {
+        this.logger.warn(
+          `[${client.id}] Connection rejected: user ${userId} not found in database`,
+        );
+        client.emit('auth:error', {
+          message: 'User does not exist',
+        });
+        client.disconnect(true);
+        return;
+      }
+
+      // 1. Track the socket
+      if (!this.activeUsers.has(userId)) {
+        this.activeUsers.set(userId, new Set());
+        // 2. FIRST TIME: This is the user's first tab. Broadcast they are ONLINE.
+        const presenceUpdate: PresenceUpdateEvent = {
+          userId,
+          status: 'online',
+          timestamp: new Date(),
+        };
+        this.server.emit('presence:update', presenceUpdate);
+      }
+
+      this.activeUsers.get(userId)!.add(client.id);
       // Attach user data to socket
       const socketData: SocketData = {
         userId: payload.sub,
@@ -80,6 +116,29 @@ export class RealtimeGateway
       this.logger.log(
         `[${client.id}] User ${payload.sub} (role: ${payload.role}) connected`,
       );
+
+      // Auto-join user to all their chat rooms
+      try {
+        const chatIds = await this.chatService.getUserChatIds(userId);
+        for (const chatId of chatIds) {
+          client.join(`chat:${chatId}`);
+        }
+        this.logger.debug(
+          `[${client.id}] User ${userId} auto-joined ${chatIds.length} chat rooms`,
+        );
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(
+          `[${client.id}] Failed to auto-join chats: ${errorMessage}`,
+        );
+      }
+
+      // Send presence sync - list of currently online users
+      const onlineUserIds = Array.from(this.activeUsers.keys());
+      const presenceSync: PresenceSyncEvent = { onlineUserIds };
+      this.logger.debug('Presence sync: ' + JSON.stringify(presenceSync));
+      client.emit('presence:sync', presenceSync);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
@@ -89,13 +148,38 @@ export class RealtimeGateway
       client.disconnect(true);
     }
   }
-
+  @SubscribeMessage('presence:getInitial')
+  handlePresenceSync(client: Socket) {
+    const onlineUserIds = Array.from(this.activeUsers.keys());
+    client.emit('presence:sync', { onlineUserIds });
+  }
   /**
    * Handle client disconnection
    */
   handleDisconnect(client: Socket) {
     const userId = (client.data as SocketData)?.userId;
-    this.logger.log(`[${client.id}] User ${userId || 'unknown'} disconnected`);
+
+    // Early return if userId is missing (unauthenticated connection)
+    if (!userId) {
+      this.logger.log(`[${client.id}] Unauthenticated connection disconnected`);
+      return;
+    }
+
+    const userSockets = this.activeUsers.get(userId);
+    if (userSockets) {
+      userSockets.delete(client.id);
+      if (userSockets.size === 0) {
+        this.activeUsers.delete(userId);
+        // User has no more active connections, broadcast they are OFFLINE
+        const presenceUpdate: PresenceUpdateEvent = {
+          userId,
+          status: 'offline',
+          timestamp: new Date(),
+        };
+        this.server.emit('presence:update', presenceUpdate);
+      }
+    }
+    this.logger.log(`[${client.id}] User ${userId} disconnected`);
   }
 
   // ========================= CHAT EVENTS =========================
@@ -120,13 +204,10 @@ export class RealtimeGateway
 
     try {
       // Validate membership and get history
-      const messages = await this.chatService.joinChat(chatId, userId);
+      await this.chatService.joinChat(chatId, userId);
 
       // Join Socket.IO room
       client.join(`chat:${chatId}`);
-
-      // Send message history
-      client.emit('chat:history', messages);
 
       // Notify others in room
       client.to(`chat:${chatId}`).emit('chat:userJoined', {
@@ -149,31 +230,51 @@ export class RealtimeGateway
    * Event: chat:sendMessage
    * Send message to chat room
    * Validates user is member before sending
+   *
+   * Payload:
+   * {
+   *   chatId: string
+   *   content: string
+   *   tempId?: string (for optimistic UI reconciliation)
+   * }
+   *
+   * Broadcasts: chat:message to all users in room (including sender)
+   * On error: sends chat:error to sender only (with tempId for reconciliation)
    */
   @SubscribeMessage('chat:sendMessage')
   async onSendMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { chatId: string; content: string },
+    @MessageBody()
+    payload: {
+      chatId: string;
+      content: string;
+      tempId?: string;
+    },
   ) {
     const { userId } = client.data as SocketData;
-    const { chatId, content } = payload;
+    const { chatId, content, tempId } = payload;
 
+    // Validate required fields
     if (!chatId || !content) {
       client.emit('chat:error', {
+        tempId,
         message: 'chatId and content are required',
       });
       return;
     }
 
     try {
-      // Send message (validates membership internally)
+      // Send message with validation (membership, content length, etc)
+      // Returns message with sender info in single round trip
       const message = await this.chatService.sendMessage(
         chatId,
         userId,
         content,
+        tempId,
       );
 
       // Broadcast to all users in room (including sender)
+      // Message includes sender info so frontend doesn't need extra lookup
       this.server.to(`chat:${chatId}`).emit('chat:message', message);
 
       this.logger.debug(
@@ -182,8 +283,13 @@ export class RealtimeGateway
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
+
       this.logger.warn(`[${client.id}] Send message failed: ${errorMessage}`);
+
+      // Emit error to sender only (not to room)
+      // Include tempId for optimistic UI reconciliation
       client.emit('chat:error', {
+        tempId,
         message: errorMessage || 'Failed to send message',
       });
     }
@@ -209,8 +315,8 @@ export class RealtimeGateway
     // Broadcast to others in room
     client.to(`chat:${chatId}`).emit('chat:typing', {
       userId,
+      chatId,
       isTyping,
-      timestamp: new Date(),
     });
 
     this.logger.debug(
@@ -244,6 +350,47 @@ export class RealtimeGateway
     });
 
     this.logger.log(`[${client.id}] User ${userId} left chat ${chatId}`);
+  }
+
+  /**
+   * Event: chat:markAsRead
+   * Mark a chat as read up to a specific message
+   * Frontend sends lastSeenMessageId to tie watermark to actual data
+   *
+   * Payload:
+   * {
+   *   chatId: string
+   *   lastSeenMessageId: string (ID of last message user read)
+   * }
+   */
+  @SubscribeMessage('chat:markAsRead')
+  async onMarkAsRead(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: MarkChatAsReadEvent,
+  ) {
+    const { userId } = client.data as SocketData;
+    const { chatId, lastSeenMessageId } = payload;
+
+    if (!chatId || !lastSeenMessageId) {
+      client.emit('chat:error', {
+        message: 'chatId and lastSeenMessageId are required',
+      });
+      return;
+    }
+
+    try {
+      await this.chatService.markChatAsRead(chatId, userId, lastSeenMessageId);
+      this.logger.debug(
+        `[${client.id}] User ${userId} marked chat ${chatId} as read up to message ${lastSeenMessageId}`,
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`[${client.id}] Mark as read failed: ${errorMessage}`);
+      client.emit('chat:error', {
+        message: errorMessage || 'Failed to mark chat as read',
+      });
+    }
   }
 
   // ========================= COLLAB EVENTS (for teammate) =========================

@@ -1,4 +1,5 @@
 import {
+  index,
   pgTable,
   uuid,
   text,
@@ -46,6 +47,7 @@ export const chatMembers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow(),
+    lastReadAt: timestamp('last_read_at', { withTimezone: true }).defaultNow(),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.chatId, t.userId] }),
@@ -55,14 +57,18 @@ export const chatMembers = pgTable(
 /**
  * Messages table: stores all chat messages
  */
-export const messages = pgTable('messages', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  chatId: uuid('chat_id')
-    .notNull()
-    .references(() => chats.id, { onDelete: 'cascade' }),
-  senderId: uuid('sender_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  content: text('content').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-});
+export const messages = pgTable(
+  'messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    chatId: uuid('chat_id')
+      .notNull()
+      .references(() => chats.id, { onDelete: 'cascade' }),
+    senderId: uuid('sender_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    content: text('content').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => [index('idx_created_at').on(t.createdAt)],
+);

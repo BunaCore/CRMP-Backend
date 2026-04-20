@@ -260,7 +260,7 @@ async function seed() {
       {
         proposalProgram: 'PG',
         stepOrder: 2,
-        approverRole: 'ADRPM',
+        approverRole: 'COLLEGE_OFFICE',
         stepLabel: 'ADRPM Approval',
         stepType: 'APPROVAL',
       },
