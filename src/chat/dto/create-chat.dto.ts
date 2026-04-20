@@ -6,6 +6,7 @@ import {
   ArrayMaxSize,
   IsOptional,
   ValidateIf,
+  IsUUID,
 } from 'class-validator';
 
 /**
@@ -23,7 +24,7 @@ export class CreateChatDto {
    * Current user is added implicitly
    */
   @IsArray()
-  @IsString({ each: true })
+  @IsUUID('4', { each: true })
   @ArrayMinSize(1, {
     message: 'Must provide at least 1 member',
   })

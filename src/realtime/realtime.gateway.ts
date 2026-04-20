@@ -137,7 +137,7 @@ export class RealtimeGateway
       // Send presence sync - list of currently online users
       const onlineUserIds = Array.from(this.activeUsers.keys());
       const presenceSync: PresenceSyncEvent = { onlineUserIds };
-      console.log('presence syncing', presenceSync);
+      this.logger.debug('Presence sync: ' + JSON.stringify(presenceSync));
       client.emit('presence:sync', presenceSync);
     } catch (error) {
       const errorMessage =
@@ -158,6 +158,13 @@ export class RealtimeGateway
    */
   handleDisconnect(client: Socket) {
     const userId = (client.data as SocketData)?.userId;
+
+    // Early return if userId is missing (unauthenticated connection)
+    if (!userId) {
+      this.logger.log(`[${client.id}] Unauthenticated connection disconnected`);
+      return;
+    }
+
     const userSockets = this.activeUsers.get(userId);
     if (userSockets) {
       userSockets.delete(client.id);
@@ -172,7 +179,7 @@ export class RealtimeGateway
         this.server.emit('presence:update', presenceUpdate);
       }
     }
-    this.logger.log(`[${client.id}] User ${userId || 'unknown'} disconnected`);
+    this.logger.log(`[${client.id}] User ${userId} disconnected`);
   }
 
   // ========================= CHAT EVENTS =========================

@@ -345,7 +345,7 @@ export class ProposalsController {
   }
 
   /**
-   * POST /proposals/:id/advisor/assign
+   * POST /proposals/:id/advisor-assign
    * Assign a single advisor to a proposal
    * Replaces existing advisor if one exists
    * Requires PROPOSAL_MANAGE_MEMBERS permission
@@ -361,7 +361,7 @@ export class ProposalsController {
   }
 
   /**
-   * POST /proposals/:id/evaluators/assign
+   * POST /proposals/:id/evaluator-assign
    * Assign evaluators to a proposal
    * Adds to existing evaluators (multiple allowed)
    * Requires PROPOSAL_MANAGE_MEMBERS permission

@@ -170,11 +170,10 @@ export class ChatController {
       throw new BadRequestException('Limit must be a number between 1 and 100');
     }
 
-    // Validate cursor if provided
+    // Validate cursor if provided (must be a valid ISO 8601 timestamp)
     if (cursor) {
-      try {
-        new Date(cursor);
-      } catch {
+      const parsedCursorDate = new Date(cursor);
+      if (isNaN(parsedCursorDate.getTime())) {
         throw new BadRequestException('Cursor must be a valid ISO timestamp');
       }
     }

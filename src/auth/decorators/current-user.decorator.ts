@@ -43,8 +43,9 @@ export const CurrentUser = createParamDecorator(
     // If a specific field is requested, extract it
     if (data && data in user) {
       const value = user[data as keyof AuthenticatedUser];
-      // Return the value (could be string, string[], or undefined)
-      return value ?? '';
+      // Return the value as-is (could be string, string[], or undefined)
+      // Let callers and DTO validation handle missing fields
+      return value;
     }
 
     // Return full user object

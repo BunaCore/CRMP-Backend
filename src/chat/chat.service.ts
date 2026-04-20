@@ -217,7 +217,10 @@ export class ChatService {
 
     // Include tempId if provided (for optimistic UI reconciliation)
     if (tempId) {
-      return { ...messageWithSender, tempId } as any;
+      return {
+        ...messageWithSender,
+        tempId,
+      } as MessageWithSender & { tempId?: string };
     }
 
     return messageWithSender;
@@ -418,12 +421,11 @@ export class ChatService {
       limit,
     );
 
-    // Determine if there are more messages
-    // If we fetched more than limit, there are more pages
+    // Determine if there are more messages (repository returns limit+1 rows)
     const hasMore = rows.length > limit;
     const messages = rows.slice(0, limit);
 
-    // Calculate nextCursor (createdAt of last message)
+    // Calculate nextCursor using the actual last message in the limit set
     const nextCursor =
       hasMore && messages.length > 0
         ? messages[messages.length - 1].createdAt?.toISOString()

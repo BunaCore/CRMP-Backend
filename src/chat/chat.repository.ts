@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { eq, and, desc, sql, gt, or, isNull } from 'drizzle-orm';
+import { eq, and, desc, sql, gt, lt, or, isNull } from 'drizzle-orm';
 import { DrizzleService } from 'src/db/db.service';
 import { chats, chatMembers, messages } from 'src/db/schema/chat';
 import { users } from 'src/db/schema/user';
@@ -150,7 +150,7 @@ export class ChatRepository {
       })
       .returning();
 
-    // Single query to get sender info (name and avatar)
+    // Fetch the sender's display details
     const [senderRow] = await this.drizzle.db
       .select({
         id: users.id,
@@ -311,7 +311,7 @@ export class ChatRepository {
   async findUserChatsWithLastMessage(
     userId: string,
   ): Promise<ChatWithLastMessage[]> {
-    // Get user's chats with lastReadAt
+    // Fetch all chats for user (single pass)
     const userChats = await this.drizzle.db
       .select({
         chatId: chats.id,
@@ -323,45 +323,104 @@ export class ChatRepository {
       .innerJoin(chats, eq(chatMembers.chatId, chats.id))
       .where(eq(chatMembers.userId, userId));
 
-    // Fetch last message and unread count for each chat
+    if (userChats.length === 0) {
+      return [];
+    }
+
+    const chatIds = userChats.map((c) => c.chatId);
+
+    // Fetch all members for all chats in one query
+    const allMemberRows = await this.drizzle.db
+      .select({
+        chatId: chatMembers.chatId,
+        userId: chatMembers.userId,
+        fullName: users.fullName,
+        avatarUrl: users.avatarUrl,
+      })
+      .from(chatMembers)
+      .leftJoin(users, eq(chatMembers.userId, users.id))
+      .where(
+        chatIds.length === 1
+          ? eq(chatMembers.chatId, chatIds[0])
+          : or(...chatIds.map((id) => eq(chatMembers.chatId, id))),
+      );
+
+    // Group members by chatId
+    const membersByChatId = new Map<string, typeof allMemberRows>();
+    for (const memberRow of allMemberRows) {
+      const rows = membersByChatId.get(memberRow.chatId) || [];
+      rows.push(memberRow);
+      membersByChatId.set(memberRow.chatId, rows);
+    }
+
+    // Fetch all messages (with last message per chat) and unread counts
+    // Using a window function approach within a single query
+    const messageData = await this.drizzle.db
+      .select({
+        chatId: messages.chatId,
+        messageId: messages.id,
+        content: messages.content,
+        createdAt: messages.createdAt,
+        senderId: messages.senderId,
+        senderName: users.fullName,
+        senderAvatar: users.avatarUrl,
+      })
+      .from(messages)
+      .leftJoin(users, eq(messages.senderId, users.id))
+      .where(
+        chatIds.length === 1
+          ? eq(messages.chatId, chatIds[0])
+          : or(...chatIds.map((id) => eq(messages.chatId, id))),
+      );
+
+    // Group messages by chatId and find last message for each chat
+    const lastMessageByChat = new Map<string, (typeof messageData)[0] | null>();
+    const messageCountByChat = new Map<string, number>();
+
+    for (const msg of messageData) {
+      // Track last message (first one is latest due to ordering)
+      if (!lastMessageByChat.has(msg.chatId)) {
+        lastMessageByChat.set(msg.chatId, msg);
+      }
+      // Track total message count
+      messageCountByChat.set(
+        msg.chatId,
+        (messageCountByChat.get(msg.chatId) || 0) + 1,
+      );
+    }
+
+    // Fetch unread counts (messages created after lastReadAt)
+    const unreadData = await this.drizzle.db
+      .select({
+        chatId: messages.chatId,
+        unreadCount: sql<number>`count(*)::int`,
+      })
+      .from(messages)
+      .where(
+        chatIds.length === 1
+          ? eq(messages.chatId, chatIds[0])
+          : or(...chatIds.map((id) => eq(messages.chatId, id))),
+      )
+      .groupBy(messages.chatId);
+
+    const unreadCountByChat = new Map<string, number>();
+    for (const { chatId, unreadCount } of unreadData) {
+      unreadCountByChat.set(chatId, unreadCount || 0);
+    }
+
+    // Build result array
     const result: any = [];
     for (const chat of userChats) {
-      // Get last message with sender name and avatar
-      const [lastMsg] = await this.drizzle.db
-        .select({
-          id: messages.id,
-          content: messages.content,
-          createdAt: messages.createdAt,
-          senderId: messages.senderId,
-          senderName: users.fullName,
-          senderAvatar: users.avatarUrl,
-        })
-        .from(messages)
-        .leftJoin(users, eq(messages.senderId, users.id))
-        .where(eq(messages.chatId, chat.chatId))
-        .orderBy(desc(messages.createdAt))
-        .limit(1);
-
-      const whereClause = chat.lastReadAt
-        ? and(
-            eq(messages.chatId, chat.chatId),
-            gt(messages.createdAt, chat.lastReadAt),
-          )
-        : eq(messages.chatId, chat.chatId);
-
-      // Count unread messages (created after lastReadAt)
-      const unreadRows = await this.drizzle.db
-        .select({ count: sql<number>`count(*)` })
-        .from(messages)
-        .where(whereClause);
-      const unreadCount = unreadRows[0] ? Number(unreadRows[0].count || 0) : 0;
+      const lastMsg = lastMessageByChat.get(chat.chatId);
+      const unreadCount = unreadCountByChat.get(chat.chatId) || 0;
+      const memberRows = membersByChatId.get(chat.chatId) || [];
 
       const row: any = {
         chatId: chat.chatId,
         chatType: chat.chatType,
         chatName: chat.chatName,
         lastReadAt: chat.lastReadAt,
-        _lastMessageId: lastMsg?.id || null,
+        _lastMessageId: lastMsg?.messageId || null,
         _lastMessageContent: lastMsg?.content || null,
         _lastMessageCreatedAt: lastMsg?.createdAt || null,
         _lastMessageSenderId: lastMsg?.senderId || null,
@@ -370,35 +429,17 @@ export class ChatRepository {
         _unreadCount: unreadCount,
       };
 
-      // For DMs, fetch the other member with avatar
+      // For DMs, set the other member
       if (chat.chatType === 'dm') {
-        const memberRows = await this.drizzle.db
-          .select({
-            userId: chatMembers.userId,
-            fullName: users.fullName,
-            avatarUrl: users.avatarUrl,
-          })
-          .from(chatMembers)
-          .leftJoin(users, eq(chatMembers.userId, users.id))
-          .where(eq(chatMembers.chatId, chat.chatId));
-
         const otherMember = memberRows.find((r) => r.userId !== userId);
         row._otherUserId = otherMember?.userId || null;
         row._otherUserName = otherMember?.fullName || null;
         row._otherUserAvatar = otherMember?.avatarUrl || null;
       } else {
-        // For groups, fetch all member IDs (needed for online count computation)
-        const memberRows = await this.drizzle.db
-          .select({
-            userId: chatMembers.userId,
-          })
-          .from(chatMembers)
-          .where(eq(chatMembers.chatId, chat.chatId));
-
+        // For groups, set all member IDs
         row._memberIds = memberRows.map((r) => r.userId);
       }
 
-      // Add row to result array
       result.push(row);
     }
 
@@ -442,8 +483,9 @@ export class ChatRepository {
     // If cursor provided, fetch messages before that timestamp
     if (cursor) {
       const cursorDate = new Date(cursor);
-      whereConditions.push(sql`${messages.createdAt} < ${cursorDate}`);
+      whereConditions.push(lt(messages.createdAt, cursorDate));
     }
+    console.log(whereConditions);
 
     const rows = await this.drizzle.db
       .select({
@@ -459,13 +501,11 @@ export class ChatRepository {
       .leftJoin(users, eq(messages.senderId, users.id))
       .where(and(...whereConditions))
       .orderBy(desc(messages.createdAt))
-      .limit(limit + 1); // Fetch one extra to determine if there are more
+      .limit(limit + 1); // Fetch one extra so callers can detect whether there are more
 
-    // Map results: slice to limit, return with nextCursor if more exist
-    const hasMore = rows.length > limit;
-    const paginatedRows = rows.slice(0, limit);
-
-    return paginatedRows.map((row) => ({
+    // Return all fetched rows, including the extra record used for pagination detection.
+    // Callers will slice to limit and check rows.length > limit for hasMore
+    return rows.map((row) => ({
       id: row.id,
       chatId: row.chatId,
       content: row.content,
