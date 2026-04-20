@@ -24,6 +24,8 @@ export class LastMessageDto {
  * - displayImage: other user's avatar for DM, chat image for group
  * - unreadCount: messages created after lastReadAt
  * - lastMessage: full message with sender for consistent UI rendering
+ * - otherMemberId (DM only): for presence indicator (online/offline)
+ * - memberIds (group only): for computing online count
  */
 export class ChatSidebarItemDto {
   id: string;
@@ -32,4 +34,6 @@ export class ChatSidebarItemDto {
   displayImage?: string | null;
   unreadCount: number;
   lastMessage?: LastMessageDto | null;
+  otherMemberId?: string | null; // For DMs - needed for presence indicator
+  memberIds?: string[]; // For groups - needed for online count
 }

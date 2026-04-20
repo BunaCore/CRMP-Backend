@@ -106,6 +106,29 @@ export class ChatRepository {
   }
 
   /**
+   * Find a message by ID, optionally validate it belongs to a specific chat
+   */
+  async findMessageById(
+    messageId: string,
+    chatId?: string,
+  ): Promise<Message | null> {
+    let query = this.drizzle.db
+      .select()
+      .from(messages)
+      .where(eq(messages.id, messageId));
+
+    if (chatId) {
+      query = this.drizzle.db
+        .select()
+        .from(messages)
+        .where(and(eq(messages.id, messageId), eq(messages.chatId, chatId)));
+    }
+
+    const [message] = await query;
+    return message || null;
+  }
+
+  /**
    * Create message and return with sender info in a single round trip
    * Optimized for real-time messaging (hot path)
    * Uses JOIN to avoid N+1 query
@@ -256,13 +279,22 @@ export class ChatRepository {
   }
 
   /**
-   * Mark a chat as read by updating lastReadAt timestamp
+   * Mark a chat as read by updating lastReadAt to the timestamp of the specified message
+   * Ties the watermark to actual message data, not wall clock
+   *
+   * Validates:
+   * - message exists and belongs to this chat
+   * - user is member of chat
    */
-  async markChatAsRead(chatId: string, userId: string): Promise<void> {
+  async markChatAsRead(
+    chatId: string,
+    userId: string,
+    messageCreatedAt: Date,
+  ): Promise<void> {
     await this.drizzle.db
       .update(chatMembers)
       .set({
-        lastReadAt: new Date(),
+        lastReadAt: messageCreatedAt,
       })
       .where(
         and(eq(chatMembers.chatId, chatId), eq(chatMembers.userId, userId)),
@@ -354,6 +386,16 @@ export class ChatRepository {
         row._otherUserId = otherMember?.userId || null;
         row._otherUserName = otherMember?.fullName || null;
         row._otherUserAvatar = otherMember?.avatarUrl || null;
+      } else {
+        // For groups, fetch all member IDs (needed for online count computation)
+        const memberRows = await this.drizzle.db
+          .select({
+            userId: chatMembers.userId,
+          })
+          .from(chatMembers)
+          .where(eq(chatMembers.chatId, chat.chatId));
+
+        row._memberIds = memberRows.map((r) => r.userId);
       }
 
       // Add row to result array

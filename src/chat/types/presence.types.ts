@@ -25,7 +25,10 @@ export interface PresenceSyncEvent {
 
 /**
  * Mark chat as read request payload
+ * Frontend sends the last message ID user actually saw
+ * This ties the watermark to actual data, not wall clock
  */
 export interface MarkChatAsReadEvent {
   chatId: string;
+  lastSeenMessageId: string; // ID of last message user actually read
 }

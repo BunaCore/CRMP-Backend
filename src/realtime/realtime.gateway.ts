@@ -326,7 +326,14 @@ export class RealtimeGateway
 
   /**
    * Event: chat:markAsRead
-   * Mark a chat as read - updates lastReadAt timestamp
+   * Mark a chat as read up to a specific message
+   * Frontend sends lastSeenMessageId to tie watermark to actual data
+   *
+   * Payload:
+   * {
+   *   chatId: string
+   *   lastSeenMessageId: string (ID of last message user read)
+   * }
    */
   @SubscribeMessage('chat:markAsRead')
   async onMarkAsRead(
@@ -334,17 +341,19 @@ export class RealtimeGateway
     @MessageBody() payload: MarkChatAsReadEvent,
   ) {
     const { userId } = client.data as SocketData;
-    const { chatId } = payload;
+    const { chatId, lastSeenMessageId } = payload;
 
-    if (!chatId) {
-      client.emit('chat:error', { message: 'chatId is required' });
+    if (!chatId || !lastSeenMessageId) {
+      client.emit('chat:error', {
+        message: 'chatId and lastSeenMessageId are required',
+      });
       return;
     }
 
     try {
-      await this.chatService.markChatAsRead(chatId, userId);
+      await this.chatService.markChatAsRead(chatId, userId, lastSeenMessageId);
       this.logger.debug(
-        `[${client.id}] User ${userId} marked chat ${chatId} as read`,
+        `[${client.id}] User ${userId} marked chat ${chatId} as read up to message ${lastSeenMessageId}`,
       );
     } catch (error) {
       const errorMessage =

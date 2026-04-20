@@ -289,7 +289,20 @@ export class ChatService {
    * Mark a chat as read
    * Updates lastReadAt timestamp in chat_members
    */
-  async markChatAsRead(chatId: string, userId: string): Promise<void> {
+  /**
+   * Mark a chat as read up to a specific message
+   * Ties watermark to actual message data, not wall clock
+   *
+   * Validates:
+   * - chat exists
+   * - user is member of chat
+   * - message exists and belongs to the chat
+   */
+  async markChatAsRead(
+    chatId: string,
+    userId: string,
+    messageId: string,
+  ): Promise<void> {
     // Validate chat exists
     const chat = await this.chatRepository.findChatById(chatId);
     if (!chat) {
@@ -302,8 +315,23 @@ export class ChatService {
       throw new ForbiddenException('You are not a member of this chat');
     }
 
-    // Mark as read
-    await this.chatRepository.markChatAsRead(chatId, userId);
+    // Fetch message to validate it exists and belongs to this chat
+    const message = await this.chatRepository.findMessageById(
+      messageId,
+      chatId,
+    );
+    if (!message) {
+      throw new NotFoundException(
+        `Message ${messageId} not found or does not belong to chat ${chatId}`,
+      );
+    }
+
+    // Mark as read with message's timestamp as watermark
+    await this.chatRepository.markChatAsRead(
+      chatId,
+      userId,
+      message.createdAt!,
+    );
   }
 
   /**
@@ -333,6 +361,13 @@ export class ChatService {
         displayImage,
         unreadCount: chat._unreadCount,
       };
+
+      // Add presence-related fields
+      if (chat.chatType === 'dm') {
+        item.otherMemberId = chat._otherUserId || undefined;
+      } else {
+        item.memberIds = chat._memberIds || [];
+      }
 
       // Add last message if exists (with full sender info for consistency)
       if (chat._lastMessageId) {

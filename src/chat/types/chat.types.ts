@@ -96,7 +96,8 @@ export interface ChatWithLastMessage {
   _lastMessageSenderName: string | null;
   _lastMessageSenderAvatar: string | null;
   _unreadCount: number;
-  _otherUserId?: string | null; // For DMs only
+  _otherUserId?: string | null; // For DMs only - other participant
   _otherUserName?: string | null; // For DMs only
-  _otherUserAvatar?: string | null; // For DMs only - used as displayImage
+  _otherUserAvatar?: string | null; // For DMs only
+  _memberIds?: string[]; // For groups only - all member IDs for presence computation
 }
