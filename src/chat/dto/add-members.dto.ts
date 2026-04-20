@@ -1,4 +1,10 @@
-import { IsArray, IsString, ArrayMinSize, ArrayMaxSize } from 'class-validator';
+import {
+  IsArray,
+  IsString,
+  ArrayMinSize,
+  ArrayMaxSize,
+  IsUUID,
+} from 'class-validator';
 
 /**
  * DTO for adding members to a group chat
@@ -6,7 +12,7 @@ import { IsArray, IsString, ArrayMinSize, ArrayMaxSize } from 'class-validator';
  */
 export class AddMembersDto {
   @IsArray()
-  @IsString({ each: true })
+  @IsUUID('4', { each: true, message: 'Each user ID must be a valid UUID' })
   @ArrayMinSize(1, {
     message: 'Must provide at least 1 user to add',
   })

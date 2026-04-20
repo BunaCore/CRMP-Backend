@@ -12,6 +12,7 @@ import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { ChatService } from 'src/chat/chat.service';
+import { UsersRepository } from 'src/users/users.repository';
 import {
   PresenceUpdateEvent,
   PresenceSyncEvent,
@@ -56,11 +57,12 @@ export class RealtimeGateway
     private jwtService: JwtService,
     private configService: ConfigService,
     private chatService: ChatService,
+    private usersRepository: UsersRepository,
   ) {}
 
   /**
    * Handle client connection
-   * Verify JWT token from handshake auth
+   * Verify JWT token from handshake auth and check user exists in database
    */
   async handleConnection(client: Socket) {
     const token = client.handshake.headers['authorization'];
@@ -77,6 +79,20 @@ export class RealtimeGateway
       }) as JwtPayload;
 
       const userId = payload.sub;
+
+      // Verify user exists in database before allowing connection
+      const user = await this.usersRepository.findById(userId);
+      if (!user) {
+        this.logger.warn(
+          `[${client.id}] Connection rejected: user ${userId} not found in database`,
+        );
+        client.emit('auth:error', {
+          message: 'User does not exist',
+        });
+        client.disconnect(true);
+        return;
+      }
+
       // 1. Track the socket
       if (!this.activeUsers.has(userId)) {
         this.activeUsers.set(userId, new Set());
@@ -121,6 +137,7 @@ export class RealtimeGateway
       // Send presence sync - list of currently online users
       const onlineUserIds = Array.from(this.activeUsers.keys());
       const presenceSync: PresenceSyncEvent = { onlineUserIds };
+      console.log('presence syncing', presenceSync);
       client.emit('presence:sync', presenceSync);
     } catch (error) {
       const errorMessage =
@@ -131,7 +148,11 @@ export class RealtimeGateway
       client.disconnect(true);
     }
   }
-
+  @SubscribeMessage('presence:getInitial')
+  handlePresenceSync(client: Socket) {
+    const onlineUserIds = Array.from(this.activeUsers.keys());
+    client.emit('presence:sync', { onlineUserIds });
+  }
   /**
    * Handle client disconnection
    */
@@ -287,8 +308,8 @@ export class RealtimeGateway
     // Broadcast to others in room
     client.to(`chat:${chatId}`).emit('chat:typing', {
       userId,
+      chatId,
       isTyping,
-      timestamp: new Date(),
     });
 
     this.logger.debug(
