@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { WorkspacesRepository } from './workspaces.repository';
 import { ProjectsService } from 'src/projects/projects.service';
 import { TiptapValidator } from 'src/documents/tiptap-validator.service';
@@ -35,6 +35,12 @@ export class WorkspacesService {
     const isMember = await this.projectsService.isUserMemberOfProject(userId, projectId);
     if (!isMember) {
       throw new NotFoundException('Project not found');
+    }
+
+    // Check if project already has a workspace
+    const existingWorkspaces = await this.repository.findWorkspacesByProject(projectId);
+    if (existingWorkspaces.length > 0) {
+      throw new BadRequestException('Project already has a workspace. Only one workspace per project is allowed.');
     }
 
     const workspace = await this.repository.createWorkspace(projectId, name, userId);

@@ -139,6 +139,58 @@ describe('DocumentsService', () => {
       expect(result.filename).toBe('My Report Final.pdf');
       expect(result.buffer).toBe(buf);
     });
+
+    it('should handle table rendering in PDF export', async () => {
+      const tableDoc = {
+        type: 'doc',
+        content: [
+          {
+            type: 'table',
+            content: [
+              {
+                type: 'tableRow',
+                content: [
+                  {
+                    type: 'tableHeader',
+                    attrs: { colspan: 1, rowspan: 1 },
+                    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Header 1' }] }]
+                  },
+                  {
+                    type: 'tableHeader',
+                    attrs: { colspan: 1, rowspan: 1 },
+                    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Header 2' }] }]
+                  }
+                ]
+              },
+              {
+                type: 'tableRow',
+                content: [
+                  {
+                    type: 'tableCell',
+                    attrs: { colspan: 1, rowspan: 1 },
+                    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Cell 1' }] }]
+                  },
+                  {
+                    type: 'tableCell',
+                    attrs: { colspan: 1, rowspan: 1 },
+                    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Cell 2' }] }]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+      const buf = Buffer.from('pdf-data');
+      mockRepository.findWorkspaceById.mockResolvedValue({ id: 'ws-id', name: 'Table Test' });
+      mockRepository.findDocumentByWorkspaceId.mockResolvedValue({ id: 'doc-id', currentContent: tableDoc });
+      mockRenderer.renderToPdf.mockResolvedValue(buf);
+
+      const result = await service.exportPdf('ws-id');
+
+      expect(mockRenderer.renderToPdf).toHaveBeenCalledWith(tableDoc, 'Table Test');
+      expect(result.buffer).toBe(buf);
+    });
   });
 
   describe('importMarkdown', () => {

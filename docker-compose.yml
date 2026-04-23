@@ -43,5 +43,12 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  redis:
+    image: redis:alpine
+    container_name: crmp_redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+
 volumes:
   pgdata:

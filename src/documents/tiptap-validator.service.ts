@@ -34,6 +34,7 @@ export class TiptapValidator {
     'horizontalRule',
     'image',
     'imageResize',
+    'resizableImage',   // alias used by some TipTap image-resize extensions
     'table',
     'tableRow',
     'tableHeader',
@@ -98,10 +99,36 @@ export class TiptapValidator {
     imageResize: (node) => {
       return typeof node.attrs?.src === 'string'; // Support base64 or URL and custom widths
     },
-    table: (node) => Array.isArray(node.content),
-    tableRow: (node) => Array.isArray(node.content),
-    tableHeader: (node) => node.content === undefined || Array.isArray(node.content),
-    tableCell: (node) => node.content === undefined || Array.isArray(node.content),
+    table: (node) => {
+      if (!Array.isArray(node.content)) return false;
+      // Ensure table has at least one row
+      return node.content.length > 0 && node.content.every(row => row.type === 'tableRow');
+    },
+    tableRow: (node) => {
+      if (!Array.isArray(node.content)) return false;
+      // Ensure row has cells
+      return node.content.length > 0 && node.content.every(cell => cell.type === 'tableHeader' || cell.type === 'tableCell');
+    },
+    tableHeader: (node) => {
+      // Allow optional colspan/rowspan attrs; content may be empty (zero-content cells)
+      const validColspan = node.attrs?.colspan === undefined ||
+        (typeof node.attrs.colspan === 'number' && node.attrs.colspan >= 1);
+      const validRowspan = node.attrs?.rowspan === undefined ||
+        (typeof node.attrs.rowspan === 'number' && node.attrs.rowspan >= 1);
+      const validContent = node.content === undefined ||
+        (Array.isArray(node.content) && node.content.every(child => typeof child === 'object'));
+      return validColspan && validRowspan && validContent;
+    },
+    tableCell: (node) => {
+      // Allow optional colspan/rowspan attrs; content may be empty (zero-content cells)
+      const validColspan = node.attrs?.colspan === undefined ||
+        (typeof node.attrs.colspan === 'number' && node.attrs.colspan >= 1);
+      const validRowspan = node.attrs?.rowspan === undefined ||
+        (typeof node.attrs.rowspan === 'number' && node.attrs.rowspan >= 1);
+      const validContent = node.content === undefined ||
+        (Array.isArray(node.content) && node.content.every(child => typeof child === 'object'));
+      return validColspan && validRowspan && validContent;
+    },
     taskList: (node) => Array.isArray(node.content),
     taskItem: (node) => Array.isArray(node.content),
   };

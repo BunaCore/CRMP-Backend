@@ -18,6 +18,61 @@ interface TiptapMark {
 export class TiptapRenderer {
   private readonly logger = new Logger(TiptapRenderer.name);
 
+  // ─── Browser singleton ──────────────────────────────────────────────
+  // We launch ONE Chrome process per application lifetime and reuse it
+  // across all PDF requests. Opening a new page is cheap (~20ms) whereas
+  // launching a new browser is expensive (~1-2s) and causes port exhaustion
+  // under concurrent load.
+  private static browser: puppeteer.Browser | null = null;
+  private static launchPromise: Promise<puppeteer.Browser> | null = null;
+
+  private async getBrowser(): Promise<puppeteer.Browser> {
+    // Happy path: browser already running
+    if (TiptapRenderer.browser?.connected) {
+      return TiptapRenderer.browser;
+    }
+    // If a launch is already in progress, await it (prevents duplicate spawns)
+    if (TiptapRenderer.launchPromise) {
+      return TiptapRenderer.launchPromise;
+    }
+
+    this.logger.log('Launching Puppeteer browser (singleton)…');
+    TiptapRenderer.launchPromise = puppeteer
+      .launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          // Keep Chrome from loading plugins / extensions that slow startup
+          '--disable-extensions',
+          '--disable-default-apps',
+          // Silence font hinting warnings on Linux
+          '--font-render-hinting=none',
+        ],
+        // Give Chrome itself 30s to start before we bail
+        timeout: 30_000,
+      })
+      .then((b) => {
+        TiptapRenderer.browser = b;
+        TiptapRenderer.launchPromise = null;
+        // If Chrome crashes, clear the reference so the next request re-launches
+        b.on('disconnected', () => {
+          this.logger.warn('Puppeteer browser disconnected — will re-launch on next request');
+          TiptapRenderer.browser = null;
+          TiptapRenderer.launchPromise = null;
+        });
+        return b;
+      })
+      .catch((err) => {
+        TiptapRenderer.launchPromise = null; // allow retry
+        throw err;
+      });
+
+    return TiptapRenderer.launchPromise;
+  }
+
   /**
    * Render the Tiptap doc node to an HTML fragment (no wrapper).
    */
@@ -45,38 +100,119 @@ export class TiptapRenderer {
     const imgCount = (bodyHtml.match(/<img/g) || []).length;
     const totalLen = bodyHtml.length;
     const allTypes = this.collectNodeTypes(doc);
-    this.logger.debug(`PDF HTML: ${totalLen} chars, ${imgCount} <img> tag(s). Node types in doc: [${allTypes.join(', ')}]`);
+    this.logger.debug(
+      `PDF render start — ${totalLen} chars, ${imgCount} <img> tag(s). ` +
+      `Node types: [${allTypes.join(', ')}]`,
+    );
+    if (bodyHtml.includes('<table')) {
+      this.logger.debug('Table detected in HTML, checking structure...');
+      // Use a proper regex — note the flags and real (unescaped) character class
+      const tableMatches = bodyHtml.match(/<table[\s\S]*?<\/table>/g);
+      if (tableMatches) {
+        this.logger.debug(`Found ${tableMatches.length} table(s) in HTML`);
+        tableMatches.forEach((t, i) => {
+          const rows = (t.match(/<tr/g) || []).length;
+          const cells = (t.match(/<td|<th/g) || []).length;
+          const emptyTd = (t.match(/<td[^>]*>\s*(&nbsp;)?\s*<\/td>/g) || []).length;
+          const emptyTh = (t.match(/<th[^>]*>\s*(&nbsp;)?\s*<\/th>/g) || []).length;
+          this.logger.debug(
+            `Table ${i + 1}: ${rows} row(s), ${cells} cell(s) ` +
+            `(${emptyTd + emptyTh} empty/nbsp-only)`,
+          );
+        });
+      } else {
+        this.logger.warn('Table tag detected but no complete table structure found in HTML');
+      }
+    }
     const fullHtml = this.buildPdfHtmlDocument(bodyHtml, title);
 
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-web-security',
-        '--allow-running-insecure-content',
-        '--disable-dev-shm-usage',
-      ],
-    });
+    const browser = await this.getBrowser();
+    const page = await browser.newPage();
 
     try {
-      const page = await browser.newPage();
-      await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
-      // Wait for all images to finish loading before printing
-      await page.evaluate(() =>
-        Promise.all(
-          Array.from(document.images).map(
-            (img) =>
+      // Raise per-page limits so slow machines don't hit the default 30s wall
+      page.setDefaultNavigationTimeout(120_000);
+      page.setDefaultTimeout(120_000);
+
+      // ── Load content ────────────────────────────────────────────────
+      // 'domcontentloaded' fires as soon as the HTML is parsed — it does NOT
+      // wait for external resources (Google Fonts, images).  This is the key
+      // fix: 'networkidle0' was timing out because it blocked until every
+      // Google Fonts HTTP request completed, which could take > 30s on a slow
+      // or firewalled connection.
+      await page.setContent(fullHtml, {
+        waitUntil: 'domcontentloaded',
+        timeout: 120_000,
+      });
+
+      // ── Wait for web-fonts (capped at 6 s) ──────────────────────────
+      // document.fonts.ready resolves once all @font-face declarations have
+      // either loaded or been rejected.  We race it against a 6-second
+      // timeout so a network outage never turns into a hung request.
+      await Promise.race([
+        page.evaluate(() => document.fonts.ready as unknown as void),
+        new Promise<void>((resolve) => setTimeout(resolve, 6_000)),
+      ]);
+
+      // ── Wait for tables & log real render dimensions ─────────────────
+      if (fullHtml.includes('<table')) {
+        this.logger.debug('Waiting for table rendering...');
+        try {
+          await page.waitForSelector('table', { timeout: 5000 });
+          this.logger.debug('Table element found in DOM');
+
+          // Gather real computed dimensions from the browser for debugging
+          const tableDiagnostics = await page.evaluate(() => {
+            return Array.from(document.querySelectorAll('table')).map((tbl, i) => {
+              const rect = tbl.getBoundingClientRect();
+              const rows = tbl.querySelectorAll('tr').length;
+              const cells = tbl.querySelectorAll('td, th').length;
+              const style = window.getComputedStyle(tbl);
+              return {
+                index: i + 1,
+                width: Math.round(rect.width),
+                height: Math.round(rect.height),
+                rows,
+                cells,
+                tableLayout: style.tableLayout,
+                borderCollapse: style.borderCollapse,
+                display: style.display,
+              };
+            });
+          });
+
+          tableDiagnostics.forEach((d) => {
+            this.logger.debug(
+              `Table ${d.index} render: ${d.width}×${d.height}px, ` +
+              `${d.rows} rows, ${d.cells} cells — ` +
+              `tableLayout=${d.tableLayout}, borderCollapse=${d.borderCollapse}, display=${d.display}`,
+            );
+            if (d.width === 0 || d.height === 0) {
+              this.logger.warn(`Table ${d.index} has zero dimension — it may not appear in the PDF!`);
+            }
+          });
+        } catch (e) {
+          this.logger.warn(`Table wait/diagnostics failed: ${(e as Error).message}`);
+        }
+      }
+
+      // ── Wait for inline images (best-effort) ────────────────────────
+      if (imgCount > 0) {
+        await page.evaluate(() =>
+          Promise.all(
+            Array.from(document.images).map((img) =>
               img.complete
                 ? Promise.resolve()
                 : new Promise<void>((resolve) => {
                     img.onload = () => resolve();
-                    img.onerror = () => resolve(); // resolve even on error so PDF still generates
+                    img.onerror = () => resolve();
                   }),
+            ),
           ),
-        ),
-      );
+        );
+      }
 
+      // ── Generate PDF ─────────────────────────────────────────────────
       const pdfBuffer = await page.pdf({
         format: 'A4',
         printBackground: true,
@@ -96,11 +232,14 @@ export class TiptapRenderer {
           bottom: '1in',
           left: '1in',
         },
+        timeout: 120_000,
       });
 
+      this.logger.debug(`PDF generated — ${pdfBuffer.byteLength} bytes`);
       return Buffer.from(pdfBuffer);
     } finally {
-      await browser.close();
+      // Close the PAGE (cheap), keep the BROWSER running for the next request
+      await page.close();
     }
   }
 
@@ -113,13 +252,15 @@ export class TiptapRenderer {
 
       case 'paragraph': {
         const inner = (node.content || []).map((c) => this.renderNode(c)).join('');
-        return `<p>${inner}</p>`;
+        const style = this.buildBlockStyle(node.attrs);
+        return `<p${style}>${inner}</p>`;
       }
 
       case 'heading': {
         const level = node.attrs?.level || 1;
         const inner = (node.content || []).map((c) => this.renderNode(c)).join('');
-        return `<h${level}>${inner}</h${level}>`;
+        const style = this.buildBlockStyle(node.attrs);
+        return `<h${level}${style}>${inner}</h${level}>`;
       }
 
       case 'text':
@@ -155,6 +296,30 @@ export class TiptapRenderer {
 
       case 'horizontalRule':
         return '<hr />';
+
+      // ── Table nodes ──────────────────────────────────────────────────
+      case 'table':
+        const tableAttrs = this.buildTableAttrs(node.attrs);
+        return `<table${tableAttrs}>${(node.content || []).map((c) => this.renderNode(c)).join('')}</table>`;
+
+      case 'tableRow':
+        return `<tr>${(node.content || []).map((c) => this.renderNode(c)).join('')}</tr>`;
+
+      case 'tableHeader': {
+        const colspan = node.attrs?.colspan ? ` colspan="${node.attrs.colspan}"` : '';
+        const rowspan = node.attrs?.rowspan ? ` rowspan="${node.attrs.rowspan}"` : '';
+        const style = this.buildCellStyle(node.attrs);
+        const inner = (node.content || []).map((c) => this.renderNode(c)).join('');
+        return `<th${colspan}${rowspan}${style}>${inner || '&nbsp;'}</th>`;
+      }
+
+      case 'tableCell': {
+        const colspan = node.attrs?.colspan ? ` colspan="${node.attrs.colspan}"` : '';
+        const rowspan = node.attrs?.rowspan ? ` rowspan="${node.attrs.rowspan}"` : '';
+        const style = this.buildCellStyle(node.attrs);
+        const inner = (node.content || []).map((c) => this.renderNode(c)).join('');
+        return `<td${colspan}${rowspan}${style}>${inner || '&nbsp;'}</td>`;
+      }
 
       case 'image':
       case 'resizableImage':
@@ -217,12 +382,89 @@ export class TiptapRenderer {
           result = `<mark style="background-color: ${color};">${result}</mark>`;
           break;
         }
+        case 'textStyle': {
+          // Carries fontFamily, color (and potentially fontSize) from TipTap TextStyle extension
+          const styleParts: string[] = [];
+          if (mark.attrs?.fontFamily) {
+            styleParts.push(`font-family: ${mark.attrs.fontFamily}`);
+          }
+          if (mark.attrs?.color) {
+            styleParts.push(`color: ${mark.attrs.color}`);
+          }
+          if (mark.attrs?.fontSize) {
+            styleParts.push(`font-size: ${mark.attrs.fontSize}`);
+          }
+          if (styleParts.length > 0) {
+            result = `<span style="${styleParts.join('; ')}">${result}</span>`;
+          }
+          break;
+        }
+        case 'underline':
+          result = `<u>${result}</u>`;
+          break;
+        case 'subscript':
+          result = `<sub>${result}</sub>`;
+          break;
+        case 'superscript':
+          result = `<sup>${result}</sup>`;
+          break;
       }
     }
     return result;
   }
 
   // ─── Utility ────────────────────────────────────────────────────────
+
+  /**
+   * Builds an inline style string from block-level attrs like textAlign and lineHeight.
+   * Returns a ` style="..."` attribute string (with leading space) or empty string.
+   */
+  private buildBlockStyle(attrs?: Record<string, any>): string {
+    if (!attrs) return '';
+    const parts: string[] = [];
+    if (attrs.textAlign && attrs.textAlign !== 'left') {
+      parts.push(`text-align: ${attrs.textAlign}`);
+    }
+    if (attrs.lineHeight) {
+      parts.push(`line-height: ${attrs.lineHeight}`);
+    }
+    // TipTap TextAlign extension may also store alignment directly on the node
+    if (attrs['text-align'] && !attrs.textAlign) {
+      parts.push(`text-align: ${attrs['text-align']}`);
+    }
+    return parts.length > 0 ? ` style="${parts.join('; ')}"` : '';
+  }
+
+  /**
+   * Builds attributes for table elements.
+   */
+  private buildTableAttrs(attrs?: Record<string, any>): string {
+    if (!attrs) return '';
+    const parts: string[] = [];
+    if (attrs.class) parts.push(`class="${this.escapeAttribute(attrs.class)}"`);
+    if (attrs.style) parts.push(`style="${this.escapeAttribute(attrs.style)}"`);
+    // Add other table attributes as needed
+    return parts.length > 0 ? ` ${parts.join(' ')}` : '';
+  }
+
+  /**
+   * Builds style attributes for table cells (th, td).
+   */
+  private buildCellStyle(attrs?: Record<string, any>): string {
+    if (!attrs) return '';
+    const parts: string[] = [];
+    if (attrs.textAlign && attrs.textAlign !== 'left') {
+      parts.push(`text-align: ${attrs.textAlign}`);
+    }
+    if (attrs.verticalAlign) {
+      parts.push(`vertical-align: ${attrs.verticalAlign}`);
+    }
+    if (attrs.backgroundColor) {
+      parts.push(`background-color: ${attrs.backgroundColor}`);
+    }
+    // Add other cell styles as needed
+    return parts.length > 0 ? ` style="${parts.join('; ')}"` : '';
+  }
 
   private escapeHtml(text: string): string {
     return text
@@ -261,18 +503,31 @@ export class TiptapRenderer {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${title ? this.escapeHtml(title) : 'Document'}</title>
+
+  <!-- Google Fonts: Inter (UI), Noto Sans Ethiopic (Amharic/Ge'ez), Roboto -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Ethiopic:wght@400;700&family=Roboto:wght@400;700&display=swap"
+    rel="stylesheet"
+  />
+
   <style>
     /* === Base === */
     body {
-      font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
       color: #1a1a1a;
+      /* Default line-height; individual blocks override via inline style */
       line-height: 1.15;
       margin: 0;
       padding: 0;
       font-size: 12pt;
     }
 
-    /* === Headings === */
+    /* === Headings ===
+       Note: font-size / line-height set here are DEFAULTS.
+       Inline styles from TipTap attrs will override them automatically
+       because inline styles have higher specificity than class/element rules. */
     h1, h2, h3, h4, h5, h6 {
       margin: 0.4em 0 0.15em;
       font-weight: 600;
@@ -326,6 +581,69 @@ export class TiptapRenderer {
       font-size: inherit;
     }
 
+    /* === Tables ===
+       Without explicit border rules, Puppeteer renders tables with invisible
+       borders. These rules mirror the TipTap table extension defaults.
+       IMPORTANT: Do NOT use table-layout:fixed — it prevents proper column
+       sizing and causes layout breakage in PDFs. */
+    table {
+      border-collapse: collapse;
+      border-spacing: 0;
+      /* Let the browser auto-size columns from content */
+      table-layout: auto;
+      width: 100%;
+      margin: 1em 0;
+      border: 1px solid #4b5563;
+    }
+    th, td {
+      border: 1px solid #6b7280;
+      padding: 0.4rem 0.5rem;
+      text-align: left;
+      vertical-align: top;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      /* min-width ensures the border box is visible even when the cell is empty */
+      min-width: 2em;
+      /* min-height is ignored for table cells in CSS; use line-height instead */
+      line-height: 1.4;
+    }
+    /* Force empty cells to still render their border box */
+    td:empty, th:empty {
+      padding: 0.4rem 0.5rem;
+    }
+    tr {
+      page-break-inside: avoid;
+    }
+    th {
+      background-color: #f3f4f6;
+      font-weight: 600;
+      border-bottom: 2px solid #4b5563;
+    }
+
+    /* === Print / PDF overrides ===
+       Puppeteer uses the print media type. These rules make tables crisper
+       and prevent ghost borders that sometimes appear with collapse+print. */
+    @media print {
+      table {
+        border: 1px solid #000;
+        border-collapse: collapse;
+      }
+      th, td {
+        border: 1px solid #333;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      th {
+        background-color: #f3f4f6 !important;
+      }
+      tr {
+        page-break-inside: avoid;
+      }
+      /* Avoid page break immediately after a table header row */
+      thead { display: table-header-group; }
+      tfoot { display: table-footer-group; }
+    }
+
     /* === Horizontal rule === */
     hr {
       border: none;
@@ -336,10 +654,11 @@ export class TiptapRenderer {
     /* === Links === */
     a { color: #2563eb; text-decoration: none; }
 
-    /* === Other === */
+    /* === Misc === */
     mark { background: #fef08a; padding: 0.1em 0.2em; border-radius: 2px; }
     img { max-width: 100%; height: auto; }
     del { text-decoration: line-through; color: #6b7280; }
+    u { text-decoration: underline; }
   </style>
 </head>
 <body>
