@@ -6,7 +6,8 @@ export const workspaces = pgTable('workspaces', {
   id: uuid('id').primaryKey().defaultRandom(),
   projectId: uuid('project_id')
     .notNull()
-    .references(() => projects.projectId, { onDelete: 'cascade' }),
+    .references(() => projects.projectId, { onDelete: 'cascade' })
+    .unique(),
   name: text('name').notNull(),
   createdBy: uuid('created_by')
     .notNull()

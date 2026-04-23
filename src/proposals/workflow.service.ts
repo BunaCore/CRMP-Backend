@@ -1283,7 +1283,52 @@ export class WorkflowService {
         .set({ projectId: project.projectId })
         .where(eq(schema.proposals.id, proposal.id));
 
-      // 4. Audit log
+      // 4. Create default workspace
+      const [workspace] = await tx
+        .insert(schema.workspaces)
+        .values({
+          projectId: project.projectId,
+          name: 'Default Workspace',
+          createdBy: approverUserId,
+        })
+        .returning();
+
+      // 5. Create initial document
+      const initialContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Start writing your document here...' }],
+          },
+        ],
+      };
+      const [document] = await tx
+        .insert(schema.documents)
+        .values({
+          workspaceId: workspace.id,
+          currentContent: initialContent,
+        })
+        .returning();
+
+      // 6. Create initial version
+      const [version] = await tx
+        .insert(schema.documentVersions)
+        .values({
+          documentId: document.id,
+          content: initialContent,
+          createdBy: approverUserId,
+          versionNumber: 1,
+        })
+        .returning();
+
+      // 7. Update document with current version
+      await tx
+        .update(schema.documents)
+        .set({ currentVersionId: version.id })
+        .where(eq(schema.documents.id, document.id));
+
+      // 8. Audit log
       await tx.insert(schema.auditLogs).values({
         actorUserId: approverUserId,
         action: 'CREATED',

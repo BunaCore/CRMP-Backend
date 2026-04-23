@@ -19,13 +19,13 @@ interface TiptapMark {
  * Supported elements:
  *   headings (1-6), paragraphs, bullet lists, ordered lists (with nesting),
  *   blockquotes (multi-line), code blocks (fenced), horizontal rules,
- *   inline: bold, italic, strikethrough, inline code, links.
+ *   GFM pipe tables, inline: bold, italic, strikethrough, inline code, links.
  *
  * Known limitations:
- *   - Tables, task lists, footnotes are NOT supported.
+ *   - Task lists, footnotes are NOT supported.
  *   - Image nodes are exported but not created on import.
- *   - Highlight marks are preserved in Tiptap but dropped in markdown
- *     (no standard markdown equivalent).
+ *   - Highlight / textStyle marks are preserved in Tiptap but dropped in
+ *     Markdown (no standard equivalent).
  *   - Deeply nested lists (>2 levels) are flattened on import.
  */
 @Injectable()
@@ -124,6 +124,16 @@ export class MarkdownConverter {
         continue;
       }
 
+      // ── GFM pipe table ──────────────────────────────────────────
+      // A table starts with a header row (cells separated by |) immediately
+      // followed by an alignment/separator row (|---|---|).
+      if (this.isTableLine(line) && i + 1 < lines.length && this.isTableSeparator(lines[i + 1])) {
+        const tableResult = this.parseMarkdownTable(lines, i);
+        content.push(tableResult.node);
+        i = tableResult.nextIndex;
+        continue;
+      }
+
       // ── Blank line ──────────────────────────────────────────────
       if (line.trim() === '') {
         i++;
@@ -153,6 +163,90 @@ export class MarkdownConverter {
   }
 
   // ─── Private: Markdown → Tiptap helpers ─────────────────────────────
+
+  /** Returns true for any line that looks like a GFM table row (contains |). */
+  private isTableLine(line: string): boolean {
+    const t = line.trim();
+    return t.startsWith('|') && t.lastIndexOf('|') > 0;
+  }
+
+  /**
+   * Returns true when a line is a GFM table separator like |---|---| or
+   * |:---|:--:|---:| (alignment syntax).
+   */
+  private isTableSeparator(line: string): boolean {
+    return /^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?$/.test(line.trim());
+  }
+
+  /**
+   * Splits a GFM table row string into cell text values, stripping leading
+   * and trailing pipe characters and trimming whitespace.
+   */
+  private splitTableRow(line: string): string[] {
+    return line
+      .trim()
+      .replace(/^\|/, '')   // remove optional leading pipe
+      .replace(/\|$/, '')   // remove optional trailing pipe
+      .split('|')
+      .map((cell) => cell.trim());
+  }
+
+  /**
+   * Parses a GFM pipe table starting at `start`.
+   * Returns the resulting TipTap `table` node and the index of the first
+   * line after the table.
+   */
+  private parseMarkdownTable(
+    lines: string[],
+    start: number,
+  ): { node: TiptapNode; nextIndex: number } {
+    const headerCells = this.splitTableRow(lines[start]);
+    // lines[start + 1] is the separator — skip it
+    let i = start + 2;
+
+    const rows: TiptapNode[] = [];
+
+    // Header row — rendered as <th> cells
+    rows.push({
+      type: 'tableRow',
+      content: headerCells.map((cellText) => ({
+        type: 'tableHeader',
+        attrs: { colspan: 1, rowspan: 1, colwidth: null },
+        content: [
+          {
+            type: 'paragraph',
+            content: this.parseInlineMarkdown(cellText),
+          },
+        ],
+      })),
+    });
+
+    // Data rows — rendered as <td> cells
+    while (i < lines.length && this.isTableLine(lines[i])) {
+      const cells = this.splitTableRow(lines[i]);
+      // Pad/trim to match header column count
+      while (cells.length < headerCells.length) cells.push('');
+      rows.push({
+        type: 'tableRow',
+        content: cells.slice(0, headerCells.length).map((cellText) => ({
+          type: 'tableCell',
+          attrs: { colspan: 1, rowspan: 1, colwidth: null },
+          content: [
+            {
+              type: 'paragraph',
+              content: this.parseInlineMarkdown(cellText),
+            },
+          ],
+        })),
+      });
+      i++;
+    }
+
+    return {
+      node: { type: 'table', content: rows },
+      nextIndex: i,
+    };
+  }
 
   private isListLine(line: string): boolean {
     return /^\s*([-*+])\s+/.test(line) || /^\s*\d+\.\s+/.test(line);
@@ -351,6 +445,47 @@ export class MarkdownConverter {
         const alt = node.attrs?.alt || '';
         return `![${alt}](${src})`;
       }
+
+      // ── GFM pipe table ──────────────────────────────────────────
+      case 'table': {
+        const tableRows = node.content || [];
+        if (tableRows.length === 0) return '';
+
+        const mdRows: string[] = [];
+
+        tableRows.forEach((row, rowIdx) => {
+          const cells = (row.content || []).map((cell) => {
+            // Each cell contains paragraph node(s)
+            const text = (cell.content || [])
+              .map((c) => this.serializeNode(c, depth))
+              .join(' ')
+              .replace(/\|/g, '\\|'); // escape literal pipes inside cells
+            return text;
+          });
+
+          mdRows.push('| ' + cells.join(' | ') + ' |');
+
+          // After the first (header) row, insert the separator line
+          if (rowIdx === 0) {
+            mdRows.push('| ' + cells.map(() => '---').join(' | ') + ' |');
+          }
+        });
+
+        return mdRows.join('\n');
+      }
+
+      // Individual table nodes are serialized inline by the table case above;
+      // these fallbacks handle edge cases (e.g. a tableRow outside a table).
+      case 'tableRow':
+        return (node.content || [])
+          .map((c) => this.serializeNode(c, depth))
+          .join(' | ');
+
+      case 'tableHeader':
+      case 'tableCell':
+        return (node.content || [])
+          .map((c) => this.serializeNode(c, depth))
+          .join('');
 
       default:
         return (node.content || []).map((c) => this.serializeNode(c, depth)).join('');
