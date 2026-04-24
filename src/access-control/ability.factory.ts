@@ -6,6 +6,7 @@ import {
 } from '@casl/ability';
 import { Permission } from './permission.enum';
 import { UsersRepository } from 'src/users/users.repository';
+import { Role } from './role.enum';
 
 /**
  * AbilityFactory builds CASL abilities from user roles and permissions
@@ -20,8 +21,14 @@ export class AbilityFactory {
    */
   async createAbility(userId: string): Promise<MongoAbility> {
     try {
-      // Fetch user permissions via repository
-      const permissions = await this.usersRepository.getUserPermissions(userId);
+      const [permissions, userRoleRecords] = await Promise.all([
+        this.usersRepository.getUserPermissions(userId),
+        this.usersRepository.getUserRoles(userId),
+      ]);
+
+      const roleNames = userRoleRecords
+        .map((r) => r.roleName)
+        .filter((r): r is string => Boolean(r));
 
       if (!permissions || permissions.length === 0) {
         // User has no permissions - return empty ability
@@ -29,7 +36,7 @@ export class AbilityFactory {
       }
 
       // Map permission keys to CASL rules
-      const caslRules = this.mapPermissionsToCaslRules(permissions);
+      const caslRules = this.mapPermissionsToCaslRules(permissions, roleNames);
 
       // Build and return ability
       const { can, build } = new AbilityBuilder(createMongoAbility);
@@ -55,7 +62,10 @@ export class AbilityFactory {
    * Map Permission enum keys to CASL rules
    * Each permission translates to one or more action/subject combinations
    */
-  private mapPermissionsToCaslRules(permissionKeys: string[]): Array<{
+  private mapPermissionsToCaslRules(
+    permissionKeys: string[],
+    roleNames: string[],
+  ): Array<{
     action: string;
     subject: string;
     conditions?: Record<string, any>;
@@ -77,7 +87,7 @@ export class AbilityFactory {
     > = {
       // --- Proposal Core ---
       [Permission.PROPOSAL_CREATE]: [{ action: 'create', subject: 'Proposal' }],
-      [Permission.PROPOSAL_READ]: [{ action: 'read', subject: 'Proposal' }],
+      [Permission.PROPOSAL_READ]: this.buildProposalReadRules(roleNames),
       [Permission.PROPOSAL_UPDATE]: [{ action: 'update', subject: 'Proposal' }],
       [Permission.PROPOSAL_DELETE]: [{ action: 'delete', subject: 'Proposal' }],
       [Permission.PROPOSAL_SUBMIT]: [{ action: 'submit', subject: 'Proposal' }],
@@ -188,6 +198,127 @@ export class AbilityFactory {
         console.warn(`Unknown permission: ${key}`);
       }
     });
+
+    return rules;
+  }
+
+  private buildProposalReadRules(roleNames: string[]): Array<{
+    action: string;
+    subject: string;
+    conditions?: Record<string, any>;
+  }> {
+    const roles = new Set(roleNames);
+
+    if (roles.has(Role.SYSTEM_ADMIN)) {
+      return [{ action: 'read', subject: 'Proposal' }];
+    }
+
+    const rules: Array<{
+      action: string;
+      subject: string;
+      conditions?: Record<string, any>;
+    }> = [];
+
+    const memberOnlyRoles = [
+      Role.STUDENT,
+      Role.FACULTY,
+      Role.SUPERVISOR,
+      Role.EVALUATOR,
+      Role.EXTERNAL_EXPERT,
+    ];
+
+    if (memberOnlyRoles.some((role) => roles.has(role))) {
+      rules.push({
+        action: 'read',
+        subject: 'Proposal',
+        conditions: { isMember: true },
+      });
+    }
+
+    if (roles.has(Role.COORDINATOR)) {
+      rules.push(
+        {
+          action: 'read',
+          subject: 'Proposal',
+          conditions: { program: 'UG' },
+        },
+        {
+          action: 'read',
+          subject: 'Proposal',
+          conditions: { isMember: true },
+        },
+      );
+    }
+
+    if (roles.has(Role.DGC_MEMBER)) {
+      rules.push(
+        {
+          action: 'read',
+          subject: 'Proposal',
+          conditions: { program: 'PG' },
+        },
+        {
+          action: 'read',
+          subject: 'Proposal',
+          conditions: { isMember: true },
+        },
+      );
+    }
+
+    if (roles.has(Role.PG_OFFICE)) {
+      rules.push(
+        {
+          action: 'read',
+          subject: 'Proposal',
+          conditions: { program: 'PG' },
+        },
+        {
+          action: 'read',
+          subject: 'Proposal',
+          conditions: { isMember: true },
+        },
+      );
+    }
+
+    if (roles.has(Role.COLLEGE_OFFICE)) {
+      rules.push(
+        {
+          action: 'read',
+          subject: 'Proposal',
+          conditions: { program: { $in: ['PG', 'GENERAL'] } },
+        },
+        {
+          action: 'read',
+          subject: 'Proposal',
+          conditions: { isMember: true },
+        },
+      );
+    }
+
+    const generalOnlyRoles = [Role.RAD, Role.AC_MEMBER, Role.VPRTT];
+    if (generalOnlyRoles.some((role) => roles.has(role))) {
+      rules.push(
+        {
+          action: 'read',
+          subject: 'Proposal',
+          conditions: { program: 'GENERAL' },
+        },
+        {
+          action: 'read',
+          subject: 'Proposal',
+          conditions: { isMember: true },
+        },
+      );
+    }
+
+    if (rules.length === 0) {
+      // Unknown role fallback: own/member only
+      rules.push({
+        action: 'read',
+        subject: 'Proposal',
+        conditions: { isMember: true },
+      });
+    }
 
     return rules;
   }

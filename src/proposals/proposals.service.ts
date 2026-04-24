@@ -27,6 +27,12 @@ import {
 import { ProposalResponse } from 'src/types/proposal-response.type';
 import { GetProposalsQueryDto } from './dto/get-proposals-query.dto';
 import { SubmitEvaluationScoresDto } from './dto/evaluation.dto';
+import { AbilityFactory } from 'src/access-control/ability.factory';
+import {
+  buildProposalAuthorizationWhere,
+  buildProposalRequestWhere,
+  combineWithAnd,
+} from './conditions/proposal.condition';
 @Injectable()
 export class ProposalsService {
   constructor(
@@ -36,6 +42,7 @@ export class ProposalsService {
     private readonly usersService: UsersService,
     private readonly workflowService: WorkflowService,
     private readonly mailService: MailService,
+    private readonly abilityFactory: AbilityFactory,
   ) {}
   async create(
     user: AuthenticatedUser,
@@ -486,8 +493,30 @@ export class ProposalsService {
     query: GetProposalsQueryDto,
     currentUserId?: string,
   ): Promise<ProposalResponse[]> {
-    // 1. Fetch proposals matching filters from repository (already paginated)
-    const proposals = await this.repository.getProposals(query, currentUserId);
+    if (!currentUserId) {
+      throw new BadRequestException('currentUserId is required');
+    }
+
+    const ability = await this.abilityFactory.createAbility(currentUserId);
+
+    const authWhere = buildProposalAuthorizationWhere(
+      this.drizzle.db,
+      ability,
+      currentUserId,
+    );
+    const requestWhere = buildProposalRequestWhere(
+      this.drizzle.db,
+      query,
+      currentUserId,
+    );
+
+    const where = combineWithAnd([authWhere, requestWhere]);
+
+    // 1. Fetch proposals matching visibility + request filters from repository
+    const proposals = await this.repository.getProposals(where, {
+      limit: query.limit ?? 10,
+      offset: query.getOffset(),
+    });
 
     if (proposals.length === 0) {
       return [];
@@ -550,6 +579,7 @@ export class ProposalsService {
           id: p.id,
           title: p.title,
           abstract: p.abstract ?? undefined,
+          proposalProgram: p.proposalProgram ?? undefined,
           currentStatus: p.currentStatus ?? undefined,
           submittedAt: p.submittedAt ?? undefined,
           isFunded: p.isFunded ?? false,

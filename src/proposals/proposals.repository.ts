@@ -9,7 +9,6 @@ import {
   isNotNull,
   desc,
   asc,
-  ilike,
   or,
   sql,
   SQL,
@@ -17,7 +16,6 @@ import {
 import { evaluationRubrics, evaluationScores } from 'src/db/schema/evaluation';
 import { DB } from 'src/db/db.type';
 import { ProposalMemberRole } from './dto/proposal-member.dto';
-import { GetProposalsQueryDto } from './dto/get-proposals-query.dto';
 import {
   ProposalRow,
   BudgetRow,
@@ -580,102 +578,18 @@ export class ProposalsRepository {
   }
 
   async getProposals(
-    query: GetProposalsQueryDto,
-    currentUserId?: string,
+    where: SQL<unknown> | undefined,
+    pagination: { limit: number; offset: number },
   ): Promise<ProposalRow[]> {
-    // Validate required params
-    if (query.me === true && !currentUserId) {
-      throw new BadRequestException('currentUserId is required when me=true');
-    }
-
-    // Step 1: Build where conditions for proposal table
-    const proposalConditions: SQL<unknown>[] = [];
-
-    if (query.status) {
-      const validStatuses = [
-        'Draft',
-        'Under_Review',
-        'Needs_Revision',
-        'Approved',
-        'Rejected',
-      ];
-      if (validStatuses.includes(query.status)) {
-        proposalConditions.push(
-          eq(schema.proposals.currentStatus, query.status as any),
-        );
-      }
-    }
-
-    if (query.program) {
-      const validPrograms = ['UG', 'PG', 'GENERAL'];
-      if (validPrograms.includes(query.program)) {
-        proposalConditions.push(
-          eq(schema.proposals.proposalProgram, query.program as any),
-        );
-      }
-    }
-
-    if (query.departmentId) {
-      proposalConditions.push(
-        eq(schema.proposals.departmentId, query.departmentId),
-      );
-    }
-
-    if (query.search) {
-      proposalConditions.push(
-        ilike(schema.proposals.title, `%${query.search}%`),
-      );
-    }
-
-    const needsMemberFilter =
-      query.me === true || query.getRolesArray().length > 0;
-    const roles = query.getRolesArray();
-
-    // STEP 1: Fetch proposal IDs with filters and pagination
-    let proposalIdsQuery = this.drizzle.db
-      .selectDistinct({
+    const proposalIdsResult = await this.drizzle.db
+      .select({
         id: schema.proposals.id,
-        createdAt: schema.proposals.createdAt,
       })
-      .from(schema.proposals);
-
-    // Conditionally add member join only if needed for filtering
-    if (needsMemberFilter) {
-      proposalIdsQuery = proposalIdsQuery.leftJoin(
-        schema.proposalMembers,
-        eq(schema.proposalMembers.proposalId, schema.proposals.id),
-      ) as any;
-    }
-
-    // Build member conditions
-    const memberConditions: SQL<unknown>[] = [];
-    if (query.me === true && currentUserId) {
-      memberConditions.push(eq(schema.proposalMembers.userId, currentUserId));
-    }
-    if (roles.length > 0) {
-      memberConditions.push(inArray(schema.proposalMembers.role, roles));
-    }
-
-    // Combine all conditions
-    const allConditions: SQL<unknown>[] = [
-      ...proposalConditions,
-      ...memberConditions,
-    ];
-
-    if (allConditions.length > 0) {
-      proposalIdsQuery = proposalIdsQuery.where(
-        allConditions.length === 1 ? allConditions[0] : and(...allConditions),
-      ) as any;
-    }
-
-    // Apply pagination on proposal ID query
-    const offset = query.getOffset();
-    const limit = query.limit ?? 10;
-
-    const proposalIdsResult = await proposalIdsQuery
+      .from(schema.proposals)
+      .where(where)
       .orderBy(desc(schema.proposals.createdAt))
-      .limit(limit)
-      .offset(offset);
+      .limit(pagination.limit)
+      .offset(pagination.offset);
 
     // If no proposals found
     if (proposalIdsResult.length === 0) {
@@ -690,6 +604,7 @@ export class ProposalsRepository {
         id: schema.proposals.id,
         title: schema.proposals.title,
         abstract: schema.proposals.abstract,
+        proposalProgram: schema.proposals.proposalProgram,
         currentStatus: schema.proposals.currentStatus,
         submittedAt: schema.proposals.submittedAt,
         isFunded: schema.proposals.isFunded,
@@ -843,7 +758,7 @@ export class ProposalsRepository {
       .orderBy(asc(schema.proposalDefences.defenceDate));
   }
 
-/**
+  /**
    * Fetch all evaluation rubrics (the rule book)
    */
   async getEvaluationRubrics() {

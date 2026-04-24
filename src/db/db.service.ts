@@ -3,6 +3,7 @@ import { NodePgDatabase, drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { DB } from './db.type';
 import * as schema from './schema';
+import { logger } from 'handlebars';
 
 @Injectable()
 export class DrizzleService {
@@ -14,7 +15,7 @@ export class DrizzleService {
       connectionString: process.env.DATABASE_URL,
     });
 
-    this.db = drizzle(this.pool, { schema });
+    this.db = drizzle(this.pool, { schema, logger: true });
   }
 
   /**

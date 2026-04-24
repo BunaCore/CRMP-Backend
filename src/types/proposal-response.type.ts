@@ -18,6 +18,7 @@ export type ProposalResponse = {
   id: string;
   title: string;
   abstract?: string;
+  program?: string | undefined;
 
   // Team
   pi: UserPreview | null;
