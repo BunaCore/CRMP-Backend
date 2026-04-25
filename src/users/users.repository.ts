@@ -10,6 +10,7 @@ import {
 } from 'src/db/schema/roles';
 import { departmentCoordinators } from 'src/db/schema/department';
 import { refreshTokens } from 'src/db/schema/refresh-tokens';
+import { invitations } from 'src/db/schema/invitations';
 import { User, CreateUserInput, FindUserInput } from 'src/users/types/user';
 import { UserSelectorDto } from 'src/types/selector';
 import { DB } from 'src/db/db.type';
@@ -298,6 +299,39 @@ export class UsersRepository {
     }
 
     return db.select().from(roles).where(inArray(roles.id, roleIds));
+  }
+
+  async createInvitation(
+    input: {
+      email: string;
+      tokenHash: string;
+      invitedBy: string;
+      roleId: string;
+      expiresAt: Date;
+    },
+    tx?: DB,
+  ) {
+    const db = tx || this.drizzle.db;
+    const [invitation] = await db.insert(invitations).values(input).returning();
+    return invitation;
+  }
+
+  async findInvitationByTokenHash(tokenHash: string, tx?: DB) {
+    const db = tx || this.drizzle.db;
+    const [invitation] = await db
+      .select()
+      .from(invitations)
+      .where(eq(invitations.tokenHash, tokenHash));
+
+    return invitation || null;
+  }
+
+  async markInvitationAccepted(invitationId: string, tx?: DB): Promise<void> {
+    const db = tx || this.drizzle.db;
+    await db
+      .update(invitations)
+      .set({ acceptedAt: new Date() })
+      .where(eq(invitations.id, invitationId));
   }
 
   /**

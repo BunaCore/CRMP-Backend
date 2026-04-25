@@ -42,3 +42,14 @@ export interface PasswordResetEmailJobData {
   resetToken: string;
   resetLink: string;
 }
+
+/**
+ * Payload for invitation onboarding email job
+ */
+export interface InvitationEmailJobData {
+  email: string;
+  invitationLink: string;
+  roleName: string;
+  invitedByName: string;
+  expiresAt: Date;
+}

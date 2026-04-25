@@ -1,19 +1,33 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { UsersRepository } from './users.repository';
 import { User, CreateUserInput } from 'src/users/types/user';
 import { UserSelectorDto } from 'src/types/selector';
-import { NotFoundException } from '@nestjs/common';
 import { DrizzleService } from 'src/db/db.service';
 import { GetUsersQueryDto } from './dto/get-users-query.dto';
 import { buildPaginationMeta } from 'src/common/pagination/utils/build-pagination-meta';
 import { UsersListResponse } from './types/user-admin-list.type';
 import { UserDetailResponse } from './types/user-detail.type';
+import { RolesRepository } from 'src/db/roles.repository';
+import { MailProducer } from 'src/queues/mail/mail.producer';
+import { ConfigService } from '@nestjs/config';
+import { createHash, randomBytes } from 'crypto';
+import { CreateInvitationDto } from './dto/create-invitation.dto';
 
 @Injectable()
 export class UsersService {
+  private static readonly DEFAULT_INVITATION_EXPIRATION_HOURS = 72;
+
   constructor(
     private usersRepository: UsersRepository,
     private readonly drizzle: DrizzleService,
+    private readonly rolesRepository: RolesRepository,
+    private readonly mailProducer: MailProducer,
+    private readonly configService: ConfigService,
   ) {}
 
   async findByEmail(email: string): Promise<User | null> {
@@ -231,6 +245,66 @@ export class UsersService {
         })),
       },
       createdAt: user.createdAt,
+    };
+  }
+
+  async inviteUser(invitedBy: string, dto: CreateInvitationDto) {
+    const inviter = await this.usersRepository.findById(invitedBy);
+    if (!inviter) {
+      throw new NotFoundException(`Inviter "${invitedBy}" not found`);
+    }
+
+    const email = dto.email.trim().toLowerCase();
+    const existingUser = await this.usersRepository.findByEmail(email);
+    if (existingUser) {
+      throw new ConflictException('A user with this email already exists');
+    }
+
+    const role = await this.rolesRepository.findById(dto.roleId);
+    if (!role) {
+      throw new NotFoundException(`Role "${dto.roleId}" not found`);
+    }
+
+    const token = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const expiresInHours =
+      dto.expiresInHours ?? UsersService.DEFAULT_INVITATION_EXPIRATION_HOURS;
+    const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
+
+    const invitationBaseUrl =
+      this.configService.get<string>('INVITATION_ACCEPT_URL') ||
+      this.configService.get<string>('FRONTEND_URL');
+    if (!invitationBaseUrl) {
+      throw new BadRequestException(
+        'Invitation URL is not configured (INVITATION_ACCEPT_URL or FRONTEND_URL)',
+      );
+    }
+
+    const separator = invitationBaseUrl.includes('?') ? '&' : '?';
+    const invitationLink = `${invitationBaseUrl}${separator}token=${encodeURIComponent(token)}`;
+
+    const invitation = await this.usersRepository.createInvitation({
+      email,
+      tokenHash,
+      invitedBy,
+      roleId: dto.roleId,
+      expiresAt,
+    });
+
+    await this.mailProducer.addInvitationEmailJob({
+      email,
+      invitationLink,
+      roleName: role.name,
+      invitedByName: inviter.fullName || inviter.email,
+      expiresAt,
+    });
+
+    return {
+      id: invitation.id,
+      email: invitation.email,
+      roleId: invitation.roleId,
+      expiresAt: invitation.expiresAt,
+      createdAt: invitation.createdAt,
     };
   }
 }

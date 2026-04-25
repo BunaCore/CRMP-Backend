@@ -9,6 +9,7 @@ export * from './verification';
 export * from './project';
 export * from './department';
 export * from './refresh-tokens';
+export * from './invitations';
 export * from './files';
 export * from './evaluation';
 export * from './workspace';

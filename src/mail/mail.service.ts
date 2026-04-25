@@ -26,6 +26,10 @@ export class MailService {
       template: 'password-reset',
       subject: 'Password Reset',
     },
+    [EmailType.USER_INVITATION]: {
+      template: 'user-invitation',
+      subject: 'You are invited to join CRMP',
+    },
   };
 
   constructor(private readonly mailerService: MailerService) {}

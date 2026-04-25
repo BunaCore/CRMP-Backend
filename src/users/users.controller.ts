@@ -4,8 +4,10 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Post,
   Put,
   Query,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
@@ -17,6 +19,7 @@ import { ReplaceUserRolesDto } from './dto/replace-user-roles.dto';
 import { GetUsersQueryDto } from './dto/get-users-query.dto';
 import { UsersListResponse } from './types/user-admin-list.type';
 import { UserDetailResponse } from './types/user-detail.type';
+import { CreateInvitationDto } from './dto/create-invitation.dto';
 
 @Controller('users')
 export class UsersController {
@@ -71,5 +74,13 @@ export class UsersController {
     @Body() dto: ReplaceUserRolesDto,
   ) {
     return this.usersService.replaceUserRoles(userId, dto.roleIds);
+  }
+
+  @Post('invitations')
+  @UseGuards(JwtAuthGuard, AccessGuard)
+  @RequireCasl({ action: 'assignRole', subject: 'User' })
+  async inviteUser(@Request() req: any, @Body() dto: CreateInvitationDto) {
+    const invitedBy = req.user?.sub || req.user?.id;
+    return this.usersService.inviteUser(invitedBy, dto);
   }
 }
