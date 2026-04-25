@@ -7,6 +7,7 @@ import { DrizzleService } from 'src/db/db.service';
 import { GetUsersQueryDto } from './dto/get-users-query.dto';
 import { buildPaginationMeta } from 'src/common/pagination/utils/build-pagination-meta';
 import { UsersListResponse } from './types/user-admin-list.type';
+import { UserDetailResponse } from './types/user-detail.type';
 
 @Injectable()
 export class UsersService {
@@ -187,6 +188,49 @@ export class UsersService {
     return {
       items: Array.from(grouped.values()),
       meta: buildPaginationMeta(page, limit, totalItems),
+    };
+  }
+
+  async getUserById(userId: string): Promise<UserDetailResponse> {
+    const [user, roles, coordinatorDepartments] = await Promise.all([
+      this.usersRepository.findUserDetailById(userId),
+      this.usersRepository.getUserRoles(userId),
+      this.usersRepository.getCoordinatorDepartments(userId),
+    ]);
+
+    if (!user) {
+      throw new NotFoundException(`User "${userId}" not found`);
+    }
+
+    return {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      departmentId: user.departmentId,
+      departmentName: user.departmentName ?? null,
+      universityId: user.universityId,
+      university: user.university,
+      phoneNumber: user.phoneNumber,
+      isExternal: user.isExternal ?? false,
+      accountStatus: user.accountStatus,
+      avatarUrl: user.avatarUrl,
+      roles: roles
+        .filter((role) => role.roleName !== null)
+        .map((role) => ({
+          id: role.roleId,
+          name: role.roleName as string,
+          grantedAt: role.grantedAt,
+        })),
+      departmentCoordination: {
+        isCoordinator: coordinatorDepartments.length > 0,
+        departments: coordinatorDepartments.map((department) => ({
+          id: department.id,
+          name: department.name,
+          code: department.code,
+          assignedAt: department.assignedAt,
+        })),
+      },
+      createdAt: user.createdAt,
     };
   }
 }

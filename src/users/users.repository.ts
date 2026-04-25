@@ -70,6 +70,45 @@ export class UsersRepository {
     } as any;
   }
 
+  async findUserDetailById(userId: string) {
+    const [row] = await this.drizzle.db
+      .select({
+        id: users.id,
+        fullName: users.fullName,
+        email: users.email,
+        departmentId: users.departmentId,
+        departmentName: departments.name,
+        universityId: users.universityId,
+        university: users.university,
+        phoneNumber: users.phoneNumber,
+        isExternal: users.isExternal,
+        accountStatus: users.accountStatus,
+        avatarUrl: users.avatarUrl,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .leftJoin(departments, eq(users.departmentId, departments.id))
+      .where(eq(users.id, userId));
+
+    return row || null;
+  }
+
+  async getCoordinatorDepartments(userId: string) {
+    return this.drizzle.db
+      .select({
+        id: departments.id,
+        name: departments.name,
+        code: departments.code,
+        assignedAt: departmentCoordinators.assignedAt,
+      })
+      .from(departmentCoordinators)
+      .innerJoin(
+        departments,
+        eq(departmentCoordinators.departmentId, departments.id),
+      )
+      .where(eq(departmentCoordinators.userId, userId));
+  }
+
   async findOne(input: FindUserInput): Promise<User | null> {
     if (input.email) {
       return this.findByEmail(input.email);

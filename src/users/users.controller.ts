@@ -16,6 +16,7 @@ import { RequireCasl } from 'src/access-control/require-permission.decorator';
 import { ReplaceUserRolesDto } from './dto/replace-user-roles.dto';
 import { GetUsersQueryDto } from './dto/get-users-query.dto';
 import { UsersListResponse } from './types/user-admin-list.type';
+import { UserDetailResponse } from './types/user-detail.type';
 
 @Controller('users')
 export class UsersController {
@@ -51,6 +52,15 @@ export class UsersController {
   @RequireCasl({ action: 'read', subject: 'User' })
   async getUserRoles(@Param('id', new ParseUUIDPipe()) userId: string) {
     return this.usersService.getUserRoles(userId);
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard, AccessGuard)
+  @RequireCasl({ action: 'read', subject: 'User' })
+  async getUserById(
+    @Param('id', new ParseUUIDPipe()) userId: string,
+  ): Promise<UserDetailResponse> {
+    return this.usersService.getUserById(userId);
   }
 
   @Put(':id/roles')
