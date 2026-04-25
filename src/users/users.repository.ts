@@ -233,6 +233,32 @@ export class UsersRepository {
     });
   }
 
+  async replaceUserRoles(userId: string, roleIds: string[], tx?: DB) {
+    const db = tx || this.drizzle.db;
+
+    await db.delete(userRoles).where(eq(userRoles.userId, userId));
+
+    if (roleIds.length === 0) {
+      return;
+    }
+
+    await db.insert(userRoles).values(
+      roleIds.map((roleId) => ({
+        userId,
+        roleId,
+      })),
+    );
+  }
+
+  async findRolesByIds(roleIds: string[], tx?: DB) {
+    const db = tx || this.drizzle.db;
+    if (roleIds.length === 0) {
+      return [];
+    }
+
+    return db.select().from(roles).where(inArray(roles.id, roleIds));
+  }
+
   /**
    * Find user by email with roles and permissions
    * @param email - User email

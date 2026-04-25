@@ -2,10 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { UsersRepository } from './users.repository';
 import { User, CreateUserInput } from 'src/users/types/user';
 import { UserSelectorDto } from 'src/types/selector';
+import { NotFoundException } from '@nestjs/common';
+import { DrizzleService } from 'src/db/db.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private usersRepository: UsersRepository) { }
+  constructor(
+    private usersRepository: UsersRepository,
+    private readonly drizzle: DrizzleService,
+  ) {}
 
   async findByEmail(email: string): Promise<User | null> {
     return this.usersRepository.findByEmail(email);
@@ -43,6 +48,41 @@ export class UsersService {
    */
   async getUserRoles(userId: string) {
     return this.usersRepository.getUserRoles(userId);
+  }
+
+  async replaceUserRoles(userId: string, roleIds: string[]) {
+    const user = await this.usersRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundException(`User "${userId}" not found`);
+    }
+
+    const uniqueRoleIds = Array.from(new Set(roleIds));
+    const existingRoles =
+      await this.usersRepository.findRolesByIds(uniqueRoleIds);
+    const existingRoleIdSet = new Set(existingRoles.map((role) => role.id));
+    const invalidRoleIds = uniqueRoleIds.filter(
+      (id) => !existingRoleIdSet.has(id),
+    );
+
+    await this.drizzle.transaction(async (tx) => {
+      await this.usersRepository.replaceUserRoles(
+        userId,
+        existingRoles.map((role) => role.id),
+        tx,
+      );
+    });
+
+    const updatedRoles = await this.usersRepository.getUserRoles(userId);
+
+    return {
+      userId,
+      roles: updatedRoles,
+      ignoredRoleIds: invalidRoleIds,
+      warning:
+        invalidRoleIds.length > 0
+          ? 'Some roleIds were ignored because they do not exist'
+          : undefined,
+    };
   }
 
   /**

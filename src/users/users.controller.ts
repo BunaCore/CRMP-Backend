@@ -1,6 +1,19 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UserSelectorDto } from 'src/types/selector';
+import { JwtAuthGuard } from 'src/auth/jwt.guard';
+import { AccessGuard } from 'src/access-control/access.guard';
+import { RequireCasl } from 'src/access-control/require-permission.decorator';
+import { ReplaceUserRolesDto } from './dto/replace-user-roles.dto';
 
 @Controller('users')
 export class UsersController {
@@ -22,5 +35,22 @@ export class UsersController {
   ): Promise<UserSelectorDto[]> {
     const parsedLimit = limit ? Math.min(parseInt(limit, 10), 200) : 50;
     return this.usersService.getSelector(searchQuery, roleName, parsedLimit);
+  }
+
+  @Get(':id/roles')
+  @UseGuards(JwtAuthGuard, AccessGuard)
+  @RequireCasl({ action: 'read', subject: 'User' })
+  async getUserRoles(@Param('id', new ParseUUIDPipe()) userId: string) {
+    return this.usersService.getUserRoles(userId);
+  }
+
+  @Put(':id/roles')
+  @UseGuards(JwtAuthGuard, AccessGuard)
+  @RequireCasl({ action: 'assignRole', subject: 'User' })
+  async replaceUserRoles(
+    @Param('id', new ParseUUIDPipe()) userId: string,
+    @Body() dto: ReplaceUserRolesDto,
+  ) {
+    return this.usersService.replaceUserRoles(userId, dto.roleIds);
   }
 }
