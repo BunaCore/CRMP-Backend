@@ -14,10 +14,19 @@ import { JwtAuthGuard } from 'src/auth/jwt.guard';
 import { AccessGuard } from 'src/access-control/access.guard';
 import { RequireCasl } from 'src/access-control/require-permission.decorator';
 import { ReplaceUserRolesDto } from './dto/replace-user-roles.dto';
+import { GetUsersQueryDto } from './dto/get-users-query.dto';
+import { UsersListResponse } from './types/user-admin-list.type';
 
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Get()
+  @UseGuards(JwtAuthGuard, AccessGuard)
+  @RequireCasl({ action: 'read', subject: 'User' })
+  async getUsers(@Query() query: GetUsersQueryDto): Promise<UsersListResponse> {
+    return this.usersService.getUsers(query);
+  }
 
   /**
    * GET /users/selector

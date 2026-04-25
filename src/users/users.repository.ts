@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { eq, and, inArray, or, ilike } from 'drizzle-orm';
+import { asc, desc, eq, and, inArray, or, ilike, SQL, sql } from 'drizzle-orm';
 import { DrizzleService } from 'src/db/db.service';
 import { users } from 'src/db/schema/user';
 import {
@@ -13,6 +13,8 @@ import { refreshTokens } from 'src/db/schema/refresh-tokens';
 import { User, CreateUserInput, FindUserInput } from 'src/users/types/user';
 import { UserSelectorDto } from 'src/types/selector';
 import { DB } from 'src/db/db.type';
+import { departments } from 'src/db/schema/department';
+import { GetUsersQueryDto } from './dto/get-users-query.dto';
 
 @Injectable()
 export class UsersRepository {
@@ -464,5 +466,123 @@ export class UsersRepository {
     }
 
     return Array.from(userMap.values());
+  }
+
+  private buildUserListWhere(
+    query: GetUsersQueryDto,
+  ): SQL<unknown> | undefined {
+    const conditions: SQL<unknown>[] = [];
+
+    if (query.search) {
+      conditions.push(
+        or(
+          ilike(users.fullName as any, `%${query.search}%`),
+          ilike(users.email, `%${query.search}%`),
+          ilike(users.universityId as any, `%${query.search}%`),
+        )!,
+      );
+    }
+
+    if (query.roleId) {
+      conditions.push(eq(userRoles.roleId, query.roleId));
+    }
+
+    if (query.roleName) {
+      conditions.push(eq(roles.name, query.roleName));
+    }
+
+    if (query.departmentId) {
+      conditions.push(eq(users.departmentId, query.departmentId));
+    }
+
+    if (query.accountStatus) {
+      conditions.push(eq(users.accountStatus, query.accountStatus as any));
+    }
+
+    if (typeof query.isExternal === 'boolean') {
+      conditions.push(eq(users.isExternal, query.isExternal));
+    }
+
+    if (conditions.length === 0) {
+      return undefined;
+    }
+
+    return conditions.length === 1 ? conditions[0] : and(...conditions);
+  }
+
+  async countUsersForAdminList(query: GetUsersQueryDto): Promise<number> {
+    const where = this.buildUserListWhere(query);
+
+    const result = await this.drizzle.db
+      .select({
+        total: sql<number>`count(distinct ${users.id})`,
+      })
+      .from(users)
+      .leftJoin(userRoles, eq(users.id, userRoles.userId))
+      .leftJoin(roles, eq(userRoles.roleId, roles.id))
+      .where(where);
+
+    return Number(result[0]?.total ?? 0);
+  }
+
+  async findUsersForAdminList(query: GetUsersQueryDto) {
+    const where = this.buildUserListWhere(query);
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortDir = query.sortDir ?? 'desc';
+    const limit = query.limit ?? 20;
+    const offset = query.getOffset();
+
+    const sortColumnMap = {
+      fullName: users.fullName,
+      email: users.email,
+      createdAt: users.createdAt,
+      accountStatus: users.accountStatus,
+    } as const;
+
+    const sortColumn = sortColumnMap[sortBy];
+    const orderByExpr = sortDir === 'asc' ? asc(sortColumn) : desc(sortColumn);
+
+    // Page by distinct user IDs to avoid role-join row duplication.
+    const pagedUserIds = await this.drizzle.db
+      .selectDistinct({
+        id: users.id,
+        sortValue: sortColumn,
+      })
+      .from(users)
+      .leftJoin(userRoles, eq(users.id, userRoles.userId))
+      .leftJoin(roles, eq(userRoles.roleId, roles.id))
+      .where(where)
+      .orderBy(orderByExpr)
+      .limit(limit)
+      .offset(offset);
+
+    if (pagedUserIds.length === 0) {
+      return [];
+    }
+
+    const userIds = pagedUserIds.map((row) => row.id);
+
+    return this.drizzle.db
+      .select({
+        id: users.id,
+        fullName: users.fullName,
+        email: users.email,
+        departmentId: users.departmentId,
+        departmentName: departments.name,
+        universityId: users.universityId,
+        phoneNumber: users.phoneNumber,
+        isExternal: users.isExternal,
+        accountStatus: users.accountStatus,
+        avatarUrl: users.avatarUrl,
+        createdAt: users.createdAt,
+        roleId: roles.id,
+        roleName: roles.name,
+      })
+      .from(users)
+      .leftJoin(userRoles, eq(users.id, userRoles.userId))
+      .leftJoin(roles, eq(userRoles.roleId, roles.id))
+      .leftJoin(departments, eq(users.departmentId, departments.id))
+      .where(inArray(users.id, userIds))
+      .orderBy(orderByExpr);
   }
 }

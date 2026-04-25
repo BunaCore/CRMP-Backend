@@ -4,6 +4,9 @@ import { User, CreateUserInput } from 'src/users/types/user';
 import { UserSelectorDto } from 'src/types/selector';
 import { NotFoundException } from '@nestjs/common';
 import { DrizzleService } from 'src/db/db.service';
+import { GetUsersQueryDto } from './dto/get-users-query.dto';
+import { buildPaginationMeta } from 'src/common/pagination/utils/build-pagination-meta';
+import { UsersListResponse } from './types/user-admin-list.type';
 
 @Injectable()
 export class UsersService {
@@ -126,5 +129,64 @@ export class UsersService {
       return [];
     }
     return this.usersRepository.findByIds(userIds);
+  }
+
+  async getUsers(query: GetUsersQueryDto): Promise<UsersListResponse> {
+    const [totalItems, rows] = await Promise.all([
+      this.usersRepository.countUsersForAdminList(query),
+      this.usersRepository.findUsersForAdminList(query),
+    ]);
+
+    const grouped = new Map<
+      string,
+      {
+        id: string;
+        fullName: string | null;
+        email: string;
+        departmentId: string | null;
+        departmentName: string | null;
+        universityId: string | null;
+        phoneNumber: string | null;
+        isExternal: boolean;
+        accountStatus: 'active' | 'deactive' | 'suspended';
+        avatarUrl: string | null;
+        createdAt: Date | null;
+        roles: Array<{ id: string; name: string }>;
+      }
+    >();
+
+    for (const row of rows) {
+      if (!grouped.has(row.id)) {
+        grouped.set(row.id, {
+          id: row.id,
+          fullName: row.fullName,
+          email: row.email,
+          departmentId: row.departmentId,
+          departmentName: row.departmentName ?? null,
+          universityId: row.universityId,
+          phoneNumber: row.phoneNumber,
+          isExternal: row.isExternal ?? false,
+          accountStatus: row.accountStatus,
+          avatarUrl: row.avatarUrl,
+          createdAt: row.createdAt,
+          roles: [],
+        });
+      }
+
+      if (row.roleId && row.roleName) {
+        const user = grouped.get(row.id)!;
+        if (!user.roles.some((role) => role.id === row.roleId)) {
+          user.roles.push({ id: row.roleId, name: row.roleName });
+        }
+      }
+    }
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    return {
+      items: Array.from(grouped.values()),
+      meta: buildPaginationMeta(page, limit, totalItems),
+    };
   }
 }
