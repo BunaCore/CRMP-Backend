@@ -37,6 +37,12 @@ export class BudgetItemDto {
 }
 
 export class CreateProposalDto {
+  @IsUUID()
+  @IsNotEmpty({
+    message: 'fileId is required (upload via /files/upload first)',
+  })
+  fileId: string;
+
   @IsString()
   @IsNotEmpty()
   title: string;
@@ -74,7 +80,12 @@ export class CreateProposalDto {
   @Type(() => Number)
   durationMonths: number;
 
-  @Transform(({ value }) => plainToInstance(BudgetItemDto, JSON.parse(value)))
+  @Transform(({ value }) =>
+    plainToInstance(
+      BudgetItemDto,
+      typeof value === 'string' ? JSON.parse(value) : value,
+    ),
+  )
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => BudgetItemDto)
@@ -82,7 +93,10 @@ export class CreateProposalDto {
   budget: BudgetItemDto[];
 
   @Transform(({ value }) =>
-    plainToInstance(ProposalMemberDto, JSON.parse(value)),
+    plainToInstance(
+      ProposalMemberDto,
+      typeof value === 'string' ? JSON.parse(value) : value,
+    ),
   )
   @IsArray()
   @ValidateNested({ each: true })

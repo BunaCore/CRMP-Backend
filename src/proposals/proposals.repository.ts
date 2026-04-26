@@ -192,6 +192,15 @@ export class ProposalsRepository {
     return file;
   }
 
+  async findProposalVersionById(versionId: string) {
+    const [version] = await this.drizzle.db
+      .select()
+      .from(schema.proposalVersions)
+      .where(eq(schema.proposalVersions.id, versionId));
+
+    return version || null;
+  }
+
   /**
    * Create proposal version and link to proposal
    */

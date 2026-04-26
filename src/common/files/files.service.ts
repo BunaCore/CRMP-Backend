@@ -178,6 +178,36 @@ export class FilesService {
     };
   }
 
+  async getFileWithAccess(fileId: string): Promise<{
+    id: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    url: string;
+    visibility: 'public' | 'private';
+    expiresIn?: number;
+  } | null> {
+    const meta = await this.filesRepository.findById(fileId);
+    if (!meta) {
+      return null;
+    }
+
+    const access = await this.getFileById(fileId);
+    if (!access) {
+      return null;
+    }
+
+    return {
+      id: meta.id,
+      originalName: meta.originalName,
+      mimeType: meta.mimeType,
+      size: meta.size,
+      url: access.url,
+      visibility: access.visibility,
+      expiresIn: access.expiresIn,
+    };
+  }
+
   /**
    * Delete file from storage and DB.
    *

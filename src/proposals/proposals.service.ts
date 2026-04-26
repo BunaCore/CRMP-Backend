@@ -33,6 +33,7 @@ import {
   buildProposalRequestWhere,
   combineWithAnd,
 } from './conditions/proposal.condition';
+import { FilesService } from 'src/common/files/files.service';
 @Injectable()
 export class ProposalsService {
   constructor(
@@ -43,12 +44,11 @@ export class ProposalsService {
     private readonly workflowService: WorkflowService,
     private readonly mailService: MailService,
     private readonly abilityFactory: AbilityFactory,
+    private readonly filesService: FilesService,
   ) {}
   async create(
     user: AuthenticatedUser,
     dto: CreateProposalDto,
-    // @ts-ignore
-    file: Express.Multer.File,
     shouldSubmit: boolean = false,
   ) {
     // 0. Validate members structure (PI and MEMBER roles only)
@@ -140,21 +140,19 @@ export class ProposalsService {
         allMembers as Array<{ userId: string; role: ProposalMemberRole }>,
       );
 
-      // 2.3 Create file metadata
-      const proposalFile = await this.repository.createProposalFile(tx, {
-        proposalId: created.id,
-        uploadedBy: user.id,
-        fileName: file.originalname,
-        filePath: `proposals/${Date.now()}_${file.originalname}`,
-        fileType: file.mimetype,
-        fileSize: file.size,
-      });
+      // 2.3 Attach uploaded fileId to proposal (TEMP -> ATTACHED)
+      await this.filesService.attachFile(
+        dto.fileId,
+        'PROPOSAL',
+        created.id,
+        'PRIMARY_DOCUMENT',
+      );
 
-      // 2.4 Create version snapshot
+      // 2.4 Create version snapshot (references common/files.id)
       await this.repository.createProposalVersion(tx, {
         proposalId: created.id,
         createdBy: user.id,
-        fileId: proposalFile.id,
+        fileId: dto.fileId,
         collaborators: dto.collaborators,
       });
 
@@ -675,6 +673,28 @@ export class ProposalsService {
     const budgetItems =
       await this.repository.getBudgetItemsByProposalId(proposalId);
 
+    // 9a. Fetch proposal primary file details from current version
+    let file: ProposalDetailResponse['file'] = null;
+    if (proposal.currentVersionId) {
+      const version = await this.repository.findProposalVersionById(
+        proposal.currentVersionId,
+      );
+      if (version?.fileId) {
+        const f = await this.filesService.getFileWithAccess(version.fileId);
+        if (f) {
+          file = {
+            id: f.id,
+            name: f.originalName,
+            mimeType: f.mimeType,
+            size: f.size,
+            url: f.url,
+            visibility: f.visibility,
+            expiresIn: f.expiresIn,
+          };
+        }
+      }
+    }
+
     // 10. Map to detailed response
     return mapProposalToDetailResponse(
       proposal,
@@ -686,6 +706,7 @@ export class ProposalsService {
       defenceSchedules,
       totalBudget,
       budgetItems,
+      file,
     );
   }
 

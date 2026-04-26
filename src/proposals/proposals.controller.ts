@@ -6,15 +6,9 @@ import {
   UseGuards,
   Param,
   ParseUUIDPipe,
-  BadRequestException,
   Query,
-  UseInterceptors,
-  UploadedFile,
-  ParseFilePipe,
-  MaxFileSizeValidator,
-  FileTypeValidator,
+  BadRequestException,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { ProposalsService } from './proposals.service';
 import { ProposalMembersService } from './proposal-members.service';
 import { WorkflowService } from './workflow.service';
@@ -142,28 +136,13 @@ export class ProposalsController {
 
   @Post()
   @RequirePermission(Permission.PROPOSAL_CREATE)
-  @UseInterceptors(FileInterceptor('file'))
   async submitProposal(
     @Body() createProposalDto: CreateProposalDto,
     @CurrentUser() user: AuthenticatedUser,
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }),
-          new FileTypeValidator({ fileType: 'application/pdf' }),
-        ],
-      }),
-    ) // @ts-ignore
-    file: any,
     @Query('submit') submit?: string,
   ) {
     const shouldSubmit = submit === 'true';
-    return this.proposalsService.create(
-      user,
-      createProposalDto,
-      file,
-      shouldSubmit,
-    );
+    return this.proposalsService.create(user, createProposalDto, shouldSubmit);
   }
 
   /**
