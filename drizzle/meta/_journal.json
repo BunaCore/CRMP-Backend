@@ -43,6 +43,13 @@
       "when": 1777124020213,
       "tag": "0005_fat_colleen_wing",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777154290447,
+      "tag": "0006_smiling_tomorrow_man",
+      "breakpoints": true
     }
   ]
 }
