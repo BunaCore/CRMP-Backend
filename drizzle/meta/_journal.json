@@ -36,6 +36,20 @@
       "when": 1776758324441,
       "tag": "0004_far_red_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777050000000,
+      "tag": "0005_add_documents_yjs_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777279759703,
+      "tag": "0006_classy_sunset_bain",
+      "breakpoints": true
     }
   ]
 }

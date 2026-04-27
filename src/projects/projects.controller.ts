@@ -13,6 +13,19 @@ export class ProjectsController {
     return this.projectsService.getProjectsForUser(user.id);
   }
 
+  @Get(':projectId/members')
+  async getProjectMembers(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    // Check membership
+    const isMember = await this.projectsService.isUserMemberOfProject(user.id, projectId);
+    if (!isMember) {
+      throw new NotFoundException('Project not found');
+    }
+    return this.projectsService.getProjectMembers(projectId);
+  }
+
   @Get(':projectId')
   async getProject(
     @Param('projectId', ParseUUIDPipe) projectId: string,

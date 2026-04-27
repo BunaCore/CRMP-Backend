@@ -20,4 +20,8 @@ export class ProjectsService {
   async isUserMemberOfProject(userId: string, projectId: string): Promise<boolean> {
     return this.repository.isUserMemberOfProject(userId, projectId);
   }
+
+  async getProjectMembers(projectId: string) {
+    return this.repository.getProjectMembers(projectId);
+  }
 }
