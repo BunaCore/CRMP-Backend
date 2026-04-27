@@ -1,1 +1,0 @@
-ALTER TABLE "files" ADD COLUMN "bucket" varchar(255);

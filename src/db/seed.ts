@@ -75,6 +75,18 @@ const USERS: SeedUserConfig[] = [
     roles: [Role.STUDENT],
   },
   {
+    name: 'Abebe Kebede',
+    email: 'student2@crmp.edu',
+    password: UNIVERSAL_PASSWORD,
+    roles: [Role.STUDENT],
+  },
+  {
+    name: 'Tigist Alemu',
+    email: 'student3@crmp.edu',
+    password: UNIVERSAL_PASSWORD,
+    roles: [Role.STUDENT],
+  },
+  {
     name: 'Director of RAD',
     email: 'rad@crmp.edu',
     password: UNIVERSAL_PASSWORD,
@@ -468,6 +480,7 @@ async function seed() {
         degreeLevel: 'Master' as const,
         members: [
           { email: 'student@crmp.edu', role: 'PI' as const },
+          { email: 'student2@crmp.edu', role: 'MEMBER' as const },
           { email: 'advisor@crmp.edu', role: 'ADVISOR' as const },
         ],
       },
@@ -487,6 +500,7 @@ async function seed() {
         budgetAmount: 750000,
         members: [
           { email: 'student@crmp.edu', role: 'PI' as const },
+          { email: 'student3@crmp.edu', role: 'MEMBER' as const },
           { email: 'evaluator@crmp.edu', role: 'EVALUATOR' as const },
         ],
       },
@@ -757,6 +771,57 @@ async function seed() {
           currentStepOrder: finalStepOrder,
         })
         .where(sql`${schema.proposals.id} = ${seeded.proposal.id}`);
+
+      // Create default workspace for promoted project (mirrors createProjectFromApprovedProposal)
+      const [promotedWorkspace] = await tx
+        .insert(schema.workspaces)
+        .values({
+          projectId: project.projectId,
+          name: 'Main Document',
+          createdBy: adminUser.id,
+        })
+        .returning();
+
+      const promotedInitialContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Start writing your document here...' }],
+          },
+        ],
+      };
+
+      const [promotedDocument] = await tx
+        .insert(schema.documents)
+        .values({
+          workspaceId: promotedWorkspace.id,
+          currentContent: promotedInitialContent,
+        })
+        .returning();
+
+      const promotedContentHash = createHash('sha256')
+        .update(JSON.stringify(promotedInitialContent))
+        .digest('hex');
+
+      const [promotedVersion] = await tx
+        .insert(schema.documentVersions)
+        .values({
+          documentId: promotedDocument.id,
+          versionNumber: 1,
+          content: promotedInitialContent,
+          createdBy: adminUser.id,
+          sourceAction: 'initial',
+          contentHash: promotedContentHash,
+        })
+        .returning();
+
+      await tx
+        .update(schema.documents)
+        .set({ currentVersionId: promotedVersion.id })
+        .where(eq(schema.documents.id, promotedDocument.id));
+
+      console.log(`  ✅ Created workspace for promoted project: ${project.projectTitle}`);
     }
 
     // Seed sample data for testing

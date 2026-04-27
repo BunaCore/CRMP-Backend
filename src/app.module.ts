@@ -18,7 +18,9 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { ChatModule } from './chat/chat.module';
 import { QueuesModule } from './queues/queues.module';
+
 import { AppLoggerModule } from './common/logger/logger.module';
+import { CollaborationModule } from './collaboration/collaboration.module';
 
 @Module({
   imports: [
@@ -42,6 +44,7 @@ import { AppLoggerModule } from './common/logger/logger.module';
     ChatModule,
     RealtimeModule,
     QueuesModule,
+    CollaborationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

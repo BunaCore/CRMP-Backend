@@ -19,6 +19,7 @@ import { JwtAuthGuard } from 'src/auth/jwt.guard';
 import { CurrentUser, type AuthenticatedUser } from 'src/auth/decorators/current-user.decorator';
 import { AccessService } from 'src/access-control/access.service';
 import { RequirePermission } from 'src/access-control/require-permission.decorator';
+import { WorkspaceManagerService } from './workspace-manager.service';
 
 @Controller('workspaces')
 @UseGuards(JwtAuthGuard)
@@ -26,6 +27,7 @@ export class DocumentsController {
   constructor(
     private readonly documentsService: DocumentsService,
     private readonly accessService: AccessService,
+    private readonly workspaceManager: WorkspaceManagerService,
   ) {}
 
   // ─── Workspace CRUD ─────────────────────────────────────────────────
@@ -36,19 +38,27 @@ export class DocumentsController {
     @Body() dto: CreateWorkspaceDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.documentsService.createWorkspace(projectId, dto, user.id);
+    // Compatibility route: delegates to the shared workspace manager
+    return this.workspaceManager.createWorkspace(projectId, dto.name, user.id);
   }
 
   @Get('project/:projectId')
-  async getWorkspaces(@Param('projectId', ParseUUIDPipe) projectId: string) {
-    return this.documentsService.getWorkspaces(projectId);
+  async getWorkspaces(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    // Compatibility route: delegates to the shared workspace manager
+    return this.workspaceManager.getWorkspacesForProject(projectId, user.id);
   }
 
   // ─── Document operations ────────────────────────────────────────────
 
   @Get(':workspaceId/document')
-  async getDocument(@Param('workspaceId', ParseUUIDPipe) workspaceId: string) {
-    return this.documentsService.getDocument(workspaceId);
+  async getDocument(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documentsService.getDocument(workspaceId, user.id);
   }
 
   @Put(':workspaceId/document')
@@ -63,16 +73,20 @@ export class DocumentsController {
   // ─── Version history ────────────────────────────────────────────────
 
   @Get(':workspaceId/versions')
-  async getVersions(@Param('workspaceId', ParseUUIDPipe) workspaceId: string) {
-    return this.documentsService.getVersions(workspaceId);
+  async getVersions(
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documentsService.getVersions(workspaceId, user.id);
   }
 
   @Get(':workspaceId/versions/:versionId')
   async getVersionDetail(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Param('versionId', ParseUUIDPipe) versionId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.documentsService.getVersionDetail(workspaceId, versionId);
+    return this.documentsService.getVersionDetail(workspaceId, versionId, user.id);
   }
 
   @Post(':workspaceId/versions/:versionId/restore')
@@ -104,10 +118,14 @@ export class DocumentsController {
   @Get(':workspaceId/export/markdown')
   async exportMarkdown(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Query('download') download?: string,
     @Res() res?: Response,
   ) {
-    const { markdown, workspaceName } = await this.documentsService.exportMarkdown(workspaceId);
+    const { markdown, workspaceName } = await this.documentsService.exportMarkdown(
+      workspaceId,
+      user.id,
+    );
 
     // ?download=true → send as .md file attachment
     if (download === 'true' && res) {
@@ -133,8 +151,12 @@ export class DocumentsController {
   async exportPdf(
     @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
     @Res() res: Response,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const { buffer, filename } = await this.documentsService.exportPdf(workspaceId);
+    const { buffer, filename } = await this.documentsService.exportPdf(
+      workspaceId,
+      user.id,
+    );
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${filename}"`,
