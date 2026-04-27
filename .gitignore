@@ -32,3 +32,10 @@ docker-compose.db.yml
 
 # uploaded documents
 uploads/
+
+# Machine Learning
+ml/venv/
+ml/.venv/
+**/__pycache__/
+*.py[cod]
+*$py.class
