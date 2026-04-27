@@ -18,12 +18,14 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { ChatModule } from './chat/chat.module';
 import { QueuesModule } from './queues/queues.module';
+import { AppLoggerModule } from './common/logger/logger.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    AppLoggerModule,
     DbModule,
     UsersModule,
     AuthModule,

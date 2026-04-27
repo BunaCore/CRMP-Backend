@@ -3,6 +3,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import { DrizzleService } from 'src/db/db.service';
@@ -36,6 +37,8 @@ import {
 import { FilesService } from 'src/common/files/files.service';
 @Injectable()
 export class ProposalsService {
+  private readonly logger = new Logger(ProposalsService.name);
+
   constructor(
     private readonly drizzle: DrizzleService,
     private readonly repository: ProposalsRepository,
@@ -76,16 +79,17 @@ export class ProposalsService {
           `Supervisor with ID "${dto.advisorUserId}" does not exist.`,
         );
       }
+      // TODO: ignreo for now
       // Check supervisor has SUPERVISOR role
-      const hasSupervisorRole = await this.repository.filterUsersByRole(
-        [dto.advisorUserId],
-        'SUPERVISOR',
-      );
-      if (hasSupervisorRole.length === 0) {
-        throw new BadRequestException(
-          `User "${dto.advisorUserId}" does not have SUPERVISOR role.`,
-        );
-      }
+      // const hasSupervisorRole = await this.repository.filterUsersByRole(
+      //   [dto.advisorUserId],
+      //   'SUPERVISOR',
+      // );
+      // if (hasSupervisorRole.length === 0) {
+      //   throw new BadRequestException(
+      //     `User "${dto.advisorUserId}" does not have SUPERVISOR role.`,
+      //   );
+      // }
       supervisorMember = { userId: dto.advisorUserId, role: 'SUPERVISOR' };
     }
 
@@ -157,7 +161,10 @@ export class ProposalsService {
       });
 
       // 2.5 Create budget request and items
-      console.log(dto.budget);
+      this.logger.debug(
+        { budgetItemsCount: dto.budget.length },
+        'Creating budget request items',
+      );
       await this.repository.createBudgetRequest(tx, {
         proposalId: created.id,
         requestedBy: user.id,
@@ -311,7 +318,7 @@ export class ProposalsService {
         activeStep.approverRole,
         roleNames,
       );
-      console.log(resolution);
+      this.logger.debug({ resolution }, 'Approver resolution evaluated');
 
       if (!resolution.canApprove) {
         continue;

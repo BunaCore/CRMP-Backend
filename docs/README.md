@@ -10,7 +10,8 @@ This folder contains maintainable, decision-focused documentation for the propos
 4. `data-model.md` — table relationships and workflow invariants.
 5. `runbook.md` — debugging and operational recovery steps.
 6. `testing-strategy.md` — expected test coverage and scenarios.
-7. `adr/` — architecture decisions and rationale.
+7. `storage-minio-s3.md` — MinIO/S3 setup, frontend/backend usage, troubleshooting, production guidance.
+8. `adr/` — architecture decisions and rationale.
 
 ## Documentation Standards
 

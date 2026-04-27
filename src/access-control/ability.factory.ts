@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import {
   AbilityBuilder,
   MongoAbility,
@@ -14,6 +18,8 @@ import { Role } from './role.enum';
  */
 @Injectable()
 export class AbilityFactory {
+  private readonly logger = new Logger(AbilityFactory.name);
+
   constructor(private readonly usersRepository: UsersRepository) {}
 
   /**
@@ -51,7 +57,7 @@ export class AbilityFactory {
 
       return build();
     } catch (error) {
-      console.error('Failed to create ability:', error);
+      this.logger.error({ err: error, userId }, 'Failed to create ability');
       throw new InternalServerErrorException(
         'Failed to initialize permissions',
       );
@@ -195,7 +201,7 @@ export class AbilityFactory {
         rules.push(...rulesForPermission);
       } else {
         // Unknown permission - log but don't fail
-        console.warn(`Unknown permission: ${key}`);
+        this.logger.warn(`Unknown permission: ${key}`);
       }
     });
 

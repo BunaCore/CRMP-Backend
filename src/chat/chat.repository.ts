@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { eq, and, desc, sql, gt, lt, or, isNull } from 'drizzle-orm';
 import { DrizzleService } from 'src/db/db.service';
 import { chats, chatMembers, messages } from 'src/db/schema/chat';
@@ -16,6 +16,8 @@ import {
 
 @Injectable()
 export class ChatRepository {
+  private readonly logger = new Logger(ChatRepository.name);
+
   constructor(private drizzle: DrizzleService) {}
 
   /**
@@ -485,7 +487,14 @@ export class ChatRepository {
       const cursorDate = new Date(cursor);
       whereConditions.push(lt(messages.createdAt, cursorDate));
     }
-    console.log(whereConditions);
+    this.logger.debug(
+      {
+        chatId,
+        hasCursor: Boolean(cursor),
+        whereCount: whereConditions.length,
+      },
+      'Fetching chat messages with cursor filters',
+    );
 
     const rows = await this.drizzle.db
       .select({

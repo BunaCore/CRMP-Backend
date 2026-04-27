@@ -3,6 +3,7 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { FilesRepository } from './files.repository';
@@ -32,6 +33,7 @@ import {
  */
 @Injectable()
 export class FilesService {
+  private readonly logger = new Logger(FilesService.name);
   private readonly publicBucket: string;
   private readonly privateBucket: string;
   private readonly publicBaseUrl: string;
@@ -227,7 +229,9 @@ export class FilesService {
     try {
       await this.storageService.deleteObject(dbFile.bucket, dbFile.storagePath);
     } catch (error) {
-      console.warn(`Failed to delete file from storage: ${fileId}`, error);
+      this.logger.warn(
+        `Failed to delete file from storage: ${fileId}. ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     // Delete from DB
@@ -251,7 +255,9 @@ export class FilesService {
         await this.deleteFile(file.id);
         deleted++;
       } catch (error) {
-        console.error(`Failed to cleanup file ${file.id}:`, error);
+        this.logger.error(
+          `Failed to cleanup file ${file.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 
