@@ -12,6 +12,7 @@ import { LoginDto } from './dto/login.dto';
 import { AuthResponse } from 'src/types/auth-response';
 import { UserWithPermissions } from 'src/types/user-with-permissions';
 import { JwtAuthGuard } from './jwt.guard';
+import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -33,6 +34,11 @@ export class AuthController {
   @Post('login')
   async login(@Body() dto: LoginDto): Promise<AuthResponse> {
     return this.authService.login(dto);
+  }
+
+  @Post('invitations/accept')
+  async acceptInvitation(@Body() dto: AcceptInvitationDto): Promise<AuthResponse> {
+    return this.authService.acceptInvitation(dto);
   }
 
   /**

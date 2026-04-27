@@ -1,7 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Permission } from './permission.enum';
 import { Role } from './role.enum';
 import { RolePermissions } from './role-permissions';
+import { DrizzleService } from 'src/db/db.service';
+import { AccessRepository } from './access.repository';
+import { CreateRoleDto } from './dto/create-role.dto';
+import { UpdateRoleDto } from './dto/update-role.dto';
 
 /**
  * User interface for authorization context
@@ -30,6 +38,112 @@ export interface AccessContext {
 
 @Injectable()
 export class AccessService {
+  constructor(
+    private readonly drizzle: DrizzleService,
+    private readonly accessRepository: AccessRepository,
+  ) {}
+
+  async listRoles() {
+    return this.accessRepository.findRoles();
+  }
+
+  async createRole(dto: CreateRoleDto) {
+    const existing = await this.accessRepository.findRoleByName(dto.name);
+    if (existing) {
+      throw new ConflictException(`Role name "${dto.name}" already exists`);
+    }
+
+    return this.accessRepository.createRole({
+      name: dto.name,
+      description: dto.description,
+    });
+  }
+
+  async updateRole(roleId: string, dto: UpdateRoleDto) {
+    const current = await this.accessRepository.findRoleById(roleId);
+    if (!current) {
+      throw new NotFoundException(`Role "${roleId}" not found`);
+    }
+
+    if (dto.name && dto.name !== current.name) {
+      const duplicate = await this.accessRepository.findRoleByName(dto.name);
+      if (duplicate && duplicate.id !== roleId) {
+        throw new ConflictException(`Role name "${dto.name}" already exists`);
+      }
+    }
+
+    const updated = await this.accessRepository.updateRole(roleId, dto);
+    if (!updated) {
+      throw new NotFoundException(`Role "${roleId}" not found`);
+    }
+
+    return updated;
+  }
+
+  async deleteRole(roleId: string) {
+    const exists = await this.accessRepository.findRoleById(roleId);
+    if (!exists) {
+      throw new NotFoundException(`Role "${roleId}" not found`);
+    }
+
+    const deleted = await this.accessRepository.deleteRole(roleId);
+    return { success: deleted };
+  }
+
+  async listPermissions() {
+    return this.accessRepository.findPermissions();
+  }
+
+  async getRolePermissions(roleId: string) {
+    const role = await this.accessRepository.findRoleById(roleId);
+    if (!role) {
+      throw new NotFoundException(`Role "${roleId}" not found`);
+    }
+
+    const permissions = await this.accessRepository.findRolePermissions(roleId);
+    return {
+      role,
+      permissions,
+    };
+  }
+
+  async replaceRolePermissions(roleId: string, permissionIds: string[]) {
+    const role = await this.accessRepository.findRoleById(roleId);
+    if (!role) {
+      throw new NotFoundException(`Role "${roleId}" not found`);
+    }
+
+    const uniquePermissionIds = Array.from(new Set(permissionIds));
+    const existingPermissions =
+      await this.accessRepository.findPermissionsByIds(uniquePermissionIds);
+
+    const foundIds = new Set(existingPermissions.map((p) => p.id));
+    const invalidPermissionIds = uniquePermissionIds.filter(
+      (id) => !foundIds.has(id),
+    );
+
+    await this.drizzle.transaction(async (tx) => {
+      await this.accessRepository.deleteRolePermissions(roleId, tx);
+      await this.accessRepository.insertRolePermissions(
+        roleId,
+        existingPermissions.map((p) => p.id),
+        tx,
+      );
+    });
+
+    const updated = await this.accessRepository.findRolePermissions(roleId);
+
+    return {
+      role,
+      permissions: updated,
+      ignoredPermissionIds: invalidPermissionIds,
+      warning:
+        invalidPermissionIds.length > 0
+          ? 'Some permissionIds were ignored because they do not exist'
+          : undefined,
+    };
+  }
+
   /**
    * Main authorization check - AUTHORIZATION ONLY
    *

@@ -6,6 +6,7 @@ export interface ProposalRow {
   id: string;
   title: string;
   abstract: string | null;
+  proposalProgram: string | null;
   currentStatus: string | null;
   submittedAt: Date | null;
   isFunded: boolean | null;

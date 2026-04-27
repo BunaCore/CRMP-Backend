@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 
 /**
  * Global Exception Filter
@@ -13,6 +14,8 @@ import {
  */
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
+  constructor(private readonly logger: Logger) {}
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse();
@@ -42,9 +45,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     // ✅ Always log full error for debugging
-    console.error(
-      `🔥 Exception [${request.method} ${request.url}]:`,
-      exception,
+    this.logger.error(
+      {
+        err: exception,
+        method: request.method,
+        path: request.url,
+      },
+      'Unhandled exception',
     );
 
     response.status(status).json({

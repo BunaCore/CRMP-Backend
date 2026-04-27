@@ -66,6 +66,16 @@ export type ProposalDetailResponse = {
   comments: CommentPreview[];
   defenceSchedules: DefenceSchedule[];
 
+  file?: {
+    id: string;
+    name: string;
+    mimeType: string;
+    size: number;
+    url: string;
+    visibility: 'public' | 'private';
+    expiresIn?: number;
+  } | null;
+
   createdAt: string;
 };
 
@@ -145,6 +155,7 @@ export function mapProposalToDetailResponse(
   defenceSchedules: any[] = [],
   totalBudget: number | null = null,
   budgetItems: any[] = [],
+  file: ProposalDetailResponse['file'] = null,
 ): ProposalDetailResponse {
   // Extract members by role
   const { pi, advisors, evaluators, teamMembers } =
@@ -212,6 +223,8 @@ export function mapProposalToDetailResponse(
       scheduledBy: d.scheduledBy ?? null,
       createdAt: d.createdAt?.toISOString() || new Date().toISOString(),
     })),
+
+    file,
 
     createdAt: proposal.createdAt?.toISOString() || new Date().toISOString(),
   };

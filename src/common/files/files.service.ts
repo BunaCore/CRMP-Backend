@@ -1,20 +1,20 @@
 import {
+  Inject,
   Injectable,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
-import * as fs from 'fs';
-import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { FilesRepository } from './files.repository';
-import { FileUploadResponseDto } from 'src/proposals/dto/workflow.dto';
-
-type UploadedFile = {
-  buffer: Buffer;
-  originalname: string;
-  mimetype: string;
-  size: number;
-};
+import { ConfigService } from '@nestjs/config';
+import { InitiateUploadDto } from './dto/initiate-upload.dto';
+import { FileUploadInitResponseDto } from './dto/file-upload-init-response.dto';
+import { FileAccessResponseDto } from './dto/file-access-response.dto';
+import {
+  STORAGE_SERVICE,
+  type StorageService,
+} from './storage/storage.interface';
 
 /**
  * FilesService is a generic, workflow-agnostic file management service.
@@ -33,75 +33,74 @@ type UploadedFile = {
  */
 @Injectable()
 export class FilesService {
-  private readonly uploadDir = path.join(process.cwd(), 'uploads');
+  private readonly logger = new Logger(FilesService.name);
+  private readonly publicBucket: string;
+  private readonly privateBucket: string;
+  private readonly publicBaseUrl: string;
+  private readonly signedUrlExpiresSeconds: number;
 
-  constructor(private filesRepository: FilesRepository) {
-    // Ensure upload directory exists
-    if (!fs.existsSync(this.uploadDir)) {
-      fs.mkdirSync(this.uploadDir, { recursive: true });
-    }
+  constructor(
+    private readonly filesRepository: FilesRepository,
+    private readonly configService: ConfigService,
+    @Inject(STORAGE_SERVICE) private readonly storageService: StorageService,
+  ) {
+    this.publicBucket =
+      this.configService.get<string>('S3_BUCKET_PUBLIC') || 'crmp-public';
+    this.privateBucket =
+      this.configService.get<string>('S3_BUCKET_PRIVATE') || 'crmp-private';
+    this.publicBaseUrl =
+      this.configService.get<string>('S3_PUBLIC_BASE_URL') || '';
+    this.signedUrlExpiresSeconds = parseInt(
+      this.configService.get<string>('S3_SIGNED_URL_EXPIRES_SECONDS') || '900',
+      10,
+    );
   }
 
   /**
-   * Upload file and create TEMP record.
+   * Create presigned upload URL and TEMP file record.
    *
    * LIFECYCLE STEP 1: Upload
    * - No business meaning assigned
    * - No resource attachment
    * - Purely infrastructure: store file, create DB record
    *
-   * @param file - uploaded file
-   * @param userId - user uploading the file
-   * @returns FileUploadResponseDto with fileId
+   * @param dto - upload metadata from client
+   * @param userId - user initiating upload
    */
-  async uploadFile(
-    file: UploadedFile,
+  async initiateUpload(
+    dto: InitiateUploadDto,
     userId: string,
-  ): Promise<FileUploadResponseDto> {
-    if (!file) {
-      throw new BadRequestException('No file provided');
-    }
-
-    // Validate file size (max 50MB)
-    const maxSize = 50 * 1024 * 1024;
-    if (file.size > maxSize) {
-      throw new BadRequestException('File size exceeds 50MB limit');
-    }
-
-    // Generate unique filename
+  ): Promise<FileUploadInitResponseDto> {
     const fileId = randomUUID();
-    const storagePath = await this.saveToStorage(file, fileId);
+    const key = this.buildStorageKey(userId, fileId, dto.originalName);
+    const { bucket, isPublic } = this.resolveBucket(dto.resourceType);
 
-    try {
-      // Create DB record with NO resource binding (TEMP status only)
-      const dbFile = await this.filesRepository.createFile({
-        storagePath,
-        uploadedBy: userId,
-        originalName: file.originalname,
-        mimeType: file.mimetype,
-        size: file.size,
-        resourceType: null, // NOT set during upload
-        resourceId: null, // NOT set during upload
-        purpose: null, // NOT set during upload
-        status: 'TEMP',
-      });
+    const dbFile = await this.filesRepository.createFile({
+      bucket,
+      storagePath: key,
+      uploadedBy: userId,
+      originalName: dto.originalName,
+      mimeType: dto.mimeType,
+      size: dto.size,
+      resourceType: dto.resourceType || null,
+      resourceId: null,
+      purpose: null,
+      status: 'TEMP',
+    });
 
-      return {
-        fileId: dbFile.id,
-        name: file.originalname,
-        mimeType: file.mimetype,
-        size: file.size,
-      };
-    } catch (error) {
-      // Cleanup on error
-      try {
-        fs.unlinkSync(storagePath);
-      } catch (e) {
-        // ignore cleanup errors
-      }
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      throw new BadRequestException(`File upload failed: ${errorMsg}`);
-    }
+    const uploadUrl = await this.storageService.getPresignedPutUrl({
+      bucket,
+      key,
+      contentType: dto.mimeType,
+      expiresInSeconds: this.signedUrlExpiresSeconds,
+    });
+
+    return {
+      fileId: dbFile.id,
+      storageKey: key,
+      uploadUrl,
+      publicUrl: isPublic ? this.buildPublicUrl(key) : undefined,
+    };
   }
 
   /**
@@ -147,37 +146,72 @@ export class FilesService {
   }
 
   /**
-   * Retrieve file by ID for download/viewing.
-   *
-   * @param fileId - UUID of the file
-   * @returns file buffer and metadata
+   * Resolve file access URL by file ID.
    */
-  async getFileById(fileId: string): Promise<UploadedFile | null> {
+  async getFileById(fileId: string): Promise<FileAccessResponseDto | null> {
     const dbFile = await this.filesRepository.findById(fileId);
     if (!dbFile) {
       return null;
     }
 
-    // Check if file exists on disk
-    if (!fs.existsSync(dbFile.storagePath)) {
-      throw new NotFoundException(
-        `File ${fileId} not found on disk (database record exists)`,
-      );
+    if (!dbFile.bucket) {
+      throw new BadRequestException(`File ${fileId} has no storage bucket`);
     }
 
-    // Read file from disk
-    const buffer = fs.readFileSync(dbFile.storagePath);
+    if (dbFile.bucket === this.publicBucket) {
+      return {
+        fileId: dbFile.id,
+        url: this.buildPublicUrl(dbFile.storagePath),
+        visibility: 'public',
+      };
+    }
+
+    const url = await this.storageService.getPresignedGetUrl({
+      bucket: dbFile.bucket,
+      key: dbFile.storagePath,
+      expiresInSeconds: this.signedUrlExpiresSeconds,
+    });
 
     return {
-      buffer,
-      originalname: dbFile.originalName,
-      mimetype: dbFile.mimeType,
-      size: dbFile.size,
+      fileId: dbFile.id,
+      url,
+      visibility: 'private',
+      expiresIn: this.signedUrlExpiresSeconds,
+    };
+  }
+
+  async getFileWithAccess(fileId: string): Promise<{
+    id: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    url: string;
+    visibility: 'public' | 'private';
+    expiresIn?: number;
+  } | null> {
+    const meta = await this.filesRepository.findById(fileId);
+    if (!meta) {
+      return null;
+    }
+
+    const access = await this.getFileById(fileId);
+    if (!access) {
+      return null;
+    }
+
+    return {
+      id: meta.id,
+      originalName: meta.originalName,
+      mimeType: meta.mimeType,
+      size: meta.size,
+      url: access.url,
+      visibility: access.visibility,
+      expiresIn: access.expiresIn,
     };
   }
 
   /**
-   * Delete file from disk and DB.
+   * Delete file from storage and DB.
    *
    * @param fileId - UUID of the file
    */
@@ -187,13 +221,17 @@ export class FilesService {
       throw new NotFoundException(`File ${fileId} not found`);
     }
 
-    // Delete from disk (ignore errors)
+    if (!dbFile.bucket) {
+      throw new BadRequestException(`File ${fileId} has no storage bucket`);
+    }
+
+    // Delete from object storage (ignore errors)
     try {
-      if (fs.existsSync(dbFile.storagePath)) {
-        fs.unlinkSync(dbFile.storagePath);
-      }
+      await this.storageService.deleteObject(dbFile.bucket, dbFile.storagePath);
     } catch (error) {
-      console.warn(`Failed to delete file from disk: ${fileId}`, error);
+      this.logger.warn(
+        `Failed to delete file from storage: ${fileId}. ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     // Delete from DB
@@ -217,39 +255,52 @@ export class FilesService {
         await this.deleteFile(file.id);
         deleted++;
       } catch (error) {
-        console.error(`Failed to cleanup file ${file.id}:`, error);
+        this.logger.error(
+          `Failed to cleanup file ${file.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 
     return deleted;
   }
 
-  /**
-   * Internal helper: Save file to storage.
-   *
-   * FUTURE: Replace with S3/cloud storage
-   * This abstraction allows swapping implementations without changing callers.
-   *
-   * @param file - uploaded file
-   * @param fileId - UUID for the file
-   * @returns storage path (local or S3 URL)
-   */
-  private async saveToStorage(
-    file: UploadedFile,
+  private buildStorageKey(
+    userId: string,
     fileId: string,
-  ): Promise<string> {
-    const ext = path.extname(file.originalname);
-    const filename = `${fileId}${ext}`;
-    const storagePath = path.join(this.uploadDir, filename);
+    originalName: string,
+  ): string {
+    const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    return `uploads/${userId}/${fileId}/${safeName}`;
+  }
 
-    // For now: local filesystem
-    fs.writeFileSync(storagePath, file.buffer);
+  private resolveBucket(resourceType?: string): {
+    bucket: string;
+    isPublic: boolean;
+  } {
+    if (resourceType === 'USER_AVATAR') {
+      return {
+        bucket: this.publicBucket,
+        isPublic: true,
+      };
+    }
 
-    return storagePath;
+    return {
+      bucket: this.privateBucket,
+      isPublic: false,
+    };
+  }
 
-    // FUTURE: S3 implementation
-    // const s3Key = `uploads/${filename}`;
-    // await this.s3Client.putObject({ Bucket, Key: s3Key, Body: file.buffer });
-    // return `s3://${Bucket}/${s3Key}`;
+  private buildPublicUrl(storageKey: string): string {
+    if (!this.publicBaseUrl) {
+      throw new BadRequestException(
+        'S3_PUBLIC_BASE_URL is required to serve public file URLs',
+      );
+    }
+
+    const base = this.publicBaseUrl.endsWith('/')
+      ? this.publicBaseUrl.slice(0, -1)
+      : this.publicBaseUrl;
+    const key = storageKey.startsWith('/') ? storageKey.slice(1) : storageKey;
+    return `${base}/${key}`;
   }
 }

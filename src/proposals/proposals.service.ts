@@ -3,6 +3,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import { DrizzleService } from 'src/db/db.service';
@@ -27,8 +28,17 @@ import {
 import { ProposalResponse } from 'src/types/proposal-response.type';
 import { GetProposalsQueryDto } from './dto/get-proposals-query.dto';
 import { SubmitEvaluationScoresDto } from './dto/evaluation.dto';
+import { AbilityFactory } from 'src/access-control/ability.factory';
+import {
+  buildProposalAuthorizationWhere,
+  buildProposalRequestWhere,
+  combineWithAnd,
+} from './conditions/proposal.condition';
+import { FilesService } from 'src/common/files/files.service';
 @Injectable()
 export class ProposalsService {
+  private readonly logger = new Logger(ProposalsService.name);
+
   constructor(
     private readonly drizzle: DrizzleService,
     private readonly repository: ProposalsRepository,
@@ -36,12 +46,12 @@ export class ProposalsService {
     private readonly usersService: UsersService,
     private readonly workflowService: WorkflowService,
     private readonly mailService: MailService,
+    private readonly abilityFactory: AbilityFactory,
+    private readonly filesService: FilesService,
   ) {}
   async create(
     user: AuthenticatedUser,
     dto: CreateProposalDto,
-    // @ts-ignore
-    file: Express.Multer.File,
     shouldSubmit: boolean = false,
   ) {
     // 0. Validate members structure (PI and MEMBER roles only)
@@ -69,16 +79,17 @@ export class ProposalsService {
           `Supervisor with ID "${dto.advisorUserId}" does not exist.`,
         );
       }
+      // TODO: ignreo for now
       // Check supervisor has SUPERVISOR role
-      const hasSupervisorRole = await this.repository.filterUsersByRole(
-        [dto.advisorUserId],
-        'SUPERVISOR',
-      );
-      if (hasSupervisorRole.length === 0) {
-        throw new BadRequestException(
-          `User "${dto.advisorUserId}" does not have SUPERVISOR role.`,
-        );
-      }
+      // const hasSupervisorRole = await this.repository.filterUsersByRole(
+      //   [dto.advisorUserId],
+      //   'SUPERVISOR',
+      // );
+      // if (hasSupervisorRole.length === 0) {
+      //   throw new BadRequestException(
+      //     `User "${dto.advisorUserId}" does not have SUPERVISOR role.`,
+      //   );
+      // }
       supervisorMember = { userId: dto.advisorUserId, role: 'SUPERVISOR' };
     }
 
@@ -133,26 +144,27 @@ export class ProposalsService {
         allMembers as Array<{ userId: string; role: ProposalMemberRole }>,
       );
 
-      // 2.3 Create file metadata
-      const proposalFile = await this.repository.createProposalFile(tx, {
-        proposalId: created.id,
-        uploadedBy: user.id,
-        fileName: file.originalname,
-        filePath: `proposals/${Date.now()}_${file.originalname}`,
-        fileType: file.mimetype,
-        fileSize: file.size,
-      });
+      // 2.3 Attach uploaded fileId to proposal (TEMP -> ATTACHED)
+      await this.filesService.attachFile(
+        dto.fileId,
+        'PROPOSAL',
+        created.id,
+        'PRIMARY_DOCUMENT',
+      );
 
-      // 2.4 Create version snapshot
+      // 2.4 Create version snapshot (references common/files.id)
       await this.repository.createProposalVersion(tx, {
         proposalId: created.id,
         createdBy: user.id,
-        fileId: proposalFile.id,
+        fileId: dto.fileId,
         collaborators: dto.collaborators,
       });
 
       // 2.5 Create budget request and items
-      console.log(dto.budget);
+      this.logger.debug(
+        { budgetItemsCount: dto.budget.length },
+        'Creating budget request items',
+      );
       await this.repository.createBudgetRequest(tx, {
         proposalId: created.id,
         requestedBy: user.id,
@@ -306,7 +318,7 @@ export class ProposalsService {
         activeStep.approverRole,
         roleNames,
       );
-      console.log(resolution);
+      this.logger.debug({ resolution }, 'Approver resolution evaluated');
 
       if (!resolution.canApprove) {
         continue;
@@ -486,8 +498,30 @@ export class ProposalsService {
     query: GetProposalsQueryDto,
     currentUserId?: string,
   ): Promise<ProposalResponse[]> {
-    // 1. Fetch proposals matching filters from repository (already paginated)
-    const proposals = await this.repository.getProposals(query, currentUserId);
+    if (!currentUserId) {
+      throw new BadRequestException('currentUserId is required');
+    }
+
+    const ability = await this.abilityFactory.createAbility(currentUserId);
+
+    const authWhere = buildProposalAuthorizationWhere(
+      this.drizzle.db,
+      ability,
+      currentUserId,
+    );
+    const requestWhere = buildProposalRequestWhere(
+      this.drizzle.db,
+      query,
+      currentUserId,
+    );
+
+    const where = combineWithAnd([authWhere, requestWhere]);
+
+    // 1. Fetch proposals matching visibility + request filters from repository
+    const proposals = await this.repository.getProposals(where, {
+      limit: query.limit ?? 10,
+      offset: query.getOffset(),
+    });
 
     if (proposals.length === 0) {
       return [];
@@ -550,6 +584,7 @@ export class ProposalsService {
           id: p.id,
           title: p.title,
           abstract: p.abstract ?? undefined,
+          proposalProgram: p.proposalProgram ?? undefined,
           currentStatus: p.currentStatus ?? undefined,
           submittedAt: p.submittedAt ?? undefined,
           isFunded: p.isFunded ?? false,
@@ -645,6 +680,28 @@ export class ProposalsService {
     const budgetItems =
       await this.repository.getBudgetItemsByProposalId(proposalId);
 
+    // 9a. Fetch proposal primary file details from current version
+    let file: ProposalDetailResponse['file'] = null;
+    if (proposal.currentVersionId) {
+      const version = await this.repository.findProposalVersionById(
+        proposal.currentVersionId,
+      );
+      if (version?.fileId) {
+        const f = await this.filesService.getFileWithAccess(version.fileId);
+        if (f) {
+          file = {
+            id: f.id,
+            name: f.originalName,
+            mimeType: f.mimeType,
+            size: f.size,
+            url: f.url,
+            visibility: f.visibility,
+            expiresIn: f.expiresIn,
+          };
+        }
+      }
+    }
+
     // 10. Map to detailed response
     return mapProposalToDetailResponse(
       proposal,
@@ -656,6 +713,7 @@ export class ProposalsService {
       defenceSchedules,
       totalBudget,
       budgetItems,
+      file,
     );
   }
 

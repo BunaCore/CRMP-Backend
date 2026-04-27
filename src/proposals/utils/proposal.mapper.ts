@@ -51,6 +51,7 @@ export function mapProposalToResponse(
     id: string;
     title: string;
     abstract?: string;
+    proposalProgram?: string;
     currentStatus?: string;
     submittedAt?: Date;
     isFunded: boolean;
@@ -120,6 +121,7 @@ export function mapProposalToResponse(
     id: proposal.id,
     title: proposal.title,
     abstract: proposal.abstract,
+    program: proposal.proposalProgram,
     pi: piUser,
     advisors: advisorUsers,
     evaluators: evaluatorUsers,

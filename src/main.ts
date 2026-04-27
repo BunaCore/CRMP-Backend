@@ -3,6 +3,8 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { json, urlencoded } from 'express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+
+import { Logger } from 'nestjs-pino';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
@@ -13,7 +15,11 @@ import { CollaborationYjsRepository } from './collaboration/yjs/collaboration-yj
 import { WorkspaceAccessService } from './documents/workspace-access.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
+
+  // app.useLogger(app.get(Logger));
 
   // Enable CORS - allow all origins
   app.enableCors({
@@ -25,7 +31,7 @@ async function bootstrap() {
   app.use(urlencoded({ extended: true, limit: '50mb' }));
 
   // Global exception filter - handles all errors at the edge
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalFilters(new GlobalExceptionFilter(app.get(Logger)));
 
   // Global validation pipe with custom error handling
   app.useGlobalPipes(

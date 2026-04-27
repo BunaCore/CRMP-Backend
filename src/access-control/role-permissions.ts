@@ -139,6 +139,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
   ],
 
   [Role.SYSTEM_ADMIN]: [
+    Permission.PROPOSAL_READ,
+
     Permission.USER_READ,
     Permission.USER_PROVISION,
     Permission.USER_ASSIGN_ROLE,
