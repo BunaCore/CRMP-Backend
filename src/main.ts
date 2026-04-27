@@ -1,10 +1,16 @@
+// Trigger restart
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { json, urlencoded } from 'express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { validationExceptionFactory } from './common/validation/validation-exception.factory';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { attachCollabWsServer } from './collaboration/collab-ws.server';
+import { CollaborationYjsRepository } from './collaboration/yjs/collaboration-yjs.repository';
+import { WorkspaceAccessService } from './documents/workspace-access.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -17,7 +23,6 @@ async function bootstrap() {
   // Increase payload limit for Base64 images
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
-
 
   // Global exception filter - handles all errors at the edge
   app.useGlobalFilters(new GlobalExceptionFilter());
@@ -56,6 +61,19 @@ async function bootstrap() {
       persistAuthorization: true,
     },
   });
+
+  // ── y-websocket server (WebsocketProvider backend) ───────────────────────
+  // Attach raw WS server to the NestJS HTTP server for /collab/*
+  // Must happen before listen() so upgrade handler is ready.
+  await app.init();
+  const httpServer = app.getHttpServer() as import('http').Server;
+  attachCollabWsServer(
+    httpServer,
+    app.get(JwtService),
+    app.get(ConfigService).get<string>('JWT_SECRET') ?? '',
+    app.get(CollaborationYjsRepository),
+    app.get(WorkspaceAccessService),
+  );
 
   await app.listen(process.env.PORT ?? 3000);
 }

@@ -39,6 +39,15 @@ describe('DocumentsService', () => {
     tiptapToMarkdown: jest.fn(),
   };
 
+  const mockWorkspaceAccess = {
+    ensureWorkspaceMember: jest.fn(),
+  };
+
+  const mockWorkspaceManager = {
+    createWorkspace: jest.fn(),
+    getWorkspacesForProject: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
     // Reset validator to passthrough by default
@@ -52,6 +61,8 @@ describe('DocumentsService', () => {
         { provide: TiptapValidator, useValue: mockValidator },
         { provide: TiptapRenderer, useValue: mockRenderer },
         { provide: MarkdownConverter, useValue: mockMarkdownConverter },
+        { provide: (require('./workspace-access.service') as any).WorkspaceAccessService, useValue: mockWorkspaceAccess },
+        { provide: (require('./workspace-manager.service') as any).WorkspaceManagerService, useValue: mockWorkspaceManager },
       ],
     }).compile();
 
@@ -68,6 +79,7 @@ describe('DocumentsService', () => {
       const dto = { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'test' }] }] } };
       const document = { id: 'doc-id', workspaceId: 'ws-id', currentContent: dto.content };
 
+      mockWorkspaceAccess.ensureWorkspaceMember.mockResolvedValue({ projectId: 'p1' });
       mockRepository.findDocumentByWorkspaceId.mockResolvedValue(document);
       mockRepository.findLatestVersionByDocumentId.mockResolvedValue(null);
       mockRepository.getNextVersionNumber.mockResolvedValue(2);
@@ -83,6 +95,7 @@ describe('DocumentsService', () => {
 
     it('should throw if validation fails', async () => {
       const dto = { content: { type: 'invalid' } };
+      mockWorkspaceAccess.ensureWorkspaceMember.mockResolvedValue({ projectId: 'p1' });
       mockValidator.validateDocument.mockImplementation(() => {
         throw new BadRequestException('Invalid document');
       });
@@ -95,6 +108,7 @@ describe('DocumentsService', () => {
       const document = { id: 'doc-id', workspaceId: 'ws-id', currentContent: dto.content };
       const hash = service['computeHash'](dto.content);
 
+      mockWorkspaceAccess.ensureWorkspaceMember.mockResolvedValue({ projectId: 'p1' });
       mockRepository.findDocumentByWorkspaceId.mockResolvedValue(document);
       mockRepository.findLatestVersionByDocumentId.mockResolvedValue({ contentHash: hash });
       mockRepository.updateDocument.mockResolvedValue(document);
@@ -108,6 +122,7 @@ describe('DocumentsService', () => {
 
   describe('exportMarkdown', () => {
     it('should return markdown with workspace name', async () => {
+      mockWorkspaceAccess.ensureWorkspaceMember.mockResolvedValue({ projectId: 'p1' });
       mockRepository.findWorkspaceById.mockResolvedValue({ id: 'ws-id', name: 'My Doc' });
       mockRepository.findDocumentByWorkspaceId.mockResolvedValue({
         id: 'doc-id',
@@ -115,26 +130,28 @@ describe('DocumentsService', () => {
       });
       mockMarkdownConverter.tiptapToMarkdown.mockReturnValue('hi');
 
-      const result = await service.exportMarkdown('ws-id');
+      const result = await service.exportMarkdown('ws-id', 'user-id');
 
       expect(result).toEqual({ markdown: 'hi', workspaceName: 'My Doc' });
     });
 
     it('should throw if workspace not found', async () => {
+      mockWorkspaceAccess.ensureWorkspaceMember.mockResolvedValue({ projectId: 'p1' });
       mockRepository.findWorkspaceById.mockResolvedValue(null);
 
-      await expect(service.exportMarkdown('ws-id')).rejects.toThrow(NotFoundException);
+      await expect(service.exportMarkdown('ws-id', 'user-id')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('exportPdf', () => {
     it('should return buffer with sanitized filename', async () => {
       const buf = Buffer.from('pdf-data');
+      mockWorkspaceAccess.ensureWorkspaceMember.mockResolvedValue({ projectId: 'p1' });
       mockRepository.findWorkspaceById.mockResolvedValue({ id: 'ws-id', name: 'My Report (Final)' });
       mockRepository.findDocumentByWorkspaceId.mockResolvedValue({ id: 'doc-id', currentContent: { type: 'doc', content: [] } });
       mockRenderer.renderToPdf.mockResolvedValue(buf);
 
-      const result = await service.exportPdf('ws-id');
+      const result = await service.exportPdf('ws-id', 'user-id');
 
       expect(result.filename).toBe('My Report Final.pdf');
       expect(result.buffer).toBe(buf);
@@ -182,11 +199,12 @@ describe('DocumentsService', () => {
         ]
       };
       const buf = Buffer.from('pdf-data');
+      mockWorkspaceAccess.ensureWorkspaceMember.mockResolvedValue({ projectId: 'p1' });
       mockRepository.findWorkspaceById.mockResolvedValue({ id: 'ws-id', name: 'Table Test' });
       mockRepository.findDocumentByWorkspaceId.mockResolvedValue({ id: 'doc-id', currentContent: tableDoc });
       mockRenderer.renderToPdf.mockResolvedValue(buf);
 
-      const result = await service.exportPdf('ws-id');
+      const result = await service.exportPdf('ws-id', 'user-id');
 
       expect(mockRenderer.renderToPdf).toHaveBeenCalledWith(tableDoc, 'Table Test');
       expect(result.buffer).toBe(buf);
@@ -198,6 +216,7 @@ describe('DocumentsService', () => {
       const tiptapDoc = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'hello' }] }] };
       const document = { id: 'doc-id', workspaceId: 'ws-id', currentContent: { type: 'doc', content: [] } };
 
+      mockWorkspaceAccess.ensureWorkspaceMember.mockResolvedValue({ projectId: 'p1' });
       mockRepository.findDocumentByWorkspaceId.mockResolvedValue(document);
       mockMarkdownConverter.markdownToTiptap.mockReturnValue(tiptapDoc);
       mockRepository.findLatestVersionByDocumentId.mockResolvedValue(null);
@@ -219,6 +238,7 @@ describe('DocumentsService', () => {
       const document = { id: 'doc-id', workspaceId: 'ws-id', currentContent: { type: 'doc', content: [] } };
       const version = { id: 'v-id', documentId: 'doc-id', content: { type: 'doc', content: [{ type: 'text', text: 'older' }] }, contentHash: 'old-hash' };
       
+      mockWorkspaceAccess.ensureWorkspaceMember.mockResolvedValue({ projectId: 'p1' });
       mockRepository.findDocumentByWorkspaceId.mockResolvedValue(document);
       mockRepository.findVersionById.mockResolvedValue(version);
       mockRepository.getNextVersionNumber.mockResolvedValue(3);
@@ -243,6 +263,7 @@ describe('DocumentsService', () => {
       const document = { id: 'doc-id', workspaceId: 'ws-id', currentContent: content };
       const version = { id: 'v-id', documentId: 'doc-id', content, contentHash: hash };
 
+      mockWorkspaceAccess.ensureWorkspaceMember.mockResolvedValue({ projectId: 'p1' });
       mockRepository.findDocumentByWorkspaceId.mockResolvedValue(document);
       mockRepository.findVersionById.mockResolvedValue(version);
 
@@ -254,23 +275,25 @@ describe('DocumentsService', () => {
 
   describe('Retrieving Versions', () => {
     it('getVersions should return list of mapped versions', async () => {
+      mockWorkspaceAccess.ensureWorkspaceMember.mockResolvedValue({ projectId: 'p1' });
       mockRepository.findDocumentByWorkspaceId.mockResolvedValue({ id: 'doc-id' });
       mockRepository.findVersionsByDocumentId.mockResolvedValue([
         { id: 'v1', versionNumber: 1, createdAt: new Date(), createdBy: 'u1', sourceAction: 'save', contentHash: 'h1' }
       ]);
 
-      const res = await service.getVersions('ws-id');
+      const res = await service.getVersions('ws-id', 'user-id');
       expect(res.length).toBe(1);
       expect(res[0].id).toBe('v1');
     });
 
     it('getVersionDetail should return specific version with content', async () => {
+      mockWorkspaceAccess.ensureWorkspaceMember.mockResolvedValue({ projectId: 'p1' });
       mockRepository.findDocumentByWorkspaceId.mockResolvedValue({ id: 'doc-id' });
       mockRepository.findVersionById.mockResolvedValue({
          id: 'v1', documentId: 'doc-id', versionNumber: 1, createdAt: new Date(), createdBy: 'u1', sourceAction: 'save', contentHash: 'h1', content: {}
       });
 
-      const res = await service.getVersionDetail('ws-id', 'v1');
+      const res = await service.getVersionDetail('ws-id', 'v1', 'user-id');
       expect(res.id).toBe('v1');
       expect(res.content).toBeDefined();
     });

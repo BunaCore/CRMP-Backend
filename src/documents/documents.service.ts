@@ -8,6 +8,8 @@ import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { SaveDocumentDto } from './dto/save-document.dto';
 import { ImportMarkdownDto } from './dto/import-markdown.dto';
 import { createHash } from 'crypto';
+import { WorkspaceAccessService } from './workspace-access.service';
+import { WorkspaceManagerService } from './workspace-manager.service';
 
 @Injectable()
 export class DocumentsService {
@@ -19,53 +21,26 @@ export class DocumentsService {
     private readonly tiptapValidator: TiptapValidator,
     private readonly tiptapRenderer: TiptapRenderer,
     private readonly markdownConverter: MarkdownConverter,
+    private readonly workspaceAccess: WorkspaceAccessService,
+    private readonly workspaceManager: WorkspaceManagerService,
   ) {}
 
+  // Workspace CRUD in this module is kept only for backward compatibility.
+  // The shared, membership-enforcing implementation lives in WorkspaceManagerService.
   async createWorkspace(projectId: string, dto: CreateWorkspaceDto, createdBy: string) {
-    return this.drizzle.transaction(async (tx) => {
-      const workspace = await this.repository.createWorkspace(projectId, dto.name, createdBy);
-
-      // Create initial document
-      const initialContent = {
-        type: 'doc',
-        content: [
-          {
-            type: 'paragraph',
-            content: [{ type: 'text', text: 'Start writing your document here...' }],
-          },
-        ],
-      };
-      const validatedContent = this.tiptapValidator.validateDocument(initialContent);
-      const document = await this.repository.createDocument(workspace.id, validatedContent);
-
-      // Create initial version
-      const contentHash = this.computeHash(validatedContent);
-      const version = await this.repository.createDocumentVersion(
-        document.id,
-        1,
-        validatedContent,
-        createdBy,
-        'initial',
-        contentHash,
-      );
-
-      // Update document with current version
-      await this.repository.updateDocument(document.id, validatedContent, version.id);
-
-      this.logger.log(`Created workspace '${workspace.id}' with initial document '${document.id}'`);
-      return workspace;
-    });
+    return this.workspaceManager.createWorkspace(projectId, dto.name, createdBy);
   }
 
-  async getWorkspaces(projectId: string) {
-    return this.repository.findWorkspacesByProject(projectId);
+  async getWorkspaces(projectId: string, userId: string) {
+    return this.workspaceManager.getWorkspacesForProject(projectId, userId);
   }
 
   async getProjectsForUser(userId: string) {
     return this.repository.getProjectsForUser(userId);
   }
 
-  async getDocument(workspaceId: string) {
+  async getDocument(workspaceId: string, userId: string) {
+    await this.workspaceAccess.ensureWorkspaceMember({ workspaceId, userId });
     const document = await this.repository.findDocumentByWorkspaceId(workspaceId);
     if (!document) {
       throw new NotFoundException('Document not found');
@@ -79,6 +54,7 @@ export class DocumentsService {
   }
 
   async saveDocument(workspaceId: string, dto: SaveDocumentDto, userId: string, isAutosave = false) {
+    await this.workspaceAccess.ensureWorkspaceMember({ workspaceId, userId });
     // Validate Tiptap document structure
     const validatedContent = this.tiptapValidator.validateDocument(dto.content);
 
@@ -147,7 +123,8 @@ export class DocumentsService {
     });
   }
 
-  async getVersionDetail(workspaceId: string, versionId: string) {
+  async getVersionDetail(workspaceId: string, versionId: string, userId: string) {
+    await this.workspaceAccess.ensureWorkspaceMember({ workspaceId, userId });
     const document = await this.repository.findDocumentByWorkspaceId(workspaceId);
     if (!document) {
       throw new NotFoundException('Document not found');
@@ -169,7 +146,8 @@ export class DocumentsService {
     };
   }
 
-  async getVersions(workspaceId: string) {
+  async getVersions(workspaceId: string, userId: string) {
+    await this.workspaceAccess.ensureWorkspaceMember({ workspaceId, userId });
     const document = await this.repository.findDocumentByWorkspaceId(workspaceId);
     if (!document) {
       throw new NotFoundException('Document not found');
@@ -186,6 +164,7 @@ export class DocumentsService {
   }
 
   async restoreVersion(workspaceId: string, versionId: string, userId: string) {
+    await this.workspaceAccess.ensureWorkspaceMember({ workspaceId, userId });
     return this.drizzle.transaction(async (tx) => {
       const document = await this.repository.findDocumentByWorkspaceId(workspaceId);
       if (!document) {
@@ -247,6 +226,7 @@ export class DocumentsService {
   }
 
   async importMarkdown(workspaceId: string, dto: ImportMarkdownDto, userId: string) {
+    await this.workspaceAccess.ensureWorkspaceMember({ workspaceId, userId });
     return this.drizzle.transaction(async (tx) => {
       const document = await this.repository.findDocumentByWorkspaceId(workspaceId);
       if (!document) {
@@ -303,7 +283,11 @@ export class DocumentsService {
     });
   }
 
-  async exportMarkdown(workspaceId: string): Promise<{ markdown: string; workspaceName: string }> {
+  async exportMarkdown(
+    workspaceId: string,
+    userId: string,
+  ): Promise<{ markdown: string; workspaceName: string }> {
+    await this.workspaceAccess.ensureWorkspaceMember({ workspaceId, userId });
     const workspace = await this.repository.findWorkspaceById(workspaceId);
     if (!workspace) {
       throw new NotFoundException('Workspace not found');
@@ -318,7 +302,11 @@ export class DocumentsService {
     return { markdown, workspaceName: workspace.name };
   }
 
-  async exportPdf(workspaceId: string): Promise<{ buffer: Buffer; filename: string }> {
+  async exportPdf(
+    workspaceId: string,
+    userId: string,
+  ): Promise<{ buffer: Buffer; filename: string }> {
+    await this.workspaceAccess.ensureWorkspaceMember({ workspaceId, userId });
     const workspace = await this.repository.findWorkspaceById(workspaceId);
     if (!workspace) {
       throw new NotFoundException('Workspace not found');

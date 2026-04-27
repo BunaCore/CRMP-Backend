@@ -38,6 +38,16 @@ interface SocketData {
   role: string;
 }
 
+function extractJwt(raw?: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (trimmed.toLowerCase().startsWith('bearer ')) {
+    return trimmed.slice('bearer '.length).trim() || null;
+  }
+  return trimmed;
+}
+
 @WebSocketGateway({
   cors: {
     origin: '*',
@@ -65,7 +75,8 @@ export class RealtimeGateway
    * Verify JWT token from handshake auth and check user exists in database
    */
   async handleConnection(client: Socket) {
-    const token = client.handshake.headers['authorization'];
+    const raw = client.handshake.headers['authorization'];
+    const token = extractJwt(raw);
 
     if (!token) {
       this.logger.warn(`[${client.id}] Connection rejected: no token provided`);
@@ -145,6 +156,7 @@ export class RealtimeGateway
       this.logger.warn(
         `[${client.id}] Connection rejected: invalid token - ${errorMessage}`,
       );
+      client.emit('auth:error', { message: 'Invalid token' });
       client.disconnect(true);
     }
   }
@@ -394,34 +406,7 @@ export class RealtimeGateway
   }
 
   // ========================= COLLAB EVENTS (for teammate) =========================
-  // Placeholder for document collaboration events
-  // Teammate will implement: collab:join, collab:update, collab:awareness
-
-  /**
-   * Placeholder for collab:join
-   * Teammate implements document collaboration
-   */
-  @SubscribeMessage('collab:join')
-  onCollabJoin(@ConnectedSocket() client: Socket, @MessageBody() payload: any) {
-    this.logger.log(
-      `[${client.id}] collab:join received (not yet implemented)`,
-    );
-    client.emit('collab:error', {
-      message: 'Document collaboration not yet implemented',
-    });
-  }
-
-  /**
-   * Placeholder for collab:update
-   * Teammate implements document updates
-   */
-  @SubscribeMessage('collab:update')
-  onCollabUpdate(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() payload: any,
-  ) {
-    this.logger.debug(
-      `[${client.id}] collab:update received (not yet implemented)`,
-    );
-  }
+  // Collaboration events are implemented in `CollaborationGateway`
+  // to keep this gateway focused on presence + chat and to avoid
+  // duplicated Socket.IO event handlers.
 }

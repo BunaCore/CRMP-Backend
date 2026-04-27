@@ -49,4 +49,19 @@ export class ProjectsRepository {
       );
     return !!member;
   }
+
+  async getProjectMembers(projectId: string) {
+    return this.drizzle.db
+      .select({
+        userId: schema.users.id,
+        fullName: schema.users.fullName,
+        email: schema.users.email,
+        role: schema.projectMembers.role,
+        addedAt: schema.projectMembers.addedAt,
+      })
+      .from(schema.projectMembers)
+      .innerJoin(schema.users, eq(schema.projectMembers.userId, schema.users.id))
+      .where(eq(schema.projectMembers.projectId, projectId))
+      .orderBy(schema.projectMembers.addedAt);
+  }
 }

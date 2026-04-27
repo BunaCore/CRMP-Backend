@@ -7,11 +7,27 @@ import { TiptapRenderer } from './tiptap-renderer.service';
 import { MarkdownConverter } from './markdown-converter.service';
 import { DbModule } from 'src/db/db.module';
 import { AccessControlModule } from 'src/access-control/access-control.module';
+import { ProjectsModule } from 'src/projects/projects.module';
+import { WorkspaceAccessService } from './workspace-access.service';
+import { WorkspaceManagerService } from './workspace-manager.service';
 
 @Module({
-  imports: [DbModule, AccessControlModule],
+  imports: [DbModule, AccessControlModule, ProjectsModule],
   controllers: [DocumentsController],
-  providers: [DocumentsService, DocumentsRepository, TiptapValidator, TiptapRenderer, MarkdownConverter],
-  exports: [DocumentsService, TiptapValidator],
+  providers: [
+    DocumentsService,
+    DocumentsRepository,
+    TiptapValidator,
+    TiptapRenderer,
+    MarkdownConverter,
+    WorkspaceAccessService,
+    WorkspaceManagerService,
+  ],
+  exports: [
+    DocumentsService,
+    TiptapValidator,
+    WorkspaceAccessService,
+    WorkspaceManagerService,
+  ],
 })
 export class DocumentsModule {}
