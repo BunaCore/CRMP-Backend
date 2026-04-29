@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NodePgDatabase, drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { DB } from './db.type';
@@ -8,13 +9,24 @@ import * as schema from './schema';
 export class DrizzleService {
   public db: DB;
   private pool: Pool;
+  private readonly enableQueryLogging: boolean;
 
-  constructor() {
+  constructor(private readonly configService: ConfigService) {
+    const logLevel =
+      this.configService.get<string>('DB_LOG_LEVEL') ??
+      this.configService.get<string>('LOG_LEVEL') ??
+      'info';
+
+    const explicitDbLogging = this.configService.get<string>('DB_LOG_QUERIES');
+    this.enableQueryLogging =
+      explicitDbLogging === 'true' ||
+      (explicitDbLogging !== 'false' && ['debug', 'trace'].includes(logLevel));
+
     this.pool = new Pool({
       connectionString: process.env.DATABASE_URL,
     });
 
-    this.db = drizzle(this.pool, { schema });
+    this.db = drizzle(this.pool, { schema, logger: this.enableQueryLogging });
   }
 
   /**

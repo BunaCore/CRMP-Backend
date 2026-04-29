@@ -3,6 +3,7 @@ import {
   BadRequestException,
   InternalServerErrorException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { DrizzleService } from 'src/db/db.service';
 import { DB } from 'src/db/db.type';
@@ -39,6 +40,8 @@ type ProposalRoutingInput = {
  */
 @Injectable()
 export class WorkflowService {
+  private readonly logger = new Logger(WorkflowService.name);
+
   constructor(
     private readonly drizzle: DrizzleService,
     private readonly repository: ProposalsRepository,
@@ -1277,7 +1280,13 @@ export class WorkflowService {
       }
 
       // 3. Link project to proposal
-      console.log('Linking proposal to project:', proposal.id, project);
+      this.logger.log(
+        {
+          proposalId: proposal.id,
+          projectId: project.projectId,
+        },
+        'Linking proposal to project',
+      );
       await tx
         .update(schema.proposals)
         .set({ projectId: project.projectId })
@@ -1299,7 +1308,9 @@ export class WorkflowService {
         content: [
           {
             type: 'paragraph',
-            content: [{ type: 'text', text: 'Start writing your document here...' }],
+            content: [
+              { type: 'text', text: 'Start writing your document here...' },
+            ],
           },
         ],
       };
@@ -1341,7 +1352,13 @@ export class WorkflowService {
         },
       });
     } catch (error) {
-      console.error('Failed to create project from proposal:', error);
+      this.logger.error(
+        {
+          err: error,
+          proposalId: proposal?.id,
+        },
+        'Failed to create project from proposal',
+      );
       throw new InternalServerErrorException(
         'Project creation failed after proposal approval',
       );

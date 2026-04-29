@@ -13,6 +13,7 @@ export const fileStatusEnum = pgEnum('file_status', ['TEMP', 'ATTACHED']);
 
 export const files = pgTable('files', {
   id: uuid('id').primaryKey().defaultRandom(),
+  bucket: varchar('bucket', { length: 255 }),
   storagePath: varchar('storage_path', { length: 500 }).notNull(),
   uploadedBy: uuid('uploaded_by').references(() => users.id, {
     onDelete: 'set null',
