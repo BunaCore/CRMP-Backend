@@ -61,7 +61,7 @@ const YJS_SYNC_UPDATE = 2;
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: true,
     credentials: true,
   },
 })

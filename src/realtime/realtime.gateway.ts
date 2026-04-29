@@ -50,7 +50,7 @@ function extractJwt(raw?: unknown): string | null {
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: true,
     credentials: true,
   },
 })
