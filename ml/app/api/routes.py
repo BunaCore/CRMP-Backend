@@ -25,13 +25,18 @@ async def recommend(request: RecommendationRequest):
 @router.post("/rag/upload")
 async def rag_upload(file: UploadFile = File(...)):
     try:
+        print(f"Received file upload request: {file.filename}")
         contents = await file.read()
-        if not file.filename.endswith('.pdf'):
+        if not file.filename.lower().endswith('.pdf'):
              raise HTTPException(status_code=400, detail="Only PDF files are supported")
              
         result = rag_service.process_pdf(contents, file.filename)
         return result
+    except HTTPException as he:
+        raise he
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/rag/chat", response_model=RagChatResponse)

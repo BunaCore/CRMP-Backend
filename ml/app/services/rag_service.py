@@ -13,6 +13,7 @@ class RAGService:
         self.doc_names = {}
 
     def process_pdf(self, file_bytes: bytes, filename: str) -> dict:
+        print(f"Processing PDF: {filename} ({len(file_bytes)} bytes)")
         """Extracts text from a PDF, chunks it, and stores it in memory."""
         try:
             reader = PdfReader(io.BytesIO(file_bytes))
@@ -65,6 +66,8 @@ class RAGService:
                 "num_chunks": len(chunks)
             }
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             raise Exception(f"Failed to process PDF: {str(e)}")
 
     def chat(self, document_ids: list[str], query: str) -> dict:
@@ -89,7 +92,7 @@ class RAGService:
         texts = [c["text"] for c in all_chunks]
         
         # Compute TF-IDF
-        vectorizer = TfidfVectorizer(stop_words='english')
+        vectorizer = TfidfVectorizer() # Removed stop_words to improve recall for short/simple queries
         try:
             # Check if we have enough vocabulary
             tfidf_matrix = vectorizer.fit_transform(texts)
@@ -102,7 +105,7 @@ class RAGService:
             top_indices = sims.argsort()[-3:][::-1]
             
             # Filter by a small threshold
-            relevant_indices = [i for i in top_indices if sims[i] > 0.01]
+            relevant_indices = [i for i in top_indices if sims[i] > 0.001] # Lowered threshold
             
             if not relevant_indices:
                 return {
