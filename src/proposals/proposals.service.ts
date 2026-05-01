@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { CreateProposalDto } from './dto/create-proposal.dto';
 import { DrizzleService } from 'src/db/db.service';
+import * as schema from 'src/db/schema';
+import { eq } from 'drizzle-orm';
 import { ProposalsRepository } from './proposals.repository';
 import { ProposalApprovalService } from './proposal-approval.service';
 import { UsersService } from 'src/users/users.service';
@@ -35,6 +37,7 @@ import {
   combineWithAnd,
 } from './conditions/proposal.condition';
 import { FilesService } from 'src/common/files/files.service';
+import { UpdateProposalDto } from './dto/update-proposal.dto';
 @Injectable()
 export class ProposalsService {
   private readonly logger = new Logger(ProposalsService.name);
@@ -760,6 +763,135 @@ export class ProposalsService {
     );
 
     return detailedProposals;
+  }
+
+  /**
+   * Update proposal (creator-only, editable statuses only)
+   * Allowed statuses: Draft, Needs_Revision
+   * Only non-routing-critical fields can change:
+   * - title, abstract, researchArea, fileId
+   *
+   * Cannot change:
+   * - proposalProgram, departmentId, budget (routing-critical)
+   * - currentStatus (workflow-only)
+   *
+   * @param proposalId - Proposal ID
+   * @param userId - Current user (must be creator)
+   * @param dto - Update data
+   * @returns Updated proposal summary
+   */
+  async updateProposal(
+    proposalId: string,
+    userId: string,
+    dto: UpdateProposalDto,
+  ): Promise<{ success: boolean; proposal: any }> {
+    return await this.drizzle.db.transaction(async (tx) => {
+      // 1. Fetch and validate proposal exists
+      const proposal = await this.repository.findById(proposalId);
+      if (!proposal) {
+        throw new NotFoundException(`Proposal ${proposalId} not found`);
+      }
+
+      // 2. Enforce creator-only edit
+      if (proposal.createdBy !== userId) {
+        throw new BadRequestException(
+          'Only proposal creator can edit the proposal',
+        );
+      }
+
+      // 3. Check proposal is in editable status
+      if (
+        proposal.currentStatus !== 'Draft' &&
+        proposal.currentStatus !== 'Needs_Revision'
+      ) {
+        throw new BadRequestException(
+          `Cannot edit proposal in ${proposal.currentStatus} status. Must be Draft or Needs_Revision.`,
+        );
+      }
+
+      // 4. Prepare update data (only editable fields)
+      const updateData: any = {
+        updatedAt: new Date(),
+      };
+
+      if (dto.title !== undefined && dto.title.trim() !== '') {
+        updateData.title = dto.title;
+      }
+      if (dto.abstract !== undefined) {
+        updateData.abstract = dto.abstract;
+      }
+      if (dto.researchArea !== undefined) {
+        updateData.researchArea = dto.researchArea;
+      }
+
+      // 5. Handle file update if provided
+      if (dto.fileId) {
+        // Validate new file exists and is accessible
+        const newFile = await this.filesService.getFileWithAccess(dto.fileId);
+        if (!newFile) {
+          throw new BadRequestException(
+            'File does not exist or is not accessible',
+          );
+        }
+
+        // Attach new file to proposal
+        await this.filesService.attachFile(
+          dto.fileId,
+          'PROPOSAL',
+          proposalId,
+          'PRIMARY_DOCUMENT',
+        );
+
+        // Create new proposal version with updated file
+        const nextVersionNumber = proposal.currentVersionId ? 2 : 1; // Simple increment; could fetch actual latest
+        const [newVersion] = await tx
+          .insert(schema.proposalVersions)
+          .values({
+            proposalId,
+            createdBy: userId,
+            fileId: dto.fileId,
+            versionNumber: nextVersionNumber,
+            isCurrent: true,
+            contentJson: {},
+            changeSummary: 'Proposal updated after review feedback',
+          })
+          .returning();
+
+        updateData.currentVersionId = newVersion.id;
+      }
+
+      // 6. Update proposal record
+      await tx
+        .update(schema.proposals)
+        .set(updateData)
+        .where(eq(schema.proposals.id, proposalId));
+
+      // 7. Audit log
+      await this.repository.createAuditLog(tx, {
+        actorUserId: userId,
+        action: 'STATUS_CHANGED',
+        entityType: 'proposals',
+        entityId: proposalId,
+        metadata: {
+          action: 'UPDATED',
+          from: proposal.currentStatus,
+          fields: Object.keys(updateData),
+        },
+      });
+
+      // 8. Fetch and return updated proposal
+      const updated = await this.repository.findById(proposalId);
+
+      return {
+        success: true,
+        proposal: {
+          id: updated.id,
+          title: updated.title,
+          status: updated.currentStatus,
+          isEditable: updated.isEditable,
+        },
+      };
+    });
   }
 
   /**

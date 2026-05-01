@@ -20,8 +20,8 @@ export type WorkflowStep = {
   role: string;
   status: string;
   isActive: boolean;
-  comment?: string;          // Feedback left by the approver
-  approverUserId?: string;   // Who gave this decision
+  comment?: string; // Feedback left by the approver
+  approverUserId?: string; // Who gave this decision
 };
 
 export type CommentPreview = {
@@ -65,6 +65,7 @@ export type ProposalDetailResponse = {
   };
   comments: CommentPreview[];
   defenceSchedules: DefenceSchedule[];
+  isEditable?: boolean;
 
   file?: {
     id: string;

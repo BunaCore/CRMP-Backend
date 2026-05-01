@@ -10,9 +10,16 @@ import { AccessControlModule } from 'src/access-control/access-control.module';
 import { DbModule } from 'src/db/db.module';
 import { UsersModule } from 'src/users/users.module';
 import { FilesModule } from 'src/common/files/files.module';
+import { ChatModule } from 'src/chat/chat.module';
 
 @Module({
-  imports: [AccessControlModule, DbModule, UsersModule, FilesModule],
+  imports: [
+    AccessControlModule,
+    DbModule,
+    UsersModule,
+    ChatModule,
+    FilesModule,
+  ],
   controllers: [ProposalsController],
   providers: [
     ProposalsService,
