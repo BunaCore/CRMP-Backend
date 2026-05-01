@@ -12,3 +12,18 @@ class Recommendation(BaseModel):
 
 class RecommendationResponse(BaseModel):
     recommendations: List[Recommendation]
+
+class RagChatRequest(BaseModel):
+    document_ids: List[str]
+    query: str
+
+class RagSource(BaseModel):
+    id: str
+    fileId: str
+    fileName: str
+    page: int
+    excerpt: str
+
+class RagChatResponse(BaseModel):
+    answer: str
+    sources: List[RagSource]
