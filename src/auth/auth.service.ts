@@ -17,6 +17,7 @@ import { AuthResponse } from 'src/types/auth-response';
 import { UserWithPermissions } from 'src/types/user-with-permissions';
 import { MailService } from 'src/mail/mail.service';
 import { EmailType } from 'src/mail/dto/email-type.enum';
+import { Permission } from 'src/access-control/permission.enum';
 
 import * as bcrypt from 'bcrypt';
 import { DB } from 'src/db/db.type';
@@ -124,6 +125,7 @@ export class AuthService {
       universityId: user.universityId,
       roles: roleNames,
       permissions,
+      canAccessAdmin: permissions.includes(Permission.ADMIN_VIEW),
       accountStatus: user.accountStatus,
       createdAt: user.createdAt,
     };
@@ -167,6 +169,7 @@ export class AuthService {
       universityId: user.universityId,
       roles: roleNames,
       permissions,
+      canAccessAdmin: permissions.includes(Permission.ADMIN_VIEW),
       accountStatus: user.accountStatus,
       createdAt: user.createdAt,
     };
@@ -262,6 +265,7 @@ export class AuthService {
       universityId: user.universityId,
       roles: roleNames,
       permissions,
+      canAccessAdmin: permissions.includes(Permission.ADMIN_VIEW),
       accountStatus: user.accountStatus,
       createdAt: user.createdAt,
     };
@@ -298,6 +302,7 @@ export class AuthService {
       universityId: user.universityId,
       roles: roleNames,
       permissions,
+      canAccessAdmin: permissions.includes(Permission.ADMIN_VIEW),
       accountStatus: user.accountStatus,
       createdAt: user.createdAt,
     };
