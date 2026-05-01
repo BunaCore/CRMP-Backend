@@ -21,6 +21,7 @@ import { QueuesModule } from './queues/queues.module';
 
 import { AppLoggerModule } from './common/logger/logger.module';
 import { CollaborationModule } from './collaboration/collaboration.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { CollaborationModule } from './collaboration/collaboration.module';
     RealtimeModule,
     QueuesModule,
     CollaborationModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [AppService],
