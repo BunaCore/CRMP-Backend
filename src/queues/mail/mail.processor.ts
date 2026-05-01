@@ -8,6 +8,7 @@ import {
   ProposalStatusEmailJobData,
   DefenseScheduledEmailJobData,
   PasswordResetEmailJobData,
+  InvitationEmailJobData,
 } from './mail.types';
 
 /**
@@ -124,6 +125,33 @@ export class MailProcessor {
         `Failed to send password reset email to ${email}: ${errorMessage}`,
       );
       throw error; // Re-throw for auto-retry
+    }
+  }
+
+  /**
+   * Process invitation onboarding email job
+   */
+  @Process('invitation-email')
+  async handleInvitationEmail(job: Job<InvitationEmailJobData>) {
+    const { email, invitationLink, roleName, invitedByName, expiresAt } = job.data;
+
+    this.logger.log(`Processing invitation email for ${email}`);
+
+    try {
+      await this.mailService.sendEmail(EmailType.USER_INVITATION, email, {
+        invitationLink,
+        roleName,
+        invitedByName,
+        expiresAt: new Date(expiresAt).toLocaleString(),
+      });
+      this.logger.log(`Invitation email sent to ${email}`);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(
+        `Failed to send invitation email to ${email}: ${errorMessage}`,
+      );
+      throw error;
     }
   }
 

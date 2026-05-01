@@ -32,6 +32,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.PROPOSAL_REQUEST_REVISION,
 
     Permission.EVALUATION_READ,
+
+    Permission.ADMIN_VIEW,
   ],
 
   [Role.EVALUATOR]: [
@@ -39,6 +41,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
     Permission.EVALUATION_SUBMIT,
     Permission.EVALUATION_READ,
+
+    Permission.ADMIN_VIEW,
   ],
 
   // --- Departmental Authority ---
@@ -60,6 +64,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.DEFENCE_SCHEDULE, // ✅ Can schedule PI defences
 
     Permission.USER_READ,
+
+    Permission.ADMIN_VIEW,
   ],
 
   [Role.DGC_MEMBER]: [
@@ -72,6 +78,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.EVALUATION_READ,
 
     Permission.DEFENCE_SCHEDULE, // ✅ Can schedule PI defences
+
+    Permission.ADMIN_VIEW,
   ],
 
   // --- College & Central Offices ---
@@ -83,6 +91,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.PROPOSAL_REJECT,
 
     Permission.REPORT_EXPORT,
+
+    Permission.ADMIN_VIEW,
   ],
 
   [Role.PG_OFFICE]: [
@@ -92,6 +102,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.PROPOSAL_REJECT,
 
     Permission.REPORT_EXPORT,
+
+    Permission.ADMIN_VIEW,
   ],
 
   [Role.RAD]: [
@@ -111,6 +123,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.BUDGET_VIEW,
 
     Permission.REPORT_EXPORT,
+
+    Permission.ADMIN_VIEW,
   ],
 
   [Role.FINANCE]: [
@@ -118,6 +132,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
     Permission.BUDGET_VIEW,
     Permission.BUDGET_MANAGE,
+
+    Permission.ADMIN_VIEW,
   ],
 
   // --- Executive & System ---
@@ -129,6 +145,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.PROPOSAL_REJECT,
 
     Permission.REPORT_EXPORT,
+
+    Permission.ADMIN_VIEW,
   ],
 
   [Role.AC_MEMBER]: [
@@ -136,9 +154,13 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
     Permission.PROPOSAL_APPROVE,
     Permission.PROPOSAL_REJECT,
+
+    Permission.ADMIN_VIEW,
   ],
 
   [Role.SYSTEM_ADMIN]: [
+    Permission.PROPOSAL_READ,
+
     Permission.USER_READ,
     Permission.USER_PROVISION,
     Permission.USER_ASSIGN_ROLE,
@@ -162,6 +184,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
     Permission.SYSTEM_CONFIG,
     Permission.AUDIT_LOG_VIEW,
+
+    Permission.ADMIN_VIEW,
   ],
 
   // --- External ---
@@ -170,5 +194,7 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.PROPOSAL_READ,
     Permission.EVALUATION_SUBMIT,
     Permission.EVALUATION_READ,
+
+    Permission.ADMIN_VIEW,
   ],
 };

@@ -3,6 +3,7 @@ import {
   Injectable,
   UnauthorizedException,
   NotFoundException,
+  ConflictException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -16,9 +17,12 @@ import { AuthResponse } from 'src/types/auth-response';
 import { UserWithPermissions } from 'src/types/user-with-permissions';
 import { MailService } from 'src/mail/mail.service';
 import { EmailType } from 'src/mail/dto/email-type.enum';
+import { Permission } from 'src/access-control/permission.enum';
 
 import * as bcrypt from 'bcrypt';
 import { DB } from 'src/db/db.type';
+import { AcceptInvitationDto } from './dto/accept-invitation.dto';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -30,7 +34,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private mailService: MailService,
-  ) { }
+  ) {}
 
   /**
    * Register a new user with transactional role assignment
@@ -121,6 +125,7 @@ export class AuthService {
       universityId: user.universityId,
       roles: roleNames,
       permissions,
+      canAccessAdmin: permissions.includes(Permission.ADMIN_VIEW),
       accountStatus: user.accountStatus,
       createdAt: user.createdAt,
     };
@@ -138,7 +143,6 @@ export class AuthService {
    */
   async login(dto: LoginDto): Promise<AuthResponse> {
     const user = await this.usersRepository.findByEmail(dto.email);
-    console.log('🔍 DEBUG - User fetched from DB:', user);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -165,6 +169,103 @@ export class AuthService {
       universityId: user.universityId,
       roles: roleNames,
       permissions,
+      canAccessAdmin: permissions.includes(Permission.ADMIN_VIEW),
+      accountStatus: user.accountStatus,
+      createdAt: user.createdAt,
+    };
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: userWithPermissions,
+    };
+  }
+
+  async acceptInvitation(dto: AcceptInvitationDto): Promise<AuthResponse> {
+    const tokenHash = createHash('sha256').update(dto.token).digest('hex');
+    const invitation =
+      await this.usersRepository.findInvitationByTokenHash(tokenHash);
+
+    if (!invitation) {
+      throw new BadRequestException('Invalid or expired invitation token');
+    }
+
+    if (invitation.acceptedAt) {
+      throw new BadRequestException('Invalid or expired invitation token');
+    }
+
+    if (invitation.expiresAt && invitation.expiresAt.getTime() <= Date.now()) {
+      throw new BadRequestException('Invalid or expired invitation token');
+    }
+
+    const existingUser = await this.usersRepository.findByEmail(
+      invitation.email,
+    );
+    if (existingUser) {
+      throw new ConflictException(
+        'An account with this invitation email already exists',
+      );
+    }
+
+    if (!invitation.roleId) {
+      throw new BadRequestException('Invitation role is no longer available');
+    }
+
+    const role = await this.rolesRepository.findById(invitation.roleId);
+    if (!role) {
+      throw new NotFoundException('Invitation role was not found');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    const { user, tokens } = await this.drizzleService.transaction(
+      async (tx) => {
+        const createdUser = await this.usersRepository.createWithTx(
+          {
+            email: invitation.email,
+            passwordHash,
+            fullName: dto.fullName,
+            phoneNumber: dto.phoneNumber,
+            university: dto.university,
+            universityId: dto.universityId,
+            accountStatus: 'deactive',
+          },
+          tx,
+        );
+        if (invitation.roleId) {
+          await this.usersRepository.assignRole(
+            createdUser.id,
+            invitation.roleId,
+            tx,
+          );
+        }
+        await this.usersRepository.markInvitationAccepted(invitation.id, tx);
+
+        const generatedTokens = await this.generateTokensPersist(
+          createdUser.id,
+          role.name,
+          tx,
+        );
+
+        return { user: createdUser, tokens: generatedTokens };
+      },
+    );
+
+    const permissions = await this.usersRepository.getUserPermissions(user.id);
+    const roles = await this.usersRepository.getUserRoles(user.id);
+    const roleNames = roles.map((r) => r.roleName).filter(Boolean) as string[];
+
+    const userWithPermissions: UserWithPermissions = {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      department: user.department,
+      phoneNumber: user.phoneNumber,
+      university: user.university,
+      universityId: user.universityId,
+      roles: roleNames,
+      permissions,
+      canAccessAdmin: permissions.includes(Permission.ADMIN_VIEW),
       accountStatus: user.accountStatus,
       createdAt: user.createdAt,
     };
@@ -201,6 +302,7 @@ export class AuthService {
       universityId: user.universityId,
       roles: roleNames,
       permissions,
+      canAccessAdmin: permissions.includes(Permission.ADMIN_VIEW),
       accountStatus: user.accountStatus,
       createdAt: user.createdAt,
     };

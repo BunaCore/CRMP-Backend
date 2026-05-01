@@ -6,6 +6,7 @@ import {
   ProposalStatusEmailJobData,
   DefenseScheduledEmailJobData,
   PasswordResetEmailJobData,
+  InvitationEmailJobData,
 } from './mail.types';
 
 /**
@@ -99,6 +100,23 @@ export class MailProducer {
     this.logger.log(
       `Queued password reset email job ${job.id} for ${data.email}`,
     );
+    return job;
+  }
+
+  /**
+   * Queue an invitation onboarding email job
+   */
+  async addInvitationEmailJob(data: InvitationEmailJobData): Promise<Job> {
+    const job = await this.mailQueue.add('invitation-email', data, {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 2000,
+      },
+      removeOnComplete: true,
+    });
+
+    this.logger.log(`Queued invitation email job ${job.id} for ${data.email}`);
     return job;
   }
 }

@@ -3,4 +3,5 @@ export enum EmailType {
   PROPOSAL_STATUS_CHANGED = 'proposal-status',
   WELCOME = 'welcome',
   PASSWORD_RESET = 'password-reset',
+  USER_INVITATION = 'user-invitation',
 }

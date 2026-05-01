@@ -64,4 +64,7 @@ export enum Permission {
   SYSTEM_CONFIG = 'system:config', // Deadlines, workflow rules, global settings
   AUDIT_LOG_VIEW = 'audit_log:view',
   REPORT_EXPORT = 'report:export',
+
+  // --- Frontend Access Gates ---
+  ADMIN_VIEW = 'admin:view', // Grants access to the /admin dashboard (excluded from STUDENT & FACULTY)
 }

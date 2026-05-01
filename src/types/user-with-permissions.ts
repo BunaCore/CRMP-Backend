@@ -12,6 +12,9 @@ export interface UserWithPermissions {
   universityId?: string | null;
   roles: string[];
   permissions: string[];
+  /** Convenience flag: true when the user has the 'admin:view' permission.
+   *  Use this on the frontend to guard the /admin route. */
+  canAccessAdmin: boolean;
   accountStatus: string;
   createdAt?: Date | null;
 }

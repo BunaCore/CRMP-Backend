@@ -1,0 +1,9 @@
+node_modules
+npm-debug.log
+dist
+.git
+.env
+venv
+ml/venv
+.vscode
+.next

@@ -29,7 +29,19 @@ JWT_EXPIRATION_MS=3600000
 BCRYPT_ROUNDS=
 PORT=3000
 NODE_ENV=development
+LOG_LEVEL=info
+LOG_PRETTY=true
+DB_LOG_LEVEL=debug
+DB_LOG_QUERIES=false
 ```
+
+Logging notes:
+
+- `LOG_LEVEL`: `fatal | error | warn | info | debug | trace`
+- `LOG_PRETTY=true`: human-readable logs for local development
+- `LOG_PRETTY=false`: structured JSON logs (recommended in Docker/production)
+- `DB_LOG_QUERIES=true`: force Drizzle to print SQL queries
+- `DB_LOG_LEVEL=debug|trace`: auto-enable Drizzle query logging when `DB_LOG_QUERIES` is unset
 
 ## Install
 
