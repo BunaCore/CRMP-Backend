@@ -72,4 +72,6 @@ export const PERMISSION_TO_CASL_RULES: Record<
   [Permission.SYSTEM_CONFIG]: [{ action: 'manage', subject: 'System' }],
   [Permission.AUDIT_LOG_VIEW]: [{ action: 'read', subject: 'AuditLog' }],
   [Permission.REPORT_EXPORT]: [{ action: 'export', subject: 'Report' }],
+  // Frontend-only gate — not enforced by backend CASL guards
+  [Permission.ADMIN_VIEW]: [{ action: 'access', subject: 'AdminDashboard' }],
 };

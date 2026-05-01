@@ -48,7 +48,7 @@ const USERS: SeedUserConfig[] = [
     name: 'Peer Evaluator',
     email: 'evaluator@crmp.edu',
     password: UNIVERSAL_PASSWORD,
-    roles: [Role.FACULTY],
+    roles: [Role.FACULTY, Role.EVALUATOR],
   },
   {
     name: 'College Dean (ADRPM)',
