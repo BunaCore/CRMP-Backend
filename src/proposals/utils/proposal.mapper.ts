@@ -129,6 +129,9 @@ export function mapProposalToResponse(
     department,
     submittedDate: proposal.submittedAt?.toISOString(),
     status: proposal.currentStatus || 'Draft',
+    isEditable:
+      proposal.currentStatus === 'Draft' ||
+      proposal.currentStatus === 'Needs_Revision',
     budget,
     isFunded: proposal.isFunded,
     degreeLevel: proposal.degreeLevel,

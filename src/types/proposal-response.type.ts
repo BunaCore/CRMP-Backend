@@ -30,6 +30,7 @@ export type ProposalResponse = {
   department: DepartmentPreview | null;
   submittedDate?: string;
   status: string;
+  isEditable?: boolean;
   budget?: number;
   isFunded: boolean;
   degreeLevel?: string;

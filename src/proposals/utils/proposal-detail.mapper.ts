@@ -20,8 +20,8 @@ export type WorkflowStep = {
   role: string;
   status: string;
   isActive: boolean;
-  comment?: string;          // Feedback left by the approver
-  approverUserId?: string;   // Who gave this decision
+  comment?: string; // Feedback left by the approver
+  approverUserId?: string; // Who gave this decision
 };
 
 export type CommentPreview = {
@@ -44,6 +44,8 @@ export type DefenceSchedule = {
 export type ProposalDetailResponse = {
   id: string;
   title: string;
+  abstract: string;
+  researchArea: string;
   type: 'UG' | 'PG' | 'GRANT';
   status: string;
 
@@ -65,6 +67,7 @@ export type ProposalDetailResponse = {
   };
   comments: CommentPreview[];
   defenceSchedules: DefenceSchedule[];
+  isEditable?: boolean;
 
   file?: {
     id: string;
@@ -175,8 +178,13 @@ export function mapProposalToDetailResponse(
   return {
     id: proposal.id,
     title: proposal.title,
+    abstract: proposal.abstract,
+    researchArea: proposal.researchArea,
     type,
-    status: proposal.currentStatus || 'Draft',
+    status: proposal.currentStatus,
+    isEditable:
+      proposal.currentStatus === 'Draft' ||
+      proposal.currentStatus === 'Needs_Revision',
 
     department: mapDepartmentToPreview(department),
 

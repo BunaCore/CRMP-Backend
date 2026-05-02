@@ -33,6 +33,10 @@ export class ProposalListItemDto {
   @IsEnum(['Draft', 'Under_Review', 'Needs_Revision', 'Approved', 'Rejected'])
   currentStatus: string;
 
+  @IsBoolean()
+  @IsOptional()
+  isEditable?: boolean;
+
   @IsISO8601()
   @IsOptional()
   submittedAt?: string;
