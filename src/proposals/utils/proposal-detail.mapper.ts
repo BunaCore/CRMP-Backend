@@ -44,6 +44,8 @@ export type DefenceSchedule = {
 export type ProposalDetailResponse = {
   id: string;
   title: string;
+  abstract: string;
+  researchArea: string;
   type: 'UG' | 'PG' | 'GRANT';
   status: string;
 
@@ -176,8 +178,13 @@ export function mapProposalToDetailResponse(
   return {
     id: proposal.id,
     title: proposal.title,
+    abstract: proposal.abstract,
+    researchArea: proposal.researchArea,
     type,
-    status: proposal.currentStatus || 'Draft',
+    status: proposal.currentStatus,
+    isEditable:
+      proposal.currentStatus === 'Draft' ||
+      proposal.currentStatus === 'Needs_Revision',
 
     department: mapDepartmentToPreview(department),
 
