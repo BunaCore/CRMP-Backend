@@ -25,7 +25,7 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.EVALUATION_READ,
   ],
 
-  [Role.SUPERVISOR]: [
+  [Role.ADVISOR]: [
     Permission.PROPOSAL_READ,
 
     // ❗ No direct update (avoid silent mutation)
@@ -84,7 +84,7 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
   // --- College & Central Offices ---
 
-  [Role.COLLEGE_OFFICE]: [
+  [Role.ADRPM]: [
     Permission.PROPOSAL_READ,
 
     Permission.PROPOSAL_APPROVE,

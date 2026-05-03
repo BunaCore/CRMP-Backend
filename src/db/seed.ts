@@ -36,7 +36,7 @@ const USERS: SeedUserConfig[] = [
     name: 'Dr. Advisor (Supervisor)',
     email: 'advisor@crmp.edu',
     password: UNIVERSAL_PASSWORD,
-    roles: [Role.FACULTY],
+    roles: [Role.FACULTY, Role.ADVISOR],
   },
   {
     name: 'DGC Member (Dept Head)',
@@ -52,9 +52,9 @@ const USERS: SeedUserConfig[] = [
   },
   {
     name: 'College Dean (ADRPM)',
-    email: 'college@crmp.edu',
+    email: 'adrpm@crmp.edu',
     password: UNIVERSAL_PASSWORD,
-    roles: [Role.FACULTY, Role.COLLEGE_OFFICE],
+    roles: [Role.FACULTY, Role.ADRPM],
   },
   {
     name: 'SGS Dean (PG Office)',
@@ -102,7 +102,7 @@ const USERS: SeedUserConfig[] = [
     name: 'VP of RTT',
     email: 'vprtt@crmp.edu',
     password: UNIVERSAL_PASSWORD,
-    roles: [Role.FACULTY, Role.VPRTT],
+    roles: [Role.FACULTY, Role.VPRTT, Role.AC_MEMBER],
   },
   {
     name: 'Academic Council Rep',
@@ -272,7 +272,7 @@ async function seed() {
       {
         proposalProgram: 'PG',
         stepOrder: 2,
-        approverRole: 'COLLEGE_OFFICE',
+        approverRole: 'ADRPM',
         stepLabel: 'ADRPM Approval',
         stepType: 'APPROVAL',
       },
@@ -374,7 +374,7 @@ async function seed() {
         approverRole: 'AC_MEMBER',
         stepLabel: 'Academic Council Review (>=500k)',
         stepType: 'VOTE',
-        voteThreshold: 7,
+        voteThreshold: 1,
         voteThresholdStrategy: 'MAJORITY',
         conditionGroup: 'BUDGET',
         branchKey: 'HIGH_BUDGET',
@@ -787,7 +787,9 @@ async function seed() {
         content: [
           {
             type: 'paragraph',
-            content: [{ type: 'text', text: 'Start writing your document here...' }],
+            content: [
+              { type: 'text', text: 'Start writing your document here...' },
+            ],
           },
         ],
       };
@@ -821,7 +823,9 @@ async function seed() {
         .set({ currentVersionId: promotedVersion.id })
         .where(eq(schema.documents.id, promotedDocument.id));
 
-      console.log(`  ✅ Created workspace for promoted project: ${project.projectTitle}`);
+      console.log(
+        `  ✅ Created workspace for promoted project: ${project.projectTitle}`,
+      );
     }
 
     // Seed sample data for testing

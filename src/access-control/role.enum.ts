@@ -2,7 +2,7 @@ export enum Role {
   // --- Academic / Research Identity ---
   STUDENT = 'STUDENT',
   FACULTY = 'FACULTY', // Base role for all academic staff
-  SUPERVISOR = 'SUPERVISOR', // Explicit authority to lead/advise research
+  ADVISOR = 'ADVISOR', // Explicit authority to lead/advise research
   EVALUATOR = 'EVALUATOR', // Explicit authority to peer-review/grade
 
   // --- Departmental Authority (Scoped by Dept) ---
@@ -10,7 +10,7 @@ export enum Role {
   DGC_MEMBER = 'DGC_MEMBER', // Dept Graduate Committee member
 
   // --- College & Central Offices (Scoped by College or Global) ---
-  COLLEGE_OFFICE = 'COLLEGE_OFFICE', // ADRPM / College Rep
+  ADRPM = 'ADRPM', // ADRPM / College Rep
   PG_OFFICE = 'PG_OFFICE', // School of Graduate Studies (SGS)
   RAD = 'RAD', // Research Administration Directorate
   FINANCE = 'FINANCE', // Budget & Disbursement

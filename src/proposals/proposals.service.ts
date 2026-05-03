@@ -93,7 +93,7 @@ export class ProposalsService {
       //     `User "${dto.advisorUserId}" does not have SUPERVISOR role.`,
       //   );
       // }
-      supervisorMember = { userId: dto.advisorUserId, role: 'SUPERVISOR' };
+      supervisorMember = { userId: dto.advisorUserId, role: 'ADVISOR' };
     }
 
     // 1. Validate department exists if departmentId is provided
