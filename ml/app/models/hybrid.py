@@ -42,7 +42,7 @@ class HybridRecommender:
             researcher_name = self.researchers_df[self.researchers_df['id'] == rid]['name'].iloc[0]
             
             hybrid_scores.append({
-                "id": int(rid),
+                "id": str(rid),
                 "name": researcher_name,
                 "score": round(float(final_score), 4)
             })
@@ -51,3 +51,18 @@ class HybridRecommender:
         hybrid_scores = sorted(hybrid_scores, key=lambda x: x['score'], reverse=True)
         
         return hybrid_scores[:top_k]
+
+    def search(self, query: str, top_k: int = 5) -> List[Dict]:
+        """Performs semantic search across researchers."""
+        content_scores = self.content_model.search_by_query(query, top_k=top_k)
+        
+        results = []
+        for rid, score in content_scores.items():
+            researcher_name = self.researchers_df[self.researchers_df['id'] == rid]['name'].iloc[0]
+            results.append({
+                "id": str(rid),
+                "name": researcher_name,
+                "score": round(float(score), 4)
+            })
+            
+        return results

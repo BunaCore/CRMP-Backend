@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.decomposition import TruncatedSVD
-from typing import Dict
+from typing import Dict, List
 
 class CollaborativeRecommender:
     """
@@ -38,7 +38,7 @@ class CollaborativeRecommender:
             self.model.fit(self.user_item_matrix)
             self.researcher_ids = self.user_item_matrix.columns.tolist()
 
-    def get_recommendations(self, researcher_id: int, all_researcher_ids: list, top_k: int = 5) -> Dict[int, float]:
+    def get_recommendations(self, researcher_id: str, all_researcher_ids: List[str], top_k: int = 5) -> Dict[str, float]:
         """Predicts potential collaborators for a given researcher."""
         if self.user_item_matrix is None or researcher_id not in self.user_item_matrix.index:
             return {}
