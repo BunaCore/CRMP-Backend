@@ -228,7 +228,7 @@ export class AbilityFactory {
     const memberOnlyRoles = [
       Role.STUDENT,
       Role.FACULTY,
-      Role.SUPERVISOR,
+      Role.ADVISOR,
       Role.EVALUATOR,
       Role.EXTERNAL_EXPERT,
     ];
@@ -286,7 +286,7 @@ export class AbilityFactory {
       );
     }
 
-    if (roles.has(Role.COLLEGE_OFFICE)) {
+    if (roles.has(Role.ADRPM)) {
       rules.push(
         {
           action: 'read',

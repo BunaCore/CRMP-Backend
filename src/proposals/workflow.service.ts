@@ -9,6 +9,7 @@ import { DrizzleService } from 'src/db/db.service';
 import { DB } from 'src/db/db.type';
 import * as schema from 'src/db/schema';
 import { eq, and, asc } from 'drizzle-orm';
+import { createHash } from 'crypto';
 import { ProposalsRepository } from './proposals.repository';
 import { ProposalApprovalService } from './proposal-approval.service';
 import { UsersService } from 'src/users/users.service';
@@ -17,6 +18,7 @@ import { ApproverResolution } from './types/proposal';
 import { EvaluationContext, BranchCondition } from './types/branch-condition';
 import { MailService } from 'src/mail/mail.service';
 import { EmailType } from 'src/mail/dto/email-type.enum';
+import { ChatService } from 'src/chat/chat.service';
 
 type DecisionOutcome = 'Accepted' | 'Rejected' | 'Needs_Revision';
 
@@ -49,6 +51,7 @@ export class WorkflowService {
     private readonly usersService: UsersService,
     private readonly filesService: FilesService,
     private readonly mailService: MailService,
+    private readonly chatService: ChatService,
   ) {}
 
   /**
@@ -123,7 +126,7 @@ export class WorkflowService {
       await tx.insert(schema.proposalStatusHistory).values({
         proposalId: proposalId,
         changedBy: userId,
-        oldStatus: oldStatus as any,
+        oldStatus: oldStatus,
         newStatus: 'Under_Review' as any,
         note:
           oldStatus === 'Draft'
@@ -411,7 +414,7 @@ export class WorkflowService {
     await tx
       .update(schema.proposalApprovals)
       .set({
-        decision: decision as any,
+        decision: decision,
         approverUserId: userId,
         decisionAt: new Date(),
         comment: actionData.comment || null,
@@ -724,7 +727,7 @@ export class WorkflowService {
     await tx.insert(schema.proposalStatusHistory).values({
       proposalId: proposal.id,
       changedBy: userId,
-      oldStatus: proposal.currentStatus as any,
+      oldStatus: proposal.currentStatus,
       newStatus: 'Needs_Revision' as any,
       note: `Rejected by ${activeStep.approverRole} at Step ${activeStep.stepOrder}`,
       changedAt: new Date(),
@@ -1017,7 +1020,7 @@ export class WorkflowService {
       await tx.insert(schema.proposalStatusHistory).values({
         proposalId,
         changedBy: userId,
-        oldStatus: proposal.currentStatus as any,
+        oldStatus: proposal.currentStatus,
         newStatus: newProposalStatus as any,
         note: `${decision} by ${activeStep.approverRole} at Step ${activeStep.stepOrder}`,
         changedAt: new Date(),
@@ -1254,7 +1257,7 @@ export class WorkflowService {
         .values({
           projectTitle: proposal.title,
           projectDescription: proposal.abstract || '',
-          projectProgram: proposal.proposalProgram as any,
+          projectProgram: proposal.proposalProgram,
           isFunded: proposal.isFunded,
           durationMonths: proposal.durationMonths,
           researchArea: proposal.researchArea,
@@ -1322,6 +1325,10 @@ export class WorkflowService {
         })
         .returning();
 
+      const contentHash = createHash('sha256')
+        .update(JSON.stringify(initialContent))
+        .digest('hex');
+
       // 6. Create initial version
       const [version] = await tx
         .insert(schema.documentVersions)
@@ -1329,6 +1336,8 @@ export class WorkflowService {
           documentId: document.id,
           content: initialContent,
           createdBy: approverUserId,
+          sourceAction: 'initial',
+          contentHash,
           versionNumber: 1,
         })
         .returning();
@@ -1338,6 +1347,35 @@ export class WorkflowService {
         .update(schema.documents)
         .set({ currentVersionId: version.id })
         .where(eq(schema.documents.id, document.id));
+
+      // 8. Create project chat and add project members so team can communicate
+      try {
+        const projectChat = await this.chatService.createProjectChat(
+          project.projectId,
+          project.projectTitle,
+          approverUserId,
+        );
+
+        // Add all proposal members to the chat (creator already added by service)
+        for (const m of proposalMembers) {
+          if (!m.userId) continue;
+          if (m.userId === approverUserId) continue; // already added
+          try {
+            await this.chatService.addMember(projectChat.id, m.userId);
+          } catch (err) {
+            // Non-fatal: log and continue adding other members
+            this.logger.warn(
+              { err, projectId: project.projectId, userId: m.userId },
+              'Failed to add member to project chat',
+            );
+          }
+        }
+      } catch (err) {
+        this.logger.warn(
+          { err, projectId: project.projectId },
+          'Failed to create project chat',
+        );
+      }
 
       // 8. Audit log
       await tx.insert(schema.auditLogs).values({

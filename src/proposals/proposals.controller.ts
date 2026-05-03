@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Query,
   BadRequestException,
+  Patch,
 } from '@nestjs/common';
 import { ProposalsService } from './proposals.service';
 import { ProposalMembersService } from './proposal-members.service';
@@ -18,6 +19,7 @@ import {
   SubmitStepActionDto,
   WorkflowActionResponseDto,
 } from './dto/workflow.dto';
+import { UpdateProposalDto } from './dto/update-proposal.dto';
 import {
   AddMembersDto,
   RemoveMembersDto,
@@ -166,6 +168,26 @@ export class ProposalsController {
       proposalId: result,
       newStatus: 'Under_Review',
     };
+  }
+
+  /**
+   * PATCH /proposals/:id
+   * Update proposal details (creator-only)
+   * Allowed statuses: Draft, Needs_Revision
+   * Editable fields: title, abstract, researchArea, fileId, collaborators
+   *
+   * Immutable fields:
+   * - proposalProgram, departmentId, budget (routing-critical)
+   * - createdBy, currentStatus (workflow-managed)
+   */
+  @Patch(':id')
+  @RequirePermission(Permission.PROPOSAL_UPDATE)
+  async updateProposal(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateProposalDto,
+  ) {
+    return this.proposalsService.updateProposal(proposalId, user.id, dto);
   }
 
   /**
