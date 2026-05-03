@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from app.api.schemas import RecommendationRequest, RecommendationResponse, RagChatRequest, RagChatResponse
+from app.api.schemas import RecommendationRequest, RecommendationResponse, RagChatRequest, RagChatResponse, SearchRequest
 from app.services.recommender_service import RecommenderService
 from app.services.rag_service import RAGService
 
 router = APIRouter()
-recommender_service = RecommenderService(mode="mock")
+recommender_service = RecommenderService(mode="db")
 rag_service = RAGService()
 
 @router.post("/recommend", response_model=RecommendationResponse)
@@ -19,6 +19,17 @@ async def recommend(request: RecommendationRequest):
             raise HTTPException(status_code=404, detail="Researcher not found or no recommendations available.")
             
         return {"recommendations": recommendations}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/search/members", response_model=RecommendationResponse)
+async def search_members(request: SearchRequest):
+    try:
+        results = recommender_service.search_researchers(
+            query=request.query,
+            top_k=request.top_k
+        )
+        return {"recommendations": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

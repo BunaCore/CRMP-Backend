@@ -2,11 +2,15 @@ from pydantic import BaseModel
 from typing import List
 
 class RecommendationRequest(BaseModel):
-    researcher_id: int
+    researcher_id: str
     top_k: int = 5
 
+class SearchRequest(BaseModel):
+    query: str
+    top_k: int = 10
+
 class Recommendation(BaseModel):
-    id: int
+    id: str
     name: str
     score: float
 

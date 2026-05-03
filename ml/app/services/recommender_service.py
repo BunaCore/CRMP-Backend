@@ -30,3 +30,11 @@ class RecommenderService:
             
         logger.info(f"Generating top {top_k} recommendations for researcher {researcher_id}")
         return self.recommender.get_recommendations(researcher_id, top_k)
+
+    def search_researchers(self, query: str, top_k: int = 5) -> List[Dict]:
+        """Searches for researchers based on a semantic query."""
+        if not self.is_trained:
+            self.train_model()
+            
+        logger.info(f"Searching researchers for query: '{query}'")
+        return self.recommender.search(query, top_k)
