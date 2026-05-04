@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   Post,
   Put,
+  Patch,
   Query,
   Request,
   UseGuards,
@@ -20,6 +21,7 @@ import { GetUsersQueryDto } from './dto/get-users-query.dto';
 import { UsersListResponse } from './types/user-admin-list.type';
 import { UserDetailResponse } from './types/user-detail.type';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
+import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 
 @Controller('users')
 export class UsersController {
@@ -82,5 +84,15 @@ export class UsersController {
   async inviteUser(@Request() req: any, @Body() dto: CreateInvitationDto) {
     const invitedBy = req.user?.sub || req.user?.id;
     return this.usersService.inviteUser(invitedBy, dto);
+  }
+
+  @Patch(':id/status')
+  @UseGuards(JwtAuthGuard, AccessGuard)
+  @RequireCasl({ action: 'provision', subject: 'User' })
+  async updateUserStatus(
+    @Param('id', new ParseUUIDPipe()) userId: string,
+    @Body() dto: UpdateUserStatusDto,
+  ) {
+    return this.usersService.updateUserStatus(userId, dto.status);
   }
 }

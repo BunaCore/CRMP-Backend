@@ -17,6 +17,7 @@ import { MailProducer } from 'src/queues/mail/mail.producer';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes } from 'crypto';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
+import { AccountStatusValue } from './dto/update-user-status.dto';
 
 @Injectable()
 export class UsersService {
@@ -305,6 +306,28 @@ export class UsersService {
       roleId: invitation.roleId,
       expiresAt: invitation.expiresAt,
       createdAt: invitation.createdAt,
+    };
+  }
+
+  async updateUserStatus(userId: string, status: AccountStatusValue) {
+    const user = await this.usersRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundException(`User "${userId}" not found`);
+    }
+
+    const updatedUser = await this.usersRepository.update(userId, {
+      accountStatus: status,
+    });
+
+    if (!updatedUser) {
+      throw new NotFoundException(`User "${userId}" not found`);
+    }
+
+    return {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      accountStatus: updatedUser.accountStatus,
+      updatedAt: new Date().toISOString(),
     };
   }
 }

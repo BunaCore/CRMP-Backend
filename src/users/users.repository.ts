@@ -131,6 +131,7 @@ export class UsersRepository {
         phoneNumber: input.phoneNumber,
         university: input.university,
         universityId: input.universityId,
+        userProgram: input.userProgram || null,
         accountStatus: input.accountStatus,
       })
       .returning();
@@ -254,6 +255,7 @@ export class UsersRepository {
         phoneNumber: input.phoneNumber,
         university: input.university,
         universityId: input.universityId,
+        userProgram: input.userProgram || null,
         accountStatus: input.accountStatus,
       })
       .returning();

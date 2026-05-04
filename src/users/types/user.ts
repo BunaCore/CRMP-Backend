@@ -9,6 +9,7 @@ export interface User {
   phoneNumber?: string | null;
   university?: string | null;
   universityId?: string | null;
+  userProgram?: 'UG' | 'PG' | null;
   roles?: string[];
   role?: string;
   isExternal?: boolean | null;
@@ -24,6 +25,7 @@ export interface CreateUserInput {
   phoneNumber?: string;
   university?: string;
   universityId?: string;
+  userProgram?: 'UG' | 'PG';
   role?: string;
   accountStatus?: AccountStatus;
 }

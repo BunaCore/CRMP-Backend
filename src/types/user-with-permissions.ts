@@ -10,6 +10,7 @@ export interface UserWithPermissions {
   phoneNumber?: string | null;
   university?: string | null;
   universityId?: string | null;
+  userProgram?: 'UG' | 'PG' | null;
   roles: string[];
   permissions: string[];
   /** Convenience flag: true when the user has the 'admin:view' permission.
