@@ -27,6 +27,7 @@ export class ProposalMembersService {
    * Add members to a proposal
    * Handles duplicate filtering and role constraint validation
    * Defaults new members to MEMBER role
+   * One user can only have ONE role per proposal
    *
    * @param proposalId - Proposal ID
    * @param newMembers - Array of {userId} (role defaults to MEMBER)
@@ -42,57 +43,54 @@ export class ProposalMembersService {
       throw new NotFoundException(`Proposal with ID "${proposalId}" not found`);
     }
 
-    // 2. Filter out duplicates (already members)
+    // 2. Get ALL existing members (any role) - enforce one role per user
     const existingMembers =
       await this.repository.getProposalMembers(proposalId);
     const existingUserIds = new Set(existingMembers.map((m) => m.userId));
 
+    // 3. Filter out users that already have ANY role
     const uniqueNewMembers = newMembers.filter(
       (m) => !existingUserIds.has(m.userId),
     );
 
+    const duplicateErrors = newMembers
+      .filter((m) => existingUserIds.has(m.userId))
+      .map((m) => {
+        const existingRole = existingMembers.find(
+          (em) => em.userId === m.userId,
+        );
+        return `User ${m.userId} already has role ${existingRole?.role || 'UNKNOWN'}`;
+      });
+
     if (uniqueNewMembers.length === 0) {
+      if (duplicateErrors.length > 0) {
+        throw new BadRequestException(
+          `Cannot add members. Issues: ${duplicateErrors.join(', ')}`,
+        );
+      }
       return { added: 0, skipped: newMembers.length };
     }
 
-    // 3. Verify all users exist
+    // 4. Verify all users exist
     const userIds = uniqueNewMembers.map((m) => m.userId);
     const foundIds = await this.repository.validateUsersExist(userIds);
     const missingIds = userIds.filter((id) => !foundIds.includes(id));
 
     if (missingIds.length > 0) {
+      if (duplicateErrors.length > 0) {
+        throw new BadRequestException(
+          `Cannot add members. Issues: ${[...duplicateErrors, ...missingIds.map(id => `User ${id} not found`)].join(', ')}`,
+        );
+      }
       throw new NotFoundException(`Users not found: ${missingIds.join(', ')}`);
     }
 
-    // 4. Validate role constraints (one role per user per proposal)
-    const errors: string[] = [];
-    const validMembers: Array<{ userId: string; role: ProposalMemberRole }> =
-      [];
+    // 5. Add valid members (all uniqueNewMembers at this point are valid)
+    const validMembers = uniqueNewMembers.map((m) => ({
+      userId: m.userId,
+      role: ProposalMemberRole.MEMBER,
+    }));
 
-    for (const member of uniqueNewMembers) {
-      const existingRole = existingMembers.find(
-        (m) => m.userId === member.userId,
-      );
-      if (existingRole) {
-        errors.push(
-          `User ${member.userId} already has role ${existingRole.role}`,
-        );
-      } else {
-        // Default to MEMBER role for new members
-        validMembers.push({
-          userId: member.userId,
-          role: ProposalMemberRole.MEMBER,
-        });
-      }
-    }
-
-    if (validMembers.length === 0) {
-      throw new BadRequestException(
-        `Cannot add members. Issues: ${errors.join(', ')}`,
-      );
-    }
-
-    // 5. Add valid members
     await this.repository.addProposalMembers(
       this.drizzle.db,
       proposalId,
@@ -102,7 +100,7 @@ export class ProposalMembersService {
     return {
       added: validMembers.length,
       skipped: newMembers.length - validMembers.length,
-      errors: errors.length > 0 ? errors : undefined,
+      errors: duplicateErrors.length > 0 ? duplicateErrors : undefined,
     };
   }
 
@@ -144,6 +142,7 @@ export class ProposalMembersService {
   /**
    * Assign a single advisor to a proposal
    * Only one advisor per proposal; new assignment replaces existing
+   * One user can only have ONE role per proposal
    *
    * @param proposalId - Proposal ID
    * @param userId - User ID to assign as advisor
@@ -165,7 +164,18 @@ export class ProposalMembersService {
       throw new NotFoundException(`User with ID "${userId}" not found`);
     }
 
-    // 3. Clear existing advisor(s)
+    // 3. Check if user already has ANY other role (enforce one role per user)
+    const existingMembers =
+      await this.repository.getProposalMembers(proposalId);
+    const existingRole = existingMembers.find((m) => m.userId === userId);
+
+    if (existingRole && existingRole.role !== ProposalMemberRole.ADVISOR) {
+      throw new BadRequestException(
+        `User ${userId} already has role ${existingRole.role}. One user can only have one role per proposal.`,
+      );
+    }
+
+    // 4. Clear existing advisor(s)
     await this.repository.clearMembersWithRole(
       proposalId,
       ProposalMemberRole.ADVISOR,
@@ -185,7 +195,7 @@ export class ProposalMembersService {
   /**
    * Assign evaluators to a proposal
    * Multiple evaluators allowed; adds to existing
-   * Filters out duplicates
+   * One user can only have ONE role per proposal (cannot be both EVALUATOR and MEMBER, etc)
    *
    * @param proposalId - Proposal ID
    * @param userIds - Array of user IDs to assign as evaluators
@@ -201,14 +211,36 @@ export class ProposalMembersService {
       throw new NotFoundException(`Proposal with ID "${proposalId}" not found`);
     }
 
-    // 2. Get existing evaluators
-    const existingEvaluators = await this.repository.getMembersWithRole(
-      proposalId,
-      ProposalMemberRole.EVALUATOR,
+    // 2. Get ALL existing members to check for cross-role conflicts
+    const allExistingMembers =
+      await this.repository.getProposalMembers(proposalId);
+    const existingEvaluatorIds = new Set(
+      allExistingMembers
+        .filter((m) => m.role === ProposalMemberRole.EVALUATOR)
+        .map((m) => m.userId),
     );
-    const existingSet = new Set(existingEvaluators);
 
-    const newEvaluators = userIds.filter((id) => !existingSet.has(id));
+    // 3. Filter out users already assigned as evaluators
+    const newEvaluators = userIds.filter((id) => !existingEvaluatorIds.has(id));
+
+    // 4. Check if any new evaluators have a different role already
+    const crossRoleConflicts = newEvaluators.filter((id) =>
+      allExistingMembers.find(
+        (m) => m.userId === id && m.role !== ProposalMemberRole.EVALUATOR,
+      ),
+    );
+
+    if (crossRoleConflicts.length > 0) {
+      const conflicts = crossRoleConflicts
+        .map((id) => {
+          const member = allExistingMembers.find((m) => m.userId === id);
+          return `User ${id} already has role ${member?.role}`;
+        })
+        .join(', ');
+      throw new BadRequestException(
+        `Cannot assign evaluators. Issues: ${conflicts}. One user can only have one role per proposal.`,
+      );
+    }
 
     if (newEvaluators.length === 0) {
       return { added: 0, skipped: userIds.length };

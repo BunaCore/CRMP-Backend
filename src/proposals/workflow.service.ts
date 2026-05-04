@@ -311,10 +311,15 @@ export class WorkflowService {
     success: boolean;
     isComplete: boolean;
     nextStep?: number;
-    outcome?: 'Accepted' | 'Rejected';
+    outcome?: DecisionOutcome;
     proposal?: any;
+    projectData?: {
+      projectId: string;
+      projectTitle: string;
+      proposalMembers: any[];
+    };
   }> {
-    return await this.drizzle.db.transaction(async (tx) => {
+    const result = await this.drizzle.db.transaction(async (tx) => {
       // 1. Fetch proposal and active step
       const { proposal, activeStep } = await this.getProposalWithActiveStep(
         tx,
@@ -384,6 +389,51 @@ export class WorkflowService {
           );
       }
     });
+
+    if (result.proposal) {
+      if (result.outcome === 'Rejected') {
+        await this.sendProposalStatusEmail(result.proposal, 'Rejected');
+      } else if (result.outcome === 'Needs_Revision') {
+        await this.sendProposalStatusEmail(result.proposal, 'Needs Revision');
+      } else if (result.outcome === 'Accepted' && result.isComplete) {
+        await this.sendProposalStatusEmail(result.proposal, 'Approved');
+      }
+    }
+
+    // Create project chat after transaction completes (project must be committed first)
+    if (result.projectData && result.isComplete) {
+      try {
+        const { projectId, projectTitle, proposalMembers } = result.projectData;
+        const projectChat = await this.chatService.createProjectChat(
+          projectId,
+          projectTitle,
+          userId,
+        );
+
+        // Add all proposal members to the chat (creator already added by service)
+        for (const m of proposalMembers) {
+          if (!m.userId) continue;
+          if (m.userId === userId) continue; // already added
+          try {
+            await this.chatService.addMember(projectChat.id, m.userId);
+          } catch (err) {
+            // Non-fatal: log and continue adding other members
+            this.logger.warn(
+              { err, projectId, userId: m.userId },
+              'Failed to add member to project chat',
+            );
+          }
+        }
+      } catch (err) {
+        this.logger.error(
+          { err, projectId: result.projectData?.projectId },
+          'Failed to create project chat after approval',
+        );
+        // Non-fatal: chat creation failure should not block proposal approval
+      }
+    }
+
+    return result;
   }
 
   // ============================================================================
@@ -403,8 +453,13 @@ export class WorkflowService {
     success: boolean;
     isComplete: boolean;
     nextStep?: number;
-    outcome?: 'Accepted' | 'Rejected';
+    outcome?: DecisionOutcome;
     proposal?: any;
+    projectData?: {
+      projectId: string;
+      projectTitle: string;
+      proposalMembers: any[];
+    };
   }> {
     // 1. Ensure decision is provided
     const decision = actionData.decision;
@@ -438,6 +493,7 @@ export class WorkflowService {
         nextStep: advancement.nextStep,
         outcome: 'Accepted',
         proposal: updatedProposal,
+        projectData: advancement.projectData,
       };
     } else {
       // Rejection or revision request
@@ -465,8 +521,13 @@ export class WorkflowService {
     success: boolean;
     isComplete: boolean;
     nextStep?: number;
-    outcome?: 'Accepted' | 'Rejected';
+    outcome?: DecisionOutcome;
     proposal?: any;
+    projectData?: {
+      projectId: string;
+      projectTitle: string;
+      proposalMembers: any[];
+    };
   }> {
     // 1. Validate user eligible to vote
     const eligibleVoters = await this.getEligibleVotersByRole(
@@ -560,6 +621,7 @@ export class WorkflowService {
         nextStep: advancement.nextStep,
         outcome: 'Accepted',
         proposal: updatedProposal,
+        projectData: advancement.projectData,
       };
     } else {
       // Vote rejected - handle rejection
@@ -589,6 +651,11 @@ export class WorkflowService {
     nextStep?: number;
     outcome?: 'Accepted' | 'Rejected';
     proposal?: any;
+    projectData?: {
+      projectId: string;
+      projectTitle: string;
+      proposalMembers: any[];
+    };
   }> {
     const submittedData = actionData.input || {};
 
@@ -663,6 +730,7 @@ export class WorkflowService {
         nextStep: advancement.nextStep,
         outcome: 'Accepted',
         proposal: updatedProposal,
+        projectData: advancement.projectData,
       };
     } else {
       // Form submission rejected
@@ -732,6 +800,27 @@ export class WorkflowService {
       note: `Rejected by ${activeStep.approverRole} at Step ${activeStep.stepOrder}`,
       changedAt: new Date(),
     });
+  }
+
+  private async sendProposalStatusEmail(
+    proposal: { createdBy: string; title: string },
+    status: string,
+  ): Promise<void> {
+    const creator = await this.usersService.findById(proposal.createdBy);
+
+    if (!creator) {
+      return;
+    }
+
+    await this.mailService.sendEmail(
+      EmailType.PROPOSAL_STATUS_CHANGED,
+      creator.email,
+      {
+        recipientName: creator.fullName,
+        proposalTitle: proposal.title,
+        status,
+      },
+    );
   }
   // ============================================================================
   // Vote Helper Methods
@@ -1249,7 +1338,11 @@ export class WorkflowService {
     tx: DB,
     proposal: any,
     approverUserId: string,
-  ): Promise<void> {
+  ): Promise<{
+    projectId: string;
+    projectTitle: string;
+    proposalMembers: any[];
+  }> {
     try {
       // 1. Create project
       const [project] = await tx
@@ -1348,35 +1441,6 @@ export class WorkflowService {
         .set({ currentVersionId: version.id })
         .where(eq(schema.documents.id, document.id));
 
-      // 8. Create project chat and add project members so team can communicate
-      try {
-        const projectChat = await this.chatService.createProjectChat(
-          project.projectId,
-          project.projectTitle,
-          approverUserId,
-        );
-
-        // Add all proposal members to the chat (creator already added by service)
-        for (const m of proposalMembers) {
-          if (!m.userId) continue;
-          if (m.userId === approverUserId) continue; // already added
-          try {
-            await this.chatService.addMember(projectChat.id, m.userId);
-          } catch (err) {
-            // Non-fatal: log and continue adding other members
-            this.logger.warn(
-              { err, projectId: project.projectId, userId: m.userId },
-              'Failed to add member to project chat',
-            );
-          }
-        }
-      } catch (err) {
-        this.logger.warn(
-          { err, projectId: project.projectId },
-          'Failed to create project chat',
-        );
-      }
-
       // 8. Audit log
       await tx.insert(schema.auditLogs).values({
         actorUserId: approverUserId,
@@ -1389,6 +1453,13 @@ export class WorkflowService {
           membersCount: proposalMembers.length,
         },
       });
+
+      // Return project data for post-transaction chat creation
+      return {
+        projectId: project.projectId,
+        projectTitle: project.projectTitle,
+        proposalMembers,
+      };
     } catch (error) {
       this.logger.error(
         {
@@ -1788,7 +1859,15 @@ export class WorkflowService {
     tx: DB,
     proposalId: string,
     userId: string,
-  ): Promise<{ nextStep?: number; isComplete: boolean }> {
+  ): Promise<{
+    nextStep?: number;
+    isComplete: boolean;
+    projectData?: {
+      projectId: string;
+      projectTitle: string;
+      proposalMembers: any[];
+    };
+  }> {
     const nextStep = await tx.query.proposalApprovals.findFirst({
       where: and(
         eq(schema.proposalApprovals.proposalId, proposalId),
@@ -1828,7 +1907,14 @@ export class WorkflowService {
     tx: DB,
     proposalId: string,
     userId: string,
-  ): Promise<{ isComplete: true }> {
+  ): Promise<{
+    isComplete: true;
+    projectData?: {
+      projectId: string;
+      projectTitle: string;
+      proposalMembers: any[];
+    };
+  }> {
     // Fetch proposal for project creation
     const proposal = await tx.query.proposals.findFirst({
       where: eq(schema.proposals.id, proposalId),
@@ -1859,9 +1945,13 @@ export class WorkflowService {
       changedAt: new Date(),
     });
 
-    // Create project
-    await this.createProjectFromApprovedProposal(tx, proposal, userId);
+    // Create project and get project data for post-transaction chat creation
+    const projectData = await this.createProjectFromApprovedProposal(
+      tx,
+      proposal,
+      userId,
+    );
 
-    return { isComplete: true };
+    return { isComplete: true, projectData };
   }
 }

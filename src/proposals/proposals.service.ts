@@ -834,13 +834,23 @@ export class ProposalsService {
           );
         }
 
-        // Attach new file to proposal
-        await this.filesService.attachFile(
-          dto.fileId,
-          'PROPOSAL',
-          proposalId,
-          'PRIMARY_DOCUMENT',
-        );
+        const currentVersion = proposal.currentVersionId
+          ? await tx.query.proposalVersions.findFirst({
+              where: eq(schema.proposalVersions.id, proposal.currentVersionId),
+            })
+          : null;
+
+        const isSameFile = currentVersion?.fileId === dto.fileId;
+
+        // Attach only when the user selected a different TEMP file
+        if (!isSameFile) {
+          await this.filesService.attachFile(
+            dto.fileId,
+            'PROPOSAL',
+            proposalId,
+            'PRIMARY_DOCUMENT',
+          );
+        }
 
         // Create new proposal version with updated file
         const nextVersionNumber = proposal.currentVersionId ? 2 : 1; // Simple increment; could fetch actual latest

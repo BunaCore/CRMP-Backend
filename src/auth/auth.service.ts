@@ -278,6 +278,48 @@ export class AuthService {
   }
 
   /**
+   * Get invitation details by token (for frontend pre-population before acceptance)
+   * Validates token is valid and not expired
+   * Returns email and role info so frontend can pre-populate form
+   */
+  async getInvitationDetails(token: string): Promise<{
+    email: string;
+    roleName: string;
+    expiresAt: Date;
+  }> {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const invitation =
+      await this.usersRepository.findInvitationByTokenHash(tokenHash);
+
+    if (!invitation) {
+      throw new BadRequestException('Invalid or expired invitation token');
+    }
+
+    if (invitation.acceptedAt) {
+      throw new BadRequestException('Invalid or expired invitation token');
+    }
+
+    if (invitation.expiresAt && invitation.expiresAt.getTime() <= Date.now()) {
+      throw new BadRequestException('Invalid or expired invitation token');
+    }
+
+    if (!invitation.roleId) {
+      throw new BadRequestException('Invitation role is no longer available');
+    }
+
+    const role = await this.rolesRepository.findById(invitation.roleId);
+    if (!role) {
+      throw new NotFoundException('Invitation role was not found');
+    }
+
+    return {
+      email: invitation.email,
+      roleName: role.name,
+      expiresAt: invitation.expiresAt,
+    };
+  }
+
+  /**
    * Get current user (from JWT)
    * Returns user with permissions
    */
