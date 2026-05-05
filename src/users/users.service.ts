@@ -229,6 +229,7 @@ export class UsersService {
       departmentName: user.departmentName ?? null,
       universityId: user.universityId,
       university: user.university,
+      userProgram: user.userProgram ?? null,
       phoneNumber: user.phoneNumber,
       isExternal: user.isExternal ?? false,
       accountStatus: user.accountStatus,

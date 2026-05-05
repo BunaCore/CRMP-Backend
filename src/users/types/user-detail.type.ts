@@ -16,6 +16,7 @@ export type UserDetailResponse = {
   departmentName: string | null;
   universityId: string | null;
   university: string | null;
+  userProgram: 'UG' | 'PG' | null;
   phoneNumber: string | null;
   isExternal: boolean;
   accountStatus: 'active' | 'deactive' | 'suspended';
