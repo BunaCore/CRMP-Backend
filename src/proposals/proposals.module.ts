@@ -11,6 +11,7 @@ import { DbModule } from 'src/db/db.module';
 import { UsersModule } from 'src/users/users.module';
 import { FilesModule } from 'src/common/files/files.module';
 import { ChatModule } from 'src/chat/chat.module';
+import { QueuesModule } from 'src/queues/queues.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ChatModule } from 'src/chat/chat.module';
     UsersModule,
     ChatModule,
     FilesModule,
+    QueuesModule,
   ],
   controllers: [ProposalsController],
   providers: [

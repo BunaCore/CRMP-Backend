@@ -9,11 +9,13 @@ import { UsersModule } from 'src/users/users.module';
 import { DbModule } from 'src/db/db.module';
 import { DepartmentsModule } from 'src/departments/departments.module';
 import { RolesRepository } from 'src/db/roles.repository';
+import { QueuesModule } from 'src/queues/queues.module';
 
 @Module({
   imports: [
     UsersModule,
     DbModule,
+    QueuesModule,
     DepartmentsModule,
     PassportModule,
     JwtModule.registerAsync({

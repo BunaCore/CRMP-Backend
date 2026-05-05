@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   UnauthorizedException,
   NotFoundException,
   ConflictException,
@@ -16,8 +17,7 @@ import { LoginDto } from './dto/login.dto';
 import { AuthResponse } from 'src/types/auth-response';
 import { UserWithPermissions } from 'src/types/user-with-permissions';
 import { User } from 'src/users/types/user';
-import { MailService } from 'src/mail/mail.service';
-import { EmailType } from 'src/mail/dto/email-type.enum';
+import { MailProducer } from 'src/queues/mail/mail.producer';
 import { Permission } from 'src/access-control/permission.enum';
 
 import * as bcrypt from 'bcrypt';
@@ -27,6 +27,8 @@ import { createHash } from 'crypto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private usersRepository: UsersRepository,
     private rolesRepository: RolesRepository,
@@ -34,7 +36,7 @@ export class AuthService {
     private drizzleService: DrizzleService,
     private jwtService: JwtService,
     private configService: ConfigService,
-    private mailService: MailService,
+    private mailProducer: MailProducer,
   ) {}
 
   /**
@@ -107,10 +109,19 @@ export class AuthService {
       },
     );
 
-    // Send welcome email after successful registration
-    this.mailService.sendEmail(EmailType.WELCOME, user.email, {
-      recipientName: user.fullName,
-    });
+    // Queue welcome email without blocking registration response
+    void this.mailProducer
+      .addWelcomeEmailJob({
+        userId: user.id,
+        email: user.email,
+        fullName: user.fullName ?? undefined,
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `Failed to queue welcome email for ${user.email}: ${message}`,
+        );
+      });
 
     return this.buildAuthResponse(user, tokens);
   }

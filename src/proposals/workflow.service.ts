@@ -16,8 +16,7 @@ import { UsersService } from 'src/users/users.service';
 import { FilesService } from 'src/common/files/files.service';
 import { ApproverResolution } from './types/proposal';
 import { EvaluationContext, BranchCondition } from './types/branch-condition';
-import { MailService } from 'src/mail/mail.service';
-import { EmailType } from 'src/mail/dto/email-type.enum';
+import { MailProducer } from 'src/queues/mail/mail.producer';
 import { ChatService } from 'src/chat/chat.service';
 
 type DecisionOutcome = 'Accepted' | 'Rejected' | 'Needs_Revision';
@@ -50,7 +49,7 @@ export class WorkflowService {
     private readonly approvalService: ProposalApprovalService,
     private readonly usersService: UsersService,
     private readonly filesService: FilesService,
-    private readonly mailService: MailService,
+    private readonly mailProducer: MailProducer,
     private readonly chatService: ChatService,
   ) {}
 
@@ -196,20 +195,7 @@ export class WorkflowService {
 
     // Send email after transaction
     if (result.isComplete && result.proposal) {
-      const creator = await this.usersService.findById(
-        result.proposal.createdBy,
-      );
-      if (creator) {
-        this.mailService.sendEmail(
-          EmailType.PROPOSAL_STATUS_CHANGED,
-          creator.email,
-          {
-            recipientName: creator.fullName,
-            proposalTitle: result.proposal.title,
-            status: 'Approved',
-          },
-        );
-      }
+      await this.sendProposalStatusEmail(result.proposal, 'Approved');
     }
 
     return result;
@@ -236,18 +222,7 @@ export class WorkflowService {
     if (result.success) {
       const proposal = await this.repository.findById(proposalId);
       if (proposal) {
-        const creator = await this.usersService.findById(proposal.createdBy);
-        if (creator) {
-          this.mailService.sendEmail(
-            EmailType.PROPOSAL_STATUS_CHANGED,
-            creator.email,
-            {
-              recipientName: creator.fullName,
-              proposalTitle: proposal.title,
-              status: 'Rejected',
-            },
-          );
-        }
+        await this.sendProposalStatusEmail(proposal, 'Rejected');
       }
     }
 
@@ -275,18 +250,7 @@ export class WorkflowService {
     if (result.success) {
       const proposal = await this.repository.findById(proposalId);
       if (proposal) {
-        const creator = await this.usersService.findById(proposal.createdBy);
-        if (creator) {
-          this.mailService.sendEmail(
-            EmailType.PROPOSAL_STATUS_CHANGED,
-            creator.email,
-            {
-              recipientName: creator.fullName,
-              proposalTitle: proposal.title,
-              status: 'Needs Revision',
-            },
-          );
-        }
+        await this.sendProposalStatusEmail(proposal, 'Needs Revision');
       }
     }
 
@@ -803,7 +767,7 @@ export class WorkflowService {
   }
 
   private async sendProposalStatusEmail(
-    proposal: { createdBy: string; title: string },
+    proposal: { id: string; createdBy: string; title: string },
     status: string,
   ): Promise<void> {
     const creator = await this.usersService.findById(proposal.createdBy);
@@ -812,15 +776,20 @@ export class WorkflowService {
       return;
     }
 
-    await this.mailService.sendEmail(
-      EmailType.PROPOSAL_STATUS_CHANGED,
-      creator.email,
-      {
-        recipientName: creator.fullName,
+    try {
+      await this.mailProducer.addProposalStatusEmailJob({
+        userId: creator.id,
+        email: creator.email,
+        proposalId: proposal.id,
         proposalTitle: proposal.title,
-        status,
-      },
-    );
+        newStatus: status,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Failed to queue proposal status email for ${creator.email}: ${message}`,
+      );
+    }
   }
   // ============================================================================
   // Vote Helper Methods

@@ -10,7 +10,7 @@ import { DepartmentsRepository } from 'src/departments/departments.repository';
 import { DrizzleService } from 'src/db/db.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { MailService } from 'src/mail/mail.service';
+import { MailProducer } from 'src/queues/mail/mail.producer';
 
 describe('AuthService - invitation acceptance', () => {
   let authService: AuthService;
@@ -45,7 +45,9 @@ describe('AuthService - invitation acceptance', () => {
     const configService = {
       get: jest.fn().mockReturnValue('3600000'),
     } as unknown as ConfigService;
-    const mailService = {} as MailService;
+    const mailProducer = {
+      addWelcomeEmailJob: jest.fn(),
+    } as unknown as MailProducer;
 
     authService = new AuthService(
       usersRepository,
@@ -54,7 +56,7 @@ describe('AuthService - invitation acceptance', () => {
       drizzleService,
       jwtService,
       configService,
-      mailService,
+      mailProducer,
     );
   });
 
