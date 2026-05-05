@@ -10,7 +10,7 @@ ENV NODE_ENV=development
 RUN pnpm install --frozen-lockfile
 
 COPY src ./src
-COPY tsconfig.json tsconfig.build.json drizzle.config.ts ./
+COPY tsconfig.json tsconfig.build.json drizzle.config.ts nest-cli.json ./
 
 RUN pnpm run build
 
