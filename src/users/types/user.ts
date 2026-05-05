@@ -6,6 +6,7 @@ export interface User {
   email: string;
   passwordHash: string;
   department?: string | null;
+  departmentId?: string | null;
   phoneNumber?: string | null;
   university?: string | null;
   universityId?: string | null;
@@ -22,10 +23,12 @@ export interface CreateUserInput {
   passwordHash: string;
   fullName?: string;
   department?: string;
+  departmentId?: string;
   phoneNumber?: string;
   university?: string;
   universityId?: string;
   userProgram?: 'UG' | 'PG';
+  isExternal?: boolean;
   role?: string;
   accountStatus?: AccountStatus;
 }

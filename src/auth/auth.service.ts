@@ -79,7 +79,7 @@ export class AuthService {
             email: dto.email,
             passwordHash,
             fullName: dto.fullName,
-            department: dto.departmentId, // Now stores UUID of department
+            departmentId: dto.departmentId,
             phoneNumber: dto.phoneNumber,
             university: dto.university,
             universityId: dto.universityId,

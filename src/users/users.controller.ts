@@ -22,6 +22,12 @@ import { UsersListResponse } from './types/user-admin-list.type';
 import { UserDetailResponse } from './types/user-detail.type';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
+import { UpdateSelfProfileDto } from './dto/update-self-profile.dto';
+import { UpdateUserAdminDto } from './dto/update-user-admin.dto';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from 'src/auth/decorators/current-user.decorator';
 
 @Controller('users')
 export class UsersController {
@@ -68,6 +74,15 @@ export class UsersController {
     return this.usersService.getUserById(userId);
   }
 
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  async updateSelfProfile(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateSelfProfileDto,
+  ) {
+    return this.usersService.updateSelfProfile(user.id, dto);
+  }
+
   @Put(':id/roles')
   @UseGuards(JwtAuthGuard, AccessGuard)
   @RequireCasl({ action: 'assignRole', subject: 'User' })
@@ -94,5 +109,16 @@ export class UsersController {
     @Body() dto: UpdateUserStatusDto,
   ) {
     return this.usersService.updateUserStatus(userId, dto.status);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard, AccessGuard)
+  @RequireCasl({ action: 'provision', subject: 'User' })
+  async updateUserByAdmin(
+    @Param('id', new ParseUUIDPipe()) userId: string,
+    @Body() dto: UpdateUserAdminDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.usersService.updateUserByAdmin(userId, dto, actor);
   }
 }
