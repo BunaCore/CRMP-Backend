@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsNotEmpty,
   IsUUID,
+  IsEnum,
 } from 'class-validator';
 
 export class RegisterDto {
@@ -21,9 +22,9 @@ export class RegisterDto {
   @IsString()
   fullName?: string;
 
-  @IsOptional()
+  @IsNotEmpty({ message: 'Department ID is required' })
   @IsUUID('4', { message: 'Department ID must be a valid UUID' })
-  departmentId?: string;
+  departmentId: string;
 
   @IsOptional()
   @IsString()
@@ -36,4 +37,8 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   universityId?: string;
+
+  @IsNotEmpty({ message: 'userProgram is required for student registration' })
+  @IsEnum(['UG', 'PG'], { message: 'userProgram must be UG or PG' })
+  userProgram: 'UG' | 'PG';
 }

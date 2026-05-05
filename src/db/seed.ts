@@ -21,6 +21,7 @@ type SeedUserConfig = {
   email: string;
   password: string;
   roles: Role[];
+  userProgram?: 'UG' | 'PG';
 };
 
 const UNIVERSAL_PASSWORD = 'Password@1234';
@@ -73,18 +74,21 @@ const USERS: SeedUserConfig[] = [
     email: 'student@crmp.edu',
     password: UNIVERSAL_PASSWORD,
     roles: [Role.STUDENT],
+    userProgram: 'UG',
   },
   {
     name: 'Abebe Kebede',
     email: 'student2@crmp.edu',
     password: UNIVERSAL_PASSWORD,
     roles: [Role.STUDENT],
+    userProgram: 'UG',
   },
   {
     name: 'Tigist Alemu',
     email: 'student3@crmp.edu',
     password: UNIVERSAL_PASSWORD,
     roles: [Role.STUDENT],
+    userProgram: 'PG',
   },
   {
     name: 'Director of RAD',
@@ -149,6 +153,7 @@ async function seed() {
           email: userConfig.email,
           passwordHash: hash(userConfig.password),
           accountStatus: 'active',
+          userProgram: userConfig.userProgram,
         })
         .returning();
 

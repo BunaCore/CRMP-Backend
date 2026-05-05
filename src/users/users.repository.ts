@@ -77,10 +77,12 @@ export class UsersRepository {
         id: users.id,
         fullName: users.fullName,
         email: users.email,
+        department: users.department,
         departmentId: users.departmentId,
         departmentName: departments.name,
         universityId: users.universityId,
         university: users.university,
+        userProgram: users.userProgram,
         phoneNumber: users.phoneNumber,
         isExternal: users.isExternal,
         accountStatus: users.accountStatus,
@@ -92,6 +94,15 @@ export class UsersRepository {
       .where(eq(users.id, userId));
 
     return row || null;
+  }
+
+  async departmentExists(departmentId: string): Promise<boolean> {
+    const [department] = await this.drizzle.db
+      .select({ id: departments.id })
+      .from(departments)
+      .where(eq(departments.id, departmentId));
+
+    return !!department;
   }
 
   async getCoordinatorDepartments(userId: string) {
@@ -128,9 +139,12 @@ export class UsersRepository {
         passwordHash: input.passwordHash,
         fullName: input.fullName,
         department: input.department,
+        departmentId: input.departmentId,
         phoneNumber: input.phoneNumber,
         university: input.university,
         universityId: input.universityId,
+        userProgram: input.userProgram || null,
+        isExternal: input.isExternal,
         accountStatus: input.accountStatus,
       })
       .returning();
@@ -251,9 +265,12 @@ export class UsersRepository {
         passwordHash: input.passwordHash,
         fullName: input.fullName,
         department: input.department,
+        departmentId: input.departmentId,
         phoneNumber: input.phoneNumber,
         university: input.university,
         universityId: input.universityId,
+        userProgram: input.userProgram || null,
+        isExternal: input.isExternal,
         accountStatus: input.accountStatus,
       })
       .returning();

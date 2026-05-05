@@ -13,7 +13,7 @@ export const accountStatusEnum = pgEnum('account_status', [
   'deactive',
   'suspended',
 ]);
-
+export const userProgramEnum = pgEnum('user_program', ['UG', 'PG']);
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   fullName: text('full_name'),
@@ -24,6 +24,7 @@ export const users = pgTable('users', {
   phoneNumber: text('phone_number'),
   university: text('university'),
   universityId: text('university_id'),
+  userProgram: userProgramEnum('user_program'),
   isExternal: boolean('is_external').default(false),
   accountStatus: accountStatusEnum('account_status')
     .default('deactive')

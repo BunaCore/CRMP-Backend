@@ -17,6 +17,11 @@ import { MailProducer } from 'src/queues/mail/mail.producer';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes } from 'crypto';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
+import { AccountStatusValue } from './dto/update-user-status.dto';
+import { UpdateSelfProfileDto } from './dto/update-self-profile.dto';
+import { UpdateUserAdminDto } from './dto/update-user-admin.dto';
+import { Permission } from 'src/access-control/permission.enum';
+import { UserWithPermissions } from 'src/types/user-with-permissions';
 
 @Injectable()
 export class UsersService {
@@ -224,6 +229,7 @@ export class UsersService {
       departmentName: user.departmentName ?? null,
       universityId: user.universityId,
       university: user.university,
+      userProgram: user.userProgram ?? null,
       phoneNumber: user.phoneNumber,
       isExternal: user.isExternal ?? false,
       accountStatus: user.accountStatus,
@@ -305,6 +311,140 @@ export class UsersService {
       roleId: invitation.roleId,
       expiresAt: invitation.expiresAt,
       createdAt: invitation.createdAt,
+    };
+  }
+
+  async updateUserStatus(userId: string, status: AccountStatusValue) {
+    const user = await this.usersRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundException(`User "${userId}" not found`);
+    }
+
+    const updatedUser = await this.usersRepository.update(userId, {
+      accountStatus: status,
+    });
+
+    if (!updatedUser) {
+      throw new NotFoundException(`User "${userId}" not found`);
+    }
+
+    return {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      accountStatus: updatedUser.accountStatus,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  async updateSelfProfile(
+    userId: string,
+    dto: UpdateSelfProfileDto,
+  ): Promise<UserWithPermissions> {
+    const user = await this.usersRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundException(`User "${userId}" not found`);
+    }
+
+    const updatedUser = await this.usersRepository.update(userId, {
+      fullName: dto.fullName,
+      phoneNumber: dto.phoneNumber,
+    });
+
+    if (!updatedUser) {
+      throw new NotFoundException(`User "${userId}" not found`);
+    }
+
+    return this.buildUserWithPermissions(updatedUser);
+  }
+
+  async updateUserByAdmin(
+    userId: string,
+    dto: UpdateUserAdminDto,
+    actor: { id: string },
+  ): Promise<UserWithPermissions> {
+    const user = await this.usersRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundException(`User "${userId}" not found`);
+    }
+
+    if (dto.email && dto.email !== user.email) {
+      const existing = await this.usersRepository.findByEmail(dto.email);
+      if (existing && existing.id !== userId) {
+        throw new ConflictException('A user with this email already exists');
+      }
+    }
+
+    if (dto.departmentId) {
+      const departmentExists = await this.usersRepository.departmentExists(
+        dto.departmentId,
+      );
+      if (!departmentExists) {
+        throw new NotFoundException(
+          `Department with ID "${dto.departmentId}" not found`,
+        );
+      }
+    }
+
+    const roles = await this.usersRepository.getUserRoles(userId);
+    const roleNames = roles
+      .map((role) => role.roleName)
+      .filter(Boolean) as string[];
+    const isStudent = roleNames.includes('STUDENT');
+
+    if (!isStudent && dto.userProgram) {
+      throw new BadRequestException(
+        'userProgram can only be set for STUDENT users',
+      );
+    }
+
+    const updateInput: Partial<CreateUserInput> = {
+      fullName: dto.fullName,
+      phoneNumber: dto.phoneNumber,
+      email: dto.email,
+      departmentId: dto.departmentId,
+      department: dto.department,
+      university: dto.university,
+      universityId: dto.universityId,
+      isExternal: dto.isExternal,
+      accountStatus: dto.accountStatus,
+    };
+
+    if (isStudent && dto.userProgram) {
+      updateInput.userProgram = dto.userProgram;
+    }
+
+    const updatedUser = await this.usersRepository.update(userId, updateInput);
+
+    if (!updatedUser) {
+      throw new NotFoundException(`User "${userId}" not found`);
+    }
+
+    return this.buildUserWithPermissions(updatedUser);
+  }
+
+  private async buildUserWithPermissions(
+    user: User,
+  ): Promise<UserWithPermissions> {
+    const permissions = await this.usersRepository.getUserPermissions(user.id);
+    const roles = await this.usersRepository.getUserRoles(user.id);
+    const roleNames = roles
+      .map((role) => role.roleName)
+      .filter(Boolean) as string[];
+
+    return {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      department: user.department,
+      phoneNumber: user.phoneNumber,
+      university: user.university,
+      universityId: user.universityId,
+      userProgram: user.userProgram,
+      roles: roleNames,
+      permissions,
+      canAccessAdmin: permissions.includes(Permission.ADMIN_VIEW),
+      accountStatus: user.accountStatus,
+      createdAt: user.createdAt,
     };
   }
 }

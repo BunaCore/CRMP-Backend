@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
@@ -24,6 +24,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (!user) {
       return null; // Will be rejected by guard
+    }
+
+    if (user.accountStatus !== 'active') {
+      throw new ForbiddenException('Account is not active');
     }
 
     return {

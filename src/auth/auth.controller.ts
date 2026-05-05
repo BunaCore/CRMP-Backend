@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   Post,
+  Query,
   UseGuards,
   Request,
 } from '@nestjs/common';
@@ -36,8 +38,20 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  @Get('invitations')
+  async getInvitationDetails(
+    @Query('token') token: string,
+  ): Promise<{ email: string; roleName: string; expiresAt: Date }> {
+    if (!token) {
+      throw new BadRequestException('Invitation token is required');
+    }
+    return this.authService.getInvitationDetails(token);
+  }
+
   @Post('invitations/accept')
-  async acceptInvitation(@Body() dto: AcceptInvitationDto): Promise<AuthResponse> {
+  async acceptInvitation(
+    @Body() dto: AcceptInvitationDto,
+  ): Promise<AuthResponse> {
     return this.authService.acceptInvitation(dto);
   }
 

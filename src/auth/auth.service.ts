@@ -15,6 +15,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponse } from 'src/types/auth-response';
 import { UserWithPermissions } from 'src/types/user-with-permissions';
+import { User } from 'src/users/types/user';
 import { MailService } from 'src/mail/mail.service';
 import { EmailType } from 'src/mail/dto/email-type.enum';
 import { Permission } from 'src/access-control/permission.enum';
@@ -78,10 +79,11 @@ export class AuthService {
             email: dto.email,
             passwordHash,
             fullName: dto.fullName,
-            department: dto.departmentId, // Now stores UUID of department
+            departmentId: dto.departmentId,
             phoneNumber: dto.phoneNumber,
             university: dto.university,
             universityId: dto.universityId,
+            userProgram: dto.userProgram,
             accountStatus: 'deactive',
           },
           tx,
@@ -110,31 +112,7 @@ export class AuthService {
       recipientName: user.fullName,
     });
 
-    // Fetch permissions and build response
-    const permissions = await this.usersRepository.getUserPermissions(user.id);
-    const roles = await this.usersRepository.getUserRoles(user.id);
-    const roleNames = roles.map((r) => r.roleName).filter(Boolean) as string[];
-
-    const userWithPermissions: UserWithPermissions = {
-      id: user.id,
-      fullName: user.fullName,
-      email: user.email,
-      department: user.department,
-      phoneNumber: user.phoneNumber,
-      university: user.university,
-      universityId: user.universityId,
-      roles: roleNames,
-      permissions,
-      canAccessAdmin: permissions.includes(Permission.ADMIN_VIEW),
-      accountStatus: user.accountStatus,
-      createdAt: user.createdAt,
-    };
-
-    return {
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      user: userWithPermissions,
-    };
+    return this.buildAuthResponse(user, tokens);
   }
 
   /**
@@ -152,33 +130,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Fetch permissions and roles
-    const permissions = await this.usersRepository.getUserPermissions(user.id);
     const roles = await this.usersRepository.getUserRoles(user.id);
     const roleNames = roles.map((r) => r.roleName).filter(Boolean) as string[];
-
     const tokens = await this.generateTokens(user.id, roleNames[0]);
 
-    const userWithPermissions: UserWithPermissions = {
-      id: user.id,
-      fullName: user.fullName,
-      email: user.email,
-      department: user.department,
-      phoneNumber: user.phoneNumber,
-      university: user.university,
-      universityId: user.universityId,
-      roles: roleNames,
-      permissions,
-      canAccessAdmin: permissions.includes(Permission.ADMIN_VIEW),
-      accountStatus: user.accountStatus,
-      createdAt: user.createdAt,
-    };
-
-    return {
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      user: userWithPermissions,
-    };
+    return this.buildAuthResponse(user, tokens);
   }
 
   async acceptInvitation(dto: AcceptInvitationDto): Promise<AuthResponse> {
@@ -228,7 +184,7 @@ export class AuthService {
             phoneNumber: dto.phoneNumber,
             university: dto.university,
             universityId: dto.universityId,
-            accountStatus: 'deactive',
+            accountStatus: 'active',
           },
           tx,
         );
@@ -251,29 +207,48 @@ export class AuthService {
       },
     );
 
-    const permissions = await this.usersRepository.getUserPermissions(user.id);
-    const roles = await this.usersRepository.getUserRoles(user.id);
-    const roleNames = roles.map((r) => r.roleName).filter(Boolean) as string[];
+    return this.buildAuthResponse(user, tokens);
+  }
 
-    const userWithPermissions: UserWithPermissions = {
-      id: user.id,
-      fullName: user.fullName,
-      email: user.email,
-      department: user.department,
-      phoneNumber: user.phoneNumber,
-      university: user.university,
-      universityId: user.universityId,
-      roles: roleNames,
-      permissions,
-      canAccessAdmin: permissions.includes(Permission.ADMIN_VIEW),
-      accountStatus: user.accountStatus,
-      createdAt: user.createdAt,
-    };
+  /**
+   * Get invitation details by token (for frontend pre-population before acceptance)
+   * Validates token is valid and not expired
+   * Returns email and role info so frontend can pre-populate form
+   */
+  async getInvitationDetails(token: string): Promise<{
+    email: string;
+    roleName: string;
+    expiresAt: Date;
+  }> {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const invitation =
+      await this.usersRepository.findInvitationByTokenHash(tokenHash);
+
+    if (!invitation) {
+      throw new BadRequestException('Invalid or expired invitation token');
+    }
+
+    if (invitation.acceptedAt) {
+      throw new BadRequestException('Invalid or expired invitation token');
+    }
+
+    if (invitation.expiresAt && invitation.expiresAt.getTime() <= Date.now()) {
+      throw new BadRequestException('Invalid or expired invitation token');
+    }
+
+    if (!invitation.roleId) {
+      throw new BadRequestException('Invitation role is no longer available');
+    }
+
+    const role = await this.rolesRepository.findById(invitation.roleId);
+    if (!role) {
+      throw new NotFoundException('Invitation role was not found');
+    }
 
     return {
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      user: userWithPermissions,
+      email: invitation.email,
+      roleName: role.name,
+      expiresAt: invitation.expiresAt,
     };
   }
 
@@ -288,8 +263,25 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
-    const permissions = await this.usersRepository.getUserPermissions(userId);
-    const roles = await this.usersRepository.getUserRoles(userId);
+    return this.buildUserWithPermissions(user);
+  }
+
+  private async buildAuthResponse(
+    user: User,
+    tokens: { accessToken: string; refreshToken: string },
+  ): Promise<AuthResponse> {
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: await this.buildUserWithPermissions(user),
+    };
+  }
+
+  private async buildUserWithPermissions(
+    user: User,
+  ): Promise<UserWithPermissions> {
+    const permissions = await this.usersRepository.getUserPermissions(user.id);
+    const roles = await this.usersRepository.getUserRoles(user.id);
     const roleNames = roles.map((r) => r.roleName).filter(Boolean) as string[];
 
     return {
@@ -300,6 +292,7 @@ export class AuthService {
       phoneNumber: user.phoneNumber,
       university: user.university,
       universityId: user.universityId,
+      userProgram: user.userProgram,
       roles: roleNames,
       permissions,
       canAccessAdmin: permissions.includes(Permission.ADMIN_VIEW),
