@@ -6,10 +6,11 @@ import {
 import { ProjectsService } from './projects.service';
 import { ProjectsRepository } from './projects.repository';
 import { DbModule } from 'src/db/db.module';
+import { AccessControlModule } from 'src/access-control';
 
 @Module({
-  imports: [DbModule],
-  controllers: [PublicProjectsController, ProjectsController],
+  imports: [DbModule, AccessControlModule],
+  controllers: [ProjectsController, PublicProjectsController],
   providers: [ProjectsService, ProjectsRepository],
   exports: [ProjectsService],
 })

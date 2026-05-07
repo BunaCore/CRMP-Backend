@@ -9,6 +9,7 @@ import {
   Body,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { JwtAuthGuard } from 'src/auth/jwt.guard';
@@ -17,6 +18,7 @@ import {
   type AuthenticatedUser,
 } from 'src/auth/decorators/current-user.decorator';
 import { PublishProjectDto } from './dto';
+import { GetProjectsQueryDto } from './dto/get-projects-query.dto';
 
 @Controller('projects')
 @UseGuards(JwtAuthGuard)
@@ -26,6 +28,14 @@ export class ProjectsController {
   @Get()
   async getMyProjects(@CurrentUser() user: AuthenticatedUser) {
     return this.projectsService.getProjectsForUser(user.id);
+  }
+
+  @Get('all')
+  async getAllProjects(
+    @Query() query: GetProjectsQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.projectsService.getProjects(query, user.id);
   }
 
   @Get(':projectId/members')

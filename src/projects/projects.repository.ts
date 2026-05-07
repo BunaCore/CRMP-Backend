@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DrizzleService } from 'src/db/db.service';
 import * as schema from 'src/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, SQL } from 'drizzle-orm';
 
 @Injectable()
 export class ProjectsRepository {
@@ -21,6 +21,10 @@ export class ProjectsRepository {
         departmentId: schema.projects.departmentId,
         durationMonths: schema.projects.durationMonths,
         ethicalClearanceStatus: schema.projects.ethicalClearanceStatus,
+        bannerUrl: schema.projects.bannerUrl,
+        publicFileUrl: schema.projects.publicFileUrl,
+        publishedAt: schema.projects.publishedAt,
+        isPublic: schema.projects.isPublic,
         createdAt: schema.projects.createdAt,
       })
       .from(schema.projectMembers)
@@ -158,5 +162,99 @@ export class ProjectsRepository {
       .where(eq(schema.projects.projectId, projectId))
       .returning();
     return updated;
+  }
+
+  async getProjects(
+    where: SQL<unknown> | undefined,
+    pagination: { page: number; limit: number },
+  ) {
+    const offset = (pagination.page - 1) * pagination.limit;
+
+    const projectsWithPI = await this.drizzle.db
+      .select({
+        projectId: schema.projects.projectId,
+        projectTitle: schema.projects.projectTitle,
+        isFunded: schema.projects.isFunded,
+        projectStage: schema.projects.projectStage,
+        projectDescription: schema.projects.projectDescription,
+        submissionDate: schema.projects.submissionDate,
+        researchArea: schema.projects.researchArea,
+        projectProgram: schema.projects.projectProgram,
+        departmentId: schema.projects.departmentId,
+        durationMonths: schema.projects.durationMonths,
+        ethicalClearanceStatus: schema.projects.ethicalClearanceStatus,
+        bannerUrl: schema.projects.bannerUrl,
+        publicFileUrl: schema.projects.publicFileUrl,
+        publishedAt: schema.projects.publishedAt,
+        isPublic: schema.projects.isPublic,
+        createdAt: schema.projects.createdAt,
+        piId: schema.users.id,
+        piName: schema.users.fullName,
+        piEmail: schema.users.email,
+      })
+      .from(schema.projects)
+      .leftJoin(
+        schema.projectMembers,
+        and(
+          eq(schema.projectMembers.projectId, schema.projects.projectId),
+          eq(schema.projectMembers.role, 'PI'),
+        ),
+      )
+      .leftJoin(schema.users, eq(schema.projectMembers.userId, schema.users.id))
+      .where(where)
+      .orderBy(schema.projects.createdAt)
+      .limit(pagination.limit)
+      .offset(offset);
+
+    // Count total for pagination metadata
+    const countResult = await this.drizzle.db
+      .select({ count: schema.projects.projectId })
+      .from(schema.projects)
+      .where(where);
+
+    const total = countResult.length;
+
+    // Group results to handle the LEFT JOIN producing duplicate rows per PI
+    const groupedProjects = projectsWithPI.reduce((acc, row) => {
+      const existing = acc.find((p) => p.projectId === row.projectId);
+      if (!existing) {
+        acc.push({
+          projectId: row.projectId,
+          projectTitle: row.projectTitle,
+          isFunded: row.isFunded,
+          projectStage: row.projectStage,
+          projectDescription: row.projectDescription,
+          submissionDate: row.submissionDate,
+          researchArea: row.researchArea,
+          projectProgram: row.projectProgram,
+          departmentId: row.departmentId,
+          durationMonths: row.durationMonths,
+          ethicalClearanceStatus: row.ethicalClearanceStatus,
+          bannerUrl: row.bannerUrl,
+          publicFileUrl: row.publicFileUrl,
+          publishedAt: row.publishedAt,
+          isPublic: row.isPublic,
+          createdAt: row.createdAt,
+          pi: row.piId
+            ? {
+                id: row.piId,
+                fullName: row.piName,
+                email: row.piEmail,
+              }
+            : null,
+        });
+      }
+      return acc;
+    }, [] as Array<any>);
+
+    return {
+      data: groupedProjects,
+      pagination: {
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        pages: Math.ceil(total / pagination.limit),
+      },
+    };
   }
 }
