@@ -8,6 +8,15 @@ import {
   Min,
 } from 'class-validator';
 
+/**
+ * InitiateUploadDto - Request to initiate a file upload
+ *
+ * Resource Types:
+ * - USER_AVATAR: User profile avatar (public bucket)
+ * - PROJECT_BANNER: Project banner image (public bucket)
+ * - PROJECT_FILE: Project public file (public bucket)
+ * - (undefined/other): Stored in private bucket (requires auth to access)
+ */
 export class InitiateUploadDto {
   @IsString()
   @IsNotEmpty()

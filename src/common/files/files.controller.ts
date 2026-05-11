@@ -30,6 +30,14 @@ export class FilesController {
   /**
    * POST /files/upload
    * Initiate direct upload to object storage
+   *
+   * Resource Types for Public Bucket (directly accessible):
+   * - USER_AVATAR: User profile avatars
+   * - PROJECT_BANNER: Project banner images
+   * - PROJECT_FILE: Project public files (published content)
+   *
+   * Other resource types or undefined → Private bucket (requires auth/signed URL)
+   *
    * Returns: { fileId, uploadUrl, storageKey, publicUrl? }
    * File is stored in TEMP status until attached to a resource
    */
@@ -46,9 +54,7 @@ export class FilesController {
    * Return signed URL for private files or direct URL for public files
    */
   @Get(':id')
-  async getFileUrl(
-    @Param('id', new ParseUUIDPipe()) fileId: string,
-  ) {
+  async getFileUrl(@Param('id', new ParseUUIDPipe()) fileId: string) {
     const fileData = await this.filesService.getFileById(fileId);
     if (!fileData) {
       throw new BadRequestException(`File ${fileId} not found`);

@@ -7,9 +7,10 @@ import { ProjectsService } from './projects.service';
 import { ProjectsRepository } from './projects.repository';
 import { DbModule } from 'src/db/db.module';
 import { AccessControlModule } from 'src/access-control';
+import { FilesModule } from 'src/common/files/files.module';
 
 @Module({
-  imports: [DbModule, AccessControlModule],
+  imports: [DbModule, AccessControlModule, FilesModule],
   controllers: [ProjectsController, PublicProjectsController],
   providers: [ProjectsService, ProjectsRepository],
   exports: [ProjectsService],

@@ -2,11 +2,14 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { ProjectsRepository } from './projects.repository';
 import { PublishProjectDto, PublicProjectDto } from './dto';
 import { GetProjectsQueryDto } from './dto/get-projects-query.dto';
+import { UpdateProjectVisibilityDto } from './dto/update-project-visibility.dto';
+import { UpdateProjectAssetsDto } from './dto/update-project-assets.dto';
 import { AbilityFactory } from 'src/access-control/ability.factory';
 import {
   buildProjectAuthorizationWhere,
@@ -16,15 +19,23 @@ import {
 import { buildPaginationMeta } from 'src/common/pagination/utils/build-pagination-meta';
 import { sql } from 'drizzle-orm';
 import { DrizzleService } from 'src/db/db.service';
+import { FilesService } from 'src/common/files/files.service';
 
 @Injectable()
 export class ProjectsService {
   private readonly logger = new Logger(ProjectsService.name);
 
+  private static readonly requiredUploadFields = [
+    'buffer',
+    'originalname',
+    'mimetype',
+  ] as const;
+
   constructor(
     private readonly repository: ProjectsRepository,
     private readonly abilityFactory: AbilityFactory,
     private readonly drizzle: DrizzleService,
+    private readonly filesService: FilesService,
   ) {}
 
   async getProjectsForUser(userId: string) {
@@ -32,11 +43,21 @@ export class ProjectsService {
   }
 
   async getProjectById(projectId: string) {
-    const project = await this.repository.findProjectById(projectId);
+    const [project, members] = await Promise.all([
+      this.repository.findProjectById(projectId),
+      this.repository.getProjectMembersWithDetails(projectId),
+    ]);
     if (!project) {
       throw new NotFoundException('Project not found');
     }
-    return project;
+
+    const budget = await this.repository.getProjectBudgetByProjectId(projectId);
+
+    return {
+      ...project,
+      members,
+      budget,
+    };
   }
 
   async isUserMemberOfProject(
@@ -84,11 +105,21 @@ export class ProjectsService {
   }
 
   async getPublicProjectById(projectId: string): Promise<PublicProjectDto> {
-    const project = await this.repository.findPublicProjectById(projectId);
+    const [project, members] = await Promise.all([
+      this.repository.findPublicProjectById(projectId),
+      this.repository.getProjectMembersWithDetails(projectId),
+    ]);
     if (!project) {
       throw new NotFoundException('Public project not found');
     }
-    return this.mapToPublicProjectDto(project);
+
+    const budget = await this.repository.getProjectBudgetByProjectId(projectId);
+
+    return {
+      ...this.mapToPublicProjectDto(project),
+      members,
+      budget,
+    };
   }
 
   private mapToPublicProjectDto(project: any): PublicProjectDto {
@@ -164,5 +195,153 @@ export class ProjectsService {
       items: result.data,
       meta: buildPaginationMeta(page, limit, result.pagination.total),
     };
+  }
+
+  async updateProjectVisibility(
+    projectId: string,
+    userId: string,
+    dto: UpdateProjectVisibilityDto,
+  ): Promise<{ isPublic: boolean }> {
+    // Verify project exists and user is PI
+    const project = await this.repository.findProjectById(projectId);
+    if (!project) {
+      throw new BadRequestException('Project not found');
+    }
+
+    const isPI = await this.repository.isUserPIOfProject(userId, projectId);
+    if (!isPI) {
+      throw new ForbiddenException('Only project PI can update visibility');
+    }
+
+    // Update visibility
+    await this.repository.updateProjectVisibility(projectId, dto.isPublic);
+
+    return { isPublic: dto.isPublic };
+  }
+
+  async updateProjectAssets(
+    projectId: string,
+    userId: string,
+    dto: UpdateProjectAssetsDto,
+  ): Promise<{ bannerUrl?: string | null; publicFileUrl?: string | null }> {
+    // Verify project exists and user is PI
+    const project = await this.repository.findProjectById(projectId);
+    if (!project) {
+      throw new BadRequestException('Project not found');
+    }
+
+    const isPI = await this.repository.isUserPIOfProject(userId, projectId);
+    if (!isPI) {
+      throw new ForbiddenException('Only project PI can update assets');
+    }
+
+    // Update assets with fallback to existing values
+    const bannerUrl = dto.bannerUrl ?? project.bannerUrl;
+    const publicFileUrl = dto.publicFileUrl ?? project.publicFileUrl;
+
+    await this.repository.updateProjectAssets(projectId, {
+      bannerUrl: bannerUrl ?? undefined,
+      publicFileUrl: publicFileUrl ?? undefined,
+    });
+
+    return { bannerUrl, publicFileUrl };
+  }
+
+  async uploadBanner(
+    projectId: string,
+    userId: string,
+    file: {
+      buffer: Buffer;
+      originalname: string;
+      mimetype: string;
+    },
+  ): Promise<{ fileId: string; url: string }> {
+    this.ensureUploadFile(file);
+
+    // Verify project exists and user is PI
+    const project = await this.repository.findProjectById(projectId);
+    if (!project) {
+      throw new BadRequestException('Project not found');
+    }
+
+    const isPI = await this.repository.isUserPIOfProject(userId, projectId);
+    if (!isPI) {
+      throw new ForbiddenException('Only project PI can upload banner');
+    }
+
+    // Upload and attach file
+    const result = await this.filesService.uploadAndAttachPublicFile(
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+      'PROJECT_BANNER',
+      projectId,
+      userId,
+    );
+
+    // Update project with fileId and URL
+    await this.repository.updateProjectAssets(projectId, {
+      bannerFileId: result.fileId,
+      bannerUrl: result.url,
+    });
+
+    return result;
+  }
+
+  async uploadPublicFile(
+    projectId: string,
+    userId: string,
+    file: {
+      buffer: Buffer;
+      originalname: string;
+      mimetype: string;
+    },
+  ): Promise<{ fileId: string; url: string }> {
+    this.ensureUploadFile(file);
+
+    // Verify project exists and user is PI
+    const project = await this.repository.findProjectById(projectId);
+    if (!project) {
+      throw new BadRequestException('Project not found');
+    }
+
+    const isPI = await this.repository.isUserPIOfProject(userId, projectId);
+    if (!isPI) {
+      throw new ForbiddenException('Only project PI can upload public file');
+    }
+
+    // Upload and attach file
+    const result = await this.filesService.uploadAndAttachPublicFile(
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+      'PROJECT_FILE',
+      projectId,
+      userId,
+    );
+
+    // Update project with fileId and URL
+    await this.repository.updateProjectAssets(projectId, {
+      publicFileId: result.fileId,
+      publicFileUrl: result.url,
+    });
+
+    return result;
+  }
+
+  private ensureUploadFile(file: unknown): asserts file is {
+    buffer: Buffer;
+    originalname: string;
+    mimetype: string;
+  } {
+    if (!file || typeof file !== 'object') {
+      throw new BadRequestException('File is required');
+    }
+
+    for (const field of ProjectsService.requiredUploadFields) {
+      if (!(field in file)) {
+        throw new BadRequestException('Invalid uploaded file payload');
+      }
+    }
   }
 }

@@ -78,6 +78,57 @@ export class ProjectsRepository {
       .orderBy(schema.projectMembers.addedAt);
   }
 
+  async getProjectMembersWithDetails(projectId: string) {
+    return this.drizzle.db
+      .select({
+        userId: schema.users.id,
+        fullName: schema.users.fullName,
+        email: schema.users.email,
+        avatarUrl: schema.users.avatarUrl,
+        role: schema.projectMembers.role,
+        addedAt: schema.projectMembers.addedAt,
+      })
+      .from(schema.projectMembers)
+      .innerJoin(
+        schema.users,
+        eq(schema.projectMembers.userId, schema.users.id),
+      )
+      .where(eq(schema.projectMembers.projectId, projectId))
+      .orderBy(schema.projectMembers.addedAt);
+  }
+
+  async getProjectBudgetByProjectId(projectId: string) {
+    const budgetRequest = await this.drizzle.db.query.budgetRequests.findFirst({
+      where: eq(schema.budgetRequests.projectId, projectId),
+    });
+
+    if (!budgetRequest) {
+      return null;
+    }
+
+    const items = await this.drizzle.db
+      .select({
+        id: schema.budgetRequestItems.id,
+        lineIndex: schema.budgetRequestItems.lineIndex,
+        description: schema.budgetRequestItems.description,
+        requestedAmount: schema.budgetRequestItems.requestedAmount,
+      })
+      .from(schema.budgetRequestItems)
+      .where(eq(schema.budgetRequestItems.budgetRequestId, budgetRequest.id))
+      .orderBy(schema.budgetRequestItems.lineIndex);
+
+    return {
+      id: budgetRequest.id,
+      proposalId: budgetRequest.proposalId,
+      projectId: budgetRequest.projectId,
+      currentStatus: budgetRequest.currentStatus,
+      totalAmount: budgetRequest.totalAmount,
+      approvedAmount: budgetRequest.approvedAmount,
+      createdAt: budgetRequest.createdAt,
+      items,
+    };
+  }
+
   async isUserPIOfProject(userId: string, projectId: string): Promise<boolean> {
     const [pi] = await this.drizzle.db
       .select()
@@ -89,6 +140,7 @@ export class ProjectsRepository {
           eq(schema.projectMembers.role, 'PI'),
         ),
       );
+    console.log('PI check:', { userId, projectId, pi });
     return !!pi;
   }
 
@@ -256,5 +308,51 @@ export class ProjectsRepository {
         pages: Math.ceil(total / pagination.limit),
       },
     };
+  }
+
+  async updateProjectVisibility(
+    projectId: string,
+    isPublic: boolean,
+  ): Promise<void> {
+    await this.drizzle.db
+      .update(schema.projects)
+      .set({
+        isPublic,
+        publishedAt: isPublic ? new Date() : null,
+      })
+      .where(eq(schema.projects.projectId, projectId));
+  }
+
+  async updateProjectAssets(
+    projectId: string,
+    assets: {
+      bannerFileId?: string;
+      bannerUrl?: string;
+      publicFileId?: string;
+      publicFileUrl?: string;
+    },
+  ): Promise<void> {
+    const updateData: any = {};
+    if (assets.bannerFileId !== undefined) {
+      updateData.bannerFileId = assets.bannerFileId;
+    }
+    if (assets.bannerUrl !== undefined) {
+      updateData.bannerUrl = assets.bannerUrl;
+    }
+    if (assets.publicFileId !== undefined) {
+      updateData.publicFileId = assets.publicFileId;
+    }
+    if (assets.publicFileUrl !== undefined) {
+      updateData.publicFileUrl = assets.publicFileUrl;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return; // Nothing to update
+    }
+
+    await this.drizzle.db
+      .update(schema.projects)
+      .set(updateData)
+      .where(eq(schema.projects.projectId, projectId));
   }
 }

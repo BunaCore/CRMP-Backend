@@ -10,8 +10,12 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  Post,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/auth/jwt.guard';
 import {
   CurrentUser,
@@ -19,6 +23,8 @@ import {
 } from 'src/auth/decorators/current-user.decorator';
 import { PublishProjectDto } from './dto';
 import { GetProjectsQueryDto } from './dto/get-projects-query.dto';
+import { UpdateProjectVisibilityDto } from './dto/update-project-visibility.dto';
+import { UpdateProjectAssetsDto } from './dto/update-project-assets.dto';
 
 @Controller('projects')
 @UseGuards(JwtAuthGuard)
@@ -78,6 +84,62 @@ export class ProjectsController {
     @Body() dto: PublishProjectDto,
   ) {
     return this.projectsService.publishProject(projectId, user.id, dto);
+  }
+
+  @Patch(':projectId/visibility')
+  @HttpCode(HttpStatus.OK)
+  async updateProjectVisibility(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateProjectVisibilityDto,
+  ) {
+    return this.projectsService.updateProjectVisibility(
+      projectId,
+      user.id,
+      dto,
+    );
+  }
+
+  @Patch(':projectId/assets')
+  @HttpCode(HttpStatus.OK)
+  async updateProjectAssets(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateProjectAssetsDto,
+  ) {
+    return this.projectsService.updateProjectAssets(projectId, user.id, dto);
+  }
+
+  @Post(':projectId/upload-banner')
+  @UseInterceptors(FileInterceptor('file'))
+  @HttpCode(HttpStatus.OK)
+  async uploadBanner(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFile()
+    file: {
+      buffer: Buffer;
+      originalname: string;
+      mimetype: string;
+    },
+  ) {
+    return this.projectsService.uploadBanner(projectId, user.id, file);
+  }
+
+  @Post(':projectId/upload-public-file')
+  @UseInterceptors(FileInterceptor('file'))
+  @HttpCode(HttpStatus.OK)
+  async uploadPublicFile(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFile()
+    file: {
+      buffer: Buffer;
+      originalname: string;
+      mimetype: string;
+    },
+  ) {
+    return this.projectsService.uploadPublicFile(projectId, user.id, file);
   }
 }
 

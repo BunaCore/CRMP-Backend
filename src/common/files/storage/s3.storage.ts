@@ -11,6 +11,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   PresignedGetInput,
   PresignedPutInput,
+  PutObjectInput,
   StorageService,
 } from './storage.interface';
 
@@ -75,6 +76,17 @@ export class S3StorageService implements StorageService {
       new DeleteObjectCommand({
         Bucket: bucket,
         Key: key,
+      }),
+    );
+  }
+
+  async putObject(input: PutObjectInput): Promise<void> {
+    await this.s3Client.send(
+      new PutObjectCommand({
+        Bucket: input.bucket,
+        Key: input.key,
+        Body: input.body,
+        ContentType: input.contentType,
       }),
     );
   }

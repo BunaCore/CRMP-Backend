@@ -277,13 +277,21 @@ export class FilesService {
     bucket: string;
     isPublic: boolean;
   } {
-    if (resourceType === 'USER_AVATAR') {
+    // Public bucket resource types (directly accessible without auth)
+    const publicResourceTypes = [
+      'USER_AVATAR',
+      'PROJECT_BANNER',
+      'PROJECT_FILE',
+    ];
+
+    if (resourceType && publicResourceTypes.includes(resourceType)) {
       return {
         bucket: this.publicBucket,
         isPublic: true,
       };
     }
 
+    // Private bucket for all other resource types (requires auth/signed URL)
     return {
       bucket: this.privateBucket,
       isPublic: false,
@@ -302,5 +310,66 @@ export class FilesService {
       : this.publicBaseUrl;
     const key = storageKey.startsWith('/') ? storageKey.slice(1) : storageKey;
     return `${base}/${key}`;
+  }
+
+  /**
+   * Upload and attach a public file in one operation.
+   * File is immediately set to ATTACHED status (not TEMP).
+   * Used for project banners and public files.
+   *
+   * @param buffer - File content
+   * @param originalName - Original filename
+   * @param mimeType - MIME type
+   * @param resourceType - e.g., 'PROJECT_BANNER', 'PROJECT_FILE'
+   * @param resourceId - UUID of the resource (project ID)
+   * @param userId - User uploading the file
+   * @returns { fileId, url }
+   */
+  async uploadAndAttachPublicFile(
+    buffer: Buffer,
+    originalName: string,
+    mimeType: string,
+    resourceType: string,
+    resourceId: string,
+    userId: string,
+  ): Promise<{ fileId: string; url: string }> {
+    const fileId = randomUUID();
+    const key = this.buildStorageKey(userId, fileId, originalName);
+    const { bucket, isPublic } = this.resolveBucket(resourceType);
+
+    if (!isPublic) {
+      throw new BadRequestException(
+        `Resource type ${resourceType} is not publicly accessible`,
+      );
+    }
+
+    // Upload to storage
+    await this.storageService.putObject({
+      bucket,
+      key,
+      body: buffer,
+      contentType: mimeType,
+    });
+
+    // Create file record with ATTACHED status immediately
+    const dbFile = await this.filesRepository.createFile({
+      bucket,
+      storagePath: key,
+      uploadedBy: userId,
+      originalName,
+      mimeType,
+      size: buffer.length,
+      resourceType,
+      resourceId,
+      purpose: null,
+      status: 'ATTACHED',
+    });
+
+    const url = this.buildPublicUrl(key);
+
+    return {
+      fileId: dbFile.id,
+      url,
+    };
   }
 }

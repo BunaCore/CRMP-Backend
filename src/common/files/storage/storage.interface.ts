@@ -11,9 +11,17 @@ export type PresignedGetInput = {
   expiresInSeconds: number;
 };
 
+export type PutObjectInput = {
+  bucket: string;
+  key: string;
+  body: Buffer | Uint8Array;
+  contentType: string;
+};
+
 export interface StorageService {
   getPresignedPutUrl(input: PresignedPutInput): Promise<string>;
   getPresignedGetUrl(input: PresignedGetInput): Promise<string>;
+  putObject(input: PutObjectInput): Promise<void>;
   headObject(bucket: string, key: string): Promise<void>;
   deleteObject(bucket: string, key: string): Promise<void>;
 }
