@@ -58,6 +58,16 @@ export const projects = pgTable('projects', {
     'ethical_clearance_status',
   ).notNull(),
   createdAt: timestamp('created_at').defaultNow(),
+  // Publishing fields
+  isPublic: boolean('is_public').default(false).notNull(),
+  bannerFileId: uuid('banner_file_id'), // Track banner file for lifecycle management
+  bannerUrl: text('banner_url'),
+  publicFileId: uuid('public_file_id'), // Track public file for lifecycle management
+  publicFileUrl: text('public_file_url'),
+  publishedAt: timestamp('published_at'),
+  publishedBy: uuid('published_by').references(() => users.id, {
+    onDelete: 'set null',
+  }),
 });
 
 // Project members should be in a separate table for proper many-to-many relationship

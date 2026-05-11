@@ -1357,6 +1357,12 @@ export class WorkflowService {
         .set({ projectId: project.projectId })
         .where(eq(schema.proposals.id, proposal.id));
 
+      // Link budget request to the newly created project
+      await tx
+        .update(schema.budgetRequests)
+        .set({ projectId: project.projectId })
+        .where(eq(schema.budgetRequests.proposalId, proposal.id));
+
       // 4. Create default workspace
       const [workspace] = await tx
         .insert(schema.workspaces)

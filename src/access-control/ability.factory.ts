@@ -36,6 +36,11 @@ export class AbilityFactory {
         .map((r) => r.roleName)
         .filter((r): r is string => Boolean(r));
 
+      this.logger.debug(
+        { userId, permissions, roleNames },
+        'Building CASL ability for user',
+      );
+
       if (!permissions || permissions.length === 0) {
         // User has no permissions - return empty ability
         return createMongoAbility([]) as MongoAbility;
@@ -119,7 +124,7 @@ export class AbilityFactory {
 
       // --- Project Core ---
       [Permission.PROJECT_CREATE]: [{ action: 'create', subject: 'Project' }],
-      [Permission.PROJECT_READ]: [{ action: 'read', subject: 'Project' }],
+      [Permission.PROJECT_READ]: this.buildProjectReadRules(roleNames),
       [Permission.PROJECT_UPDATE]: [{ action: 'update', subject: 'Project' }],
       [Permission.PROJECT_DELETE]: [{ action: 'delete', subject: 'Project' }],
 
@@ -322,6 +327,127 @@ export class AbilityFactory {
       rules.push({
         action: 'read',
         subject: 'Proposal',
+        conditions: { isMember: true },
+      });
+    }
+
+    return rules;
+  }
+
+  private buildProjectReadRules(roleNames: string[]): Array<{
+    action: string;
+    subject: string;
+    conditions?: Record<string, any>;
+  }> {
+    const roles = new Set(roleNames);
+
+    if (roles.has(Role.SYSTEM_ADMIN)) {
+      return [{ action: 'read', subject: 'Project' }];
+    }
+
+    const rules: Array<{
+      action: string;
+      subject: string;
+      conditions?: Record<string, any>;
+    }> = [];
+
+    const memberOnlyRoles = [
+      Role.STUDENT,
+      Role.FACULTY,
+      Role.ADVISOR,
+      Role.EVALUATOR,
+      Role.EXTERNAL_EXPERT,
+    ];
+
+    if (memberOnlyRoles.some((role) => roles.has(role))) {
+      rules.push({
+        action: 'read',
+        subject: 'Project',
+        conditions: { isMember: true },
+      });
+    }
+
+    if (roles.has(Role.COORDINATOR)) {
+      rules.push(
+        {
+          action: 'read',
+          subject: 'Project',
+          conditions: { program: 'UG' },
+        },
+        {
+          action: 'read',
+          subject: 'Project',
+          conditions: { isMember: true },
+        },
+      );
+    }
+
+    if (roles.has(Role.DGC_MEMBER)) {
+      rules.push(
+        {
+          action: 'read',
+          subject: 'Project',
+          conditions: { program: 'PG' },
+        },
+        {
+          action: 'read',
+          subject: 'Project',
+          conditions: { isMember: true },
+        },
+      );
+    }
+
+    if (roles.has(Role.PG_OFFICE)) {
+      rules.push(
+        {
+          action: 'read',
+          subject: 'Project',
+          conditions: { program: 'PG' },
+        },
+        {
+          action: 'read',
+          subject: 'Project',
+          conditions: { isMember: true },
+        },
+      );
+    }
+
+    if (roles.has(Role.ADRPM)) {
+      rules.push(
+        {
+          action: 'read',
+          subject: 'Project',
+          conditions: { program: { $in: ['PG', 'GENERAL'] } },
+        },
+        {
+          action: 'read',
+          subject: 'Project',
+          conditions: { isMember: true },
+        },
+      );
+    }
+
+    const generalOnlyRoles = [Role.RAD, Role.AC_MEMBER, Role.VPRTT];
+    if (generalOnlyRoles.some((role) => roles.has(role))) {
+      rules.push(
+        {
+          action: 'read',
+          subject: 'Project',
+          conditions: { program: 'GENERAL' },
+        },
+        {
+          action: 'read',
+          subject: 'Project',
+          conditions: { isMember: true },
+        },
+      );
+    }
+
+    if (rules.length === 0) {
+      // Unknown role fallback: own/member only
+      rules.push({
+        action: 'read',
+        subject: 'Project',
         conditions: { isMember: true },
       });
     }
