@@ -57,6 +57,8 @@ export enum Permission {
 
   BUDGET_VIEW = 'budget:view',
   BUDGET_MANAGE = 'budget:manage',
+  BUDGET_APPROVE = 'budget:approve',
+  BUDGET_REJECT = 'budget:reject',
 
   DEFENCE_SCHEDULE = 'defence:schedule', // Schedule PI defence (COORDINATOR, DGC_MEMBER, RAD only)
 

@@ -66,6 +66,7 @@ export class ProjectsRepository {
         userId: schema.users.id,
         fullName: schema.users.fullName,
         email: schema.users.email,
+        avatarUrl: schema.users.avatarUrl,
         role: schema.projectMembers.role,
         addedAt: schema.projectMembers.addedAt,
       })

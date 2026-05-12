@@ -22,6 +22,9 @@ import { QueuesModule } from './queues/queues.module';
 import { AppLoggerModule } from './common/logger/logger.module';
 import { CollaborationModule } from './collaboration/collaboration.module';
 import { AiModule } from './ai/ai.module';
+import { TasksModule } from './tasks/tasks.module';
+import { BudgetModule } from './budget/budget.module';
+
 
 @Module({
   imports: [
@@ -47,6 +50,8 @@ import { AiModule } from './ai/ai.module';
     QueuesModule,
     CollaborationModule,
     AiModule,
+    TasksModule,
+    BudgetModule,
   ],
   controllers: [AppController],
   providers: [AppService],

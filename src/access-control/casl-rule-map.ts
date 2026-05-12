@@ -68,6 +68,8 @@ export const PERMISSION_TO_CASL_RULES: Record<
   [Permission.ETHICS_DECIDE]: [{ action: 'decide', subject: 'Ethics' }],
   [Permission.BUDGET_VIEW]: [{ action: 'read', subject: 'Budget' }],
   [Permission.BUDGET_MANAGE]: [{ action: 'manage', subject: 'Budget' }],
+  [Permission.BUDGET_APPROVE]: [{ action: 'approve', subject: 'Budget' }],
+  [Permission.BUDGET_REJECT]: [{ action: 'reject', subject: 'Budget' }],
   [Permission.DEFENCE_SCHEDULE]: [{ action: 'schedule', subject: 'Defence' }],
   [Permission.SYSTEM_CONFIG]: [{ action: 'manage', subject: 'System' }],
   [Permission.AUDIT_LOG_VIEW]: [{ action: 'read', subject: 'AuditLog' }],

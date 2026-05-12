@@ -1358,10 +1358,30 @@ export class WorkflowService {
         .where(eq(schema.proposals.id, proposal.id));
 
       // Link budget request to the newly created project
-      await tx
+      const updatedBudgetReqs = await tx
         .update(schema.budgetRequests)
         .set({ projectId: project.projectId })
-        .where(eq(schema.budgetRequests.proposalId, proposal.id));
+        .where(eq(schema.budgetRequests.proposalId, proposal.id))
+        .returning();
+
+      if (updatedBudgetReqs && updatedBudgetReqs.length > 0) {
+        // Seed project_budget_items from the approved proposal's budget line items.
+        // This creates the locked "menu" the PI selects from when requesting disbursements.
+        const lineItems = await tx
+          .select()
+          .from(schema.budgetRequestItems)
+          .where(eq(schema.budgetRequestItems.budgetRequestId, updatedBudgetReqs[0].id));
+
+        if (lineItems.length > 0) {
+          const seedValues = lineItems.map((item) => ({
+            projectId: project.projectId,
+            description: item.description,
+            amount: item.requestedAmount,
+            status: 'AVAILABLE' as any,
+          }));
+          await tx.insert(schema.projectBudgetItems).values(seedValues);
+        }
+      }
 
       // 4. Create default workspace
       const [workspace] = await tx
