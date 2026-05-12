@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { sql, eq } from 'drizzle-orm';
+import { sql, eq, inArray } from 'drizzle-orm';
 import { createHash } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import * as schema from './schema';
@@ -777,6 +777,27 @@ async function seed() {
         })
         .where(sql`${schema.proposals.id} = ${seeded.proposal.id}`);
 
+      // Seed mock project_budget_items for funded projects so the budget UI works
+      if (project.isFunded && seeded.proposal.budgetAmount) {
+        const half = Number(seeded.proposal.budgetAmount) / 2;
+        await tx.insert(schema.projectBudgetItems).values([
+          {
+            projectId: project.projectId,
+            description: 'Equipment & Materials',
+            category: 'Equipment',
+            amount: half.toString(),
+            status: 'AVAILABLE',
+          },
+          {
+            projectId: project.projectId,
+            description: 'Travel & Fieldwork',
+            category: 'Travel',
+            amount: half.toString(),
+            status: 'AVAILABLE',
+          },
+        ]);
+      }
+
       // Create default workspace for promoted project (mirrors createProjectFromApprovedProposal)
       const [promotedWorkspace] = await tx
         .insert(schema.workspaces)
@@ -914,6 +935,207 @@ async function seed() {
         .set({ currentVersionId: version.id })
         .where(eq(schema.documents.id, document.id));
     }
+
+    // 8. Seed Evaluation Rubrics
+    console.log('Seeding evaluation rubrics...');
+    await tx.insert(schema.evaluationRubrics).values([
+      { name: 'Advisor', phase: 'PROPOSAL', type: 'continuous', maxPoints: '20.00' },
+      { name: 'Proposal Defence', phase: 'PROPOSAL', type: 'continuous', maxPoints: '15.00' },
+      { name: 'Advisor', phase: 'PROJECT', type: 'continuous', maxPoints: '20.00' },
+      { name: 'Documentation', phase: 'PROJECT', type: 'continuous', maxPoints: '20.00' },
+      { name: 'Defence Individual', phase: 'PROJECT', type: 'continuous', maxPoints: '15.00' },
+      { name: 'Defence Group', phase: 'PROJECT', type: 'final', maxPoints: '30.00' },
+    ]);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 9. Seed Demo PG Budget Project (replaces the old seed2.ts script)
+    // Creates a fully approved PG project with 3 budget line items and a
+    // PENDING disbursement request ready for the Finance Officer to review.
+    // ─────────────────────────────────────────────────────────────────────────
+    console.log('Seeding demo PG budget project (for Finance module demo)...');
+
+    // Dedicated demo users (separate from the main USERS list above)
+    const demoPgUsers = [
+      { name: 'PG Advisor (Demo)',   email: 'seed-pg-advisor@crmp.edu'  },
+      { name: 'PG Student (Demo)',   email: 'seed-pg-student@crmp.edu'  },
+      { name: 'PG DGC Member (Demo)',email: 'seed-pg-dgc@crmp.edu'      },
+      { name: 'PG ADRPM (Demo)',     email: 'seed-pg-adrpm@crmp.edu'    },
+      { name: 'PG Office (Demo)',    email: 'seed-pg-office@crmp.edu'   },
+    ] as const;
+
+    const demoPgMap = new Map<string, typeof schema.users.$inferSelect>();
+    for (const u of demoPgUsers) {
+      const [demoUser] = await tx
+        .insert(schema.users)
+        .values({
+          fullName: u.name,
+          email: u.email,
+          passwordHash: hash(UNIVERSAL_PASSWORD),
+          accountStatus: 'active',
+        })
+        .returning();
+      demoPgMap.set(u.email, demoUser);
+    }
+
+    const demoPiUser      = demoPgMap.get('seed-pg-student@crmp.edu')!;
+    const demoAdvisor     = demoPgMap.get('seed-pg-advisor@crmp.edu')!;
+    const demoDgcUser     = demoPgMap.get('seed-pg-dgc@crmp.edu')!;
+    const demoAdrpmUser   = demoPgMap.get('seed-pg-adrpm@crmp.edu')!;
+    const demoPgOffice    = demoPgMap.get('seed-pg-office@crmp.edu')!;
+
+    // Grant the PI the STUDENT + FINANCE roles so they appear as a researcher
+    // and can also be used to test the budget request flow end-to-end.
+    const financeRoleId  = roleNameToId.get(Role.FINANCE)!;
+    const studentRoleId  = roleNameToId.get(Role.STUDENT)!;
+    await tx.insert(schema.userRoles).values([
+      { userId: demoPiUser.id, roleId: studentRoleId, grantedBy: adminUser.id },
+      { userId: demoPiUser.id, roleId: financeRoleId, grantedBy: adminUser.id },
+    ]);
+
+    // Approved PG proposal
+    const [demoProposal] = await tx
+      .insert(schema.proposals)
+      .values({
+        createdBy: demoPiUser.id,
+        title: 'Created PG Demo',
+        abstract: 'A postgraduate research proposal created for demo workflows and budget approval testing.',
+        proposalProgram: 'PG',
+        isFunded: true,
+        degreeLevel: 'PhD',
+        researchArea: 'Artificial Intelligence',
+        durationMonths: 18,
+        budgetAmount: '27300.00',
+        currentStatus: 'Approved',
+        isEditable: false,
+        workspaceUnlocked: true,
+        workspaceUnlockedAt: new Date(),
+        currentStepOrder: 3,
+        submittedAt: new Date(),
+        departmentId: null,
+      })
+      .returning();
+
+    await tx.insert(schema.proposalMembers).values([
+      { proposalId: demoProposal.id, userId: demoPiUser.id,   role: 'PI'     },
+      { proposalId: demoProposal.id, userId: demoAdvisor.id,  role: 'ADVISOR' },
+    ]);
+
+    // Fully accepted approval trail
+    await tx.insert(schema.proposalApprovals).values([
+      {
+        proposalId: demoProposal.id, stepOrder: 1,
+        approverRole: 'DGC_MEMBER', approverUserId: demoDgcUser.id,
+        stepLabel: 'DGC Committee Review', stepType: 'FORM',
+        isActive: false, decision: 'Accepted', decisionAt: new Date(),
+      },
+      {
+        proposalId: demoProposal.id, stepOrder: 2,
+        approverRole: 'ADRPM', approverUserId: demoAdrpmUser.id,
+        stepLabel: 'ADRPM Approval', stepType: 'APPROVAL',
+        isActive: false, decision: 'Accepted', decisionAt: new Date(),
+      },
+      {
+        proposalId: demoProposal.id, stepOrder: 3,
+        approverRole: 'PG_OFFICE', approverUserId: demoPgOffice.id,
+        stepLabel: 'PG Office Finalization', stepType: 'APPROVAL',
+        isActive: false, decision: 'Accepted', decisionAt: new Date(),
+      },
+    ]);
+
+    // Approved project
+    const [demoProject] = await tx
+      .insert(schema.projects)
+      .values({
+        projectTitle: 'Created PG Demo',
+        isFunded: true,
+        projectStage: 'Approved',
+        projectDescription: demoProposal.abstract,
+        submissionDate: new Date().toISOString().split('T')[0],
+        researchArea: demoProposal.researchArea,
+        projectProgram: 'PG',
+        departmentId: null,
+        durationMonths: demoProposal.durationMonths ?? 18,
+        ethicalClearanceStatus: 'Pending',
+      })
+      .returning();
+
+    await tx.insert(schema.projectMembers).values([
+      { projectId: demoProject.projectId, userId: demoPiUser.id,  role: 'PI'      },
+      { projectId: demoProject.projectId, userId: demoAdvisor.id, role: 'ADVISOR' },
+    ]);
+
+    // Link proposal to project
+    await tx
+      .update(schema.proposals)
+      .set({ projectId: demoProject.projectId, currentStatus: 'Approved' })
+      .where(eq(schema.proposals.id, demoProposal.id));
+
+    // 3 budget line items
+    const demoBudgetItems = await tx
+      .insert(schema.projectBudgetItems)
+      .values([
+        { projectId: demoProject.projectId, description: 'Lab equipment and consumables',        category: 'Equipment', amount: '12000.00', status: 'AVAILABLE' },
+        { projectId: demoProject.projectId, description: 'Field travel and data collection',     category: 'Travel',    amount: '8500.00',  status: 'AVAILABLE' },
+        { projectId: demoProject.projectId, description: 'Software licenses and publication fees',category: 'Materials', amount: '6800.00',  status: 'AVAILABLE' },
+      ])
+      .returning();
+
+    // PENDING disbursement request for the first 2 items
+    const requestedItems  = demoBudgetItems.slice(0, 2);
+    const requestedAmount = requestedItems.reduce((s, i) => s + parseFloat(i.amount), 0);
+
+    const [demoDisbursement] = await tx
+      .insert(schema.disbursementRequests)
+      .values({
+        projectId: demoProject.projectId,
+        requestedBy: demoPiUser.id,
+        requestSequence: 1,
+        totalAmount: requestedAmount.toFixed(2),
+        status: 'PENDING',
+        submittedAt: new Date(),
+      })
+      .returning();
+
+    await tx.insert(schema.disbursementRequestItems).values(
+      requestedItems.map((item) => ({
+        disbursementRequestId: demoDisbursement.id,
+        budgetItemId: item.id,
+      })),
+    );
+
+    // Mark requested items as PENDING_DISBURSEMENT
+    await tx
+      .update(schema.projectBudgetItems)
+      .set({ status: 'PENDING_DISBURSEMENT' })
+      .where(inArray(schema.projectBudgetItems.id, requestedItems.map((i) => i.id)));
+
+    // Default workspace + document for the demo project
+    const [demoWorkspace] = await tx
+      .insert(schema.workspaces)
+      .values({ projectId: demoProject.projectId, name: 'Main Document', createdBy: adminUser.id })
+      .returning();
+
+    const demoContent = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'PG demo document workspace.' }] }],
+    };
+    const [demoDoc] = await tx
+      .insert(schema.documents)
+      .values({ workspaceId: demoWorkspace.id, currentContent: demoContent })
+      .returning();
+
+    const demoHash = createHash('sha256').update(JSON.stringify(demoContent)).digest('hex');
+    const [demoVer] = await tx
+      .insert(schema.documentVersions)
+      .values({
+        documentId: demoDoc.id, versionNumber: 1, content: demoContent,
+        createdBy: adminUser.id, sourceAction: 'initial', contentHash: demoHash,
+      })
+      .returning();
+
+    await tx.update(schema.documents).set({ currentVersionId: demoVer.id }).where(eq(schema.documents.id, demoDoc.id));
+
+    console.log('  ✅ Demo PG budget project seeded (login: seed-pg-student@crmp.edu / Password@1234)');
 
     console.log('✅ Database seeded successfully!');
   });

@@ -12,6 +12,10 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
     // ✅ PI capability
     Permission.PROPOSAL_ADD_MEMBER,
+
+    // ✅ Budget capabilities
+    Permission.BUDGET_VIEW,
+    Permission.BUDGET_MANAGE,
   ],
 
   [Role.FACULTY]: [
@@ -23,6 +27,10 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.PROPOSAL_ADD_MEMBER,
 
     Permission.EVALUATION_READ,
+
+    // ✅ Budget capabilities
+    Permission.BUDGET_VIEW,
+    Permission.BUDGET_MANAGE,
   ],
 
   [Role.ADVISOR]: [
@@ -132,6 +140,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
     Permission.BUDGET_VIEW,
     Permission.BUDGET_MANAGE,
+    Permission.BUDGET_APPROVE, // ✅ Can stamp requests as Paid
+    Permission.BUDGET_REJECT,  // ✅ Can return requests for correction
 
     Permission.ADMIN_VIEW,
   ],

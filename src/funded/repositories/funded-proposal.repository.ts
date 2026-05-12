@@ -222,6 +222,24 @@ export class FundedProposalRepository {
           .update(schema.budgetRequests)
           .set({ projectId: project.projectId })
           .where(eq(schema.budgetRequests.id, budgetReqs[0].id));
+
+        // Seed project_budget_items from the approved proposal's budget line items.
+        // This creates the locked "menu" the PI selects from when requesting disbursements.
+        const lineItems = await tx
+          .select()
+          .from(schema.budgetRequestItems)
+          .where(eq(schema.budgetRequestItems.budgetRequestId, budgetReqs[0].id));
+
+        if (lineItems.length > 0) {
+          const seedValues = lineItems.map((item) => ({
+            projectId: project.projectId,
+            description: item.description,
+            category: item.description, // no explicit category field on line items
+            amount: item.requestedAmount,
+            status: 'AVAILABLE' as const,
+          }));
+          await tx.insert(schema.projectBudgetItems).values(seedValues);
+        }
       }
 
       return project;
