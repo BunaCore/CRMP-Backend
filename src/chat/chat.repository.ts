@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { eq, and, desc, sql, gt, lt, or, isNull } from 'drizzle-orm';
+import { eq, and, desc, sql, gt, lt, or, isNull, ne } from 'drizzle-orm';
 import { DrizzleService } from 'src/db/db.service';
 import { chats, chatMembers, messages } from 'src/db/schema/chat';
 import { users } from 'src/db/schema/user';
@@ -392,18 +392,25 @@ export class ChatRepository {
     }
 
     // Fetch unread counts (messages created after lastReadAt)
+    // Exclude messages sent by the user so self-messages do not inflate unread badges.
     const unreadData = await this.drizzle.db
       .select({
-        chatId: messages.chatId,
+        chatId: chatMembers.chatId,
         unreadCount: sql<number>`count(*)::int`,
       })
-      .from(messages)
+      .from(chatMembers)
+      .innerJoin(messages, eq(messages.chatId, chatMembers.chatId))
       .where(
-        chatIds.length === 1
-          ? eq(messages.chatId, chatIds[0])
-          : or(...chatIds.map((id) => eq(messages.chatId, id))),
+        and(
+          eq(chatMembers.userId, userId),
+          chatIds.length === 1
+            ? eq(chatMembers.chatId, chatIds[0])
+            : or(...chatIds.map((id) => eq(chatMembers.chatId, id))),
+          gt(messages.createdAt, chatMembers.lastReadAt),
+          ne(messages.senderId, userId),
+        ),
       )
-      .groupBy(messages.chatId);
+      .groupBy(chatMembers.chatId);
 
     const unreadCountByChat = new Map<string, number>();
     for (const { chatId, unreadCount } of unreadData) {
