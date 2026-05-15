@@ -6,6 +6,8 @@ import {
   IsNotEmpty,
   IsUUID,
   IsEnum,
+  IsBoolean,
+  ValidateIf,
 } from 'class-validator';
 
 export class RegisterDto {
@@ -41,4 +43,18 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'userProgram is required for student registration' })
   @IsEnum(['UG', 'PG'], { message: 'userProgram must be UG or PG' })
   userProgram: 'UG' | 'PG';
+
+  @IsOptional()
+  @IsBoolean({ message: 'isExternal must be a boolean' })
+  isExternal?: boolean;
+
+  @ValidateIf((o) => o.isExternal === true)
+  @IsNotEmpty({
+    message:
+      'supportingDocumentFileId is required when registering an external user',
+  })
+  @IsUUID('4', {
+    message: 'supportingDocumentFileId must be a valid UUID',
+  })
+  supportingDocumentFileId?: string;
 }

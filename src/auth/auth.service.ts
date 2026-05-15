@@ -63,6 +63,13 @@ export class AuthService {
       }
     }
 
+    // External registration requires a supporting document
+    if (dto.isExternal && !dto.supportingDocumentFileId) {
+      throw new BadRequestException(
+        'supportingDocumentFileId is required when registering an external user',
+      );
+    }
+
     // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
@@ -86,6 +93,8 @@ export class AuthService {
             university: dto.university,
             universityId: dto.universityId,
             userProgram: dto.userProgram,
+            isExternal: dto.isExternal ?? false,
+            supportingDocumentFileId: dto.supportingDocumentFileId,
             accountStatus: 'deactive',
           },
           tx,

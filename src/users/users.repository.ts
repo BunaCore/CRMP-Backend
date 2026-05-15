@@ -85,6 +85,7 @@ export class UsersRepository {
         userProgram: users.userProgram,
         phoneNumber: users.phoneNumber,
         isExternal: users.isExternal,
+        supportingDocumentFileId: users.supportingDocumentFileId,
         accountStatus: users.accountStatus,
         avatarUrl: users.avatarUrl,
         createdAt: users.createdAt,
@@ -145,6 +146,7 @@ export class UsersRepository {
         universityId: input.universityId,
         userProgram: input.userProgram || null,
         isExternal: input.isExternal,
+        supportingDocumentFileId: input.supportingDocumentFileId,
         accountStatus: input.accountStatus,
       })
       .returning();
@@ -271,6 +273,7 @@ export class UsersRepository {
         universityId: input.universityId,
         userProgram: input.userProgram || null,
         isExternal: input.isExternal,
+        supportingDocumentFileId: input.supportingDocumentFileId,
         accountStatus: input.accountStatus,
       })
       .returning();

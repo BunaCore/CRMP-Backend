@@ -16,6 +16,9 @@ import { UserWithPermissions } from 'src/types/user-with-permissions';
 import { JwtAuthGuard } from './jwt.guard';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 
+import { RateLimit } from 'src/common/guards/rate-limit.decorator';
+import { RateLimitGuard } from 'src/common/guards/rate-limit.guard';
+
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
@@ -25,6 +28,8 @@ export class AuthController {
    * Returns accessToken, refreshToken, and user with permissions
    */
   @Post('register')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ points: 5, windowSeconds: 3600 })
   async register(@Body() dto: RegisterDto): Promise<AuthResponse> {
     return this.authService.register(dto);
   }

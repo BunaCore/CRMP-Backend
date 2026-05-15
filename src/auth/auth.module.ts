@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { RateLimitGuard } from 'src/common/guards/rate-limit.guard';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
@@ -31,7 +32,7 @@ import { QueuesModule } from 'src/queues/queues.module';
       }),
     }),
   ],
-  providers: [AuthService, JwtStrategy, RolesRepository],
+  providers: [AuthService, JwtStrategy, RolesRepository, RateLimitGuard],
   controllers: [AuthController],
 })
 export class AuthModule {}

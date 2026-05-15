@@ -14,6 +14,7 @@ export interface User {
   roles?: string[];
   role?: string;
   isExternal?: boolean | null;
+  supportingDocumentFileId?: string | null;
   accountStatus: AccountStatus;
   createdAt?: Date | null;
 }
@@ -29,6 +30,7 @@ export interface CreateUserInput {
   universityId?: string;
   userProgram?: 'UG' | 'PG';
   isExternal?: boolean;
+  supportingDocumentFileId?: string;
   role?: string;
   accountStatus?: AccountStatus;
 }
