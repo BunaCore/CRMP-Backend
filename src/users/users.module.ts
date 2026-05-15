@@ -6,9 +6,15 @@ import { DbModule } from 'src/db/db.module';
 import { AccessControlModule } from 'src/access-control/access-control.module';
 import { RolesRepository } from 'src/db/roles.repository';
 import { QueuesModule } from 'src/queues/queues.module';
+import { FilesModule } from 'src/common/files/files.module';
 
 @Module({
-  imports: [DbModule, forwardRef(() => AccessControlModule), QueuesModule],
+  imports: [
+    DbModule,
+    forwardRef(() => AccessControlModule),
+    QueuesModule,
+    FilesModule,
+  ],
   controllers: [UsersController],
   providers: [UsersRepository, UsersService, RolesRepository],
   exports: [UsersService, UsersRepository],

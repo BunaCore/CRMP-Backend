@@ -19,6 +19,16 @@ export type UserDetailResponse = {
   userProgram: 'UG' | 'PG' | null;
   phoneNumber: string | null;
   isExternal: boolean;
+  supportingDocumentFileId: string | null;
+  supportingDocument: {
+    id: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    url: string;
+    visibility: 'public' | 'private';
+    expiresIn?: number;
+  } | null;
   accountStatus: 'active' | 'deactive' | 'suspended';
   avatarUrl: string | null;
   roles: Array<{

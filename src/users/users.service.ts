@@ -22,6 +22,7 @@ import { UpdateSelfProfileDto } from './dto/update-self-profile.dto';
 import { UpdateUserAdminDto } from './dto/update-user-admin.dto';
 import { Permission } from 'src/access-control/permission.enum';
 import { UserWithPermissions } from 'src/types/user-with-permissions';
+import { FilesService } from 'src/common/files/files.service';
 
 @Injectable()
 export class UsersService {
@@ -33,6 +34,7 @@ export class UsersService {
     private readonly rolesRepository: RolesRepository,
     private readonly mailProducer: MailProducer,
     private readonly configService: ConfigService,
+    private readonly filesService: FilesService,
   ) {}
 
   async findByEmail(email: string): Promise<User | null> {
@@ -221,6 +223,10 @@ export class UsersService {
       throw new NotFoundException(`User "${userId}" not found`);
     }
 
+    const supportingDocument = user.supportingDocumentFileId
+      ? await this.filesService.getFileWithAccess(user.supportingDocumentFileId)
+      : null;
+
     return {
       id: user.id,
       fullName: user.fullName,
@@ -232,6 +238,8 @@ export class UsersService {
       userProgram: user.userProgram ?? null,
       phoneNumber: user.phoneNumber,
       isExternal: user.isExternal ?? false,
+      supportingDocumentFileId: user.supportingDocumentFileId ?? null,
+      supportingDocument,
       accountStatus: user.accountStatus,
       avatarUrl: user.avatarUrl,
       roles: roles

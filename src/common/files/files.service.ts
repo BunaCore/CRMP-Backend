@@ -104,6 +104,49 @@ export class FilesService {
   }
 
   /**
+   * Initiate a guest upload (unauthenticated). Creates a TEMP file record with uploadedBy = null
+   * and returns a presigned URL. Caller must verify captcha and other checks externally.
+   */
+  async initiateGuestUpload(dto: {
+    originalName: string;
+    mimeType: string;
+    size: number;
+    resourceType?: string;
+  }): Promise<FileUploadInitResponseDto> {
+    const fileId = randomUUID();
+    // use a generic guest prefix for storage key
+    const key = this.buildStorageKey('guest', fileId, dto.originalName);
+    const { bucket, isPublic } = this.resolveBucket(dto.resourceType);
+
+    const dbFile = await this.filesRepository.createFile({
+      bucket,
+      storagePath: key,
+      uploadedBy: null,
+      originalName: dto.originalName,
+      mimeType: dto.mimeType,
+      size: dto.size,
+      resourceType: dto.resourceType || null,
+      resourceId: null,
+      purpose: null,
+      status: 'TEMP',
+    });
+
+    const uploadUrl = await this.storageService.getPresignedPutUrl({
+      bucket,
+      key,
+      contentType: dto.mimeType,
+      expiresInSeconds: Math.min(this.signedUrlExpiresSeconds, 300),
+    });
+
+    return {
+      fileId: dbFile.id,
+      storageKey: key,
+      uploadUrl,
+      publicUrl: isPublic ? this.buildPublicUrl(key) : undefined,
+    };
+  }
+
+  /**
    * Attach file to a resource.
    *
    * LIFECYCLE STEP 2: Attach
