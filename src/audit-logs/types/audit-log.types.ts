@@ -21,3 +21,10 @@ export type AuditLogCreateInput = {
   entityId?: string | null;
   metadata?: Record<string, any> | null;
 };
+
+export type AuditLogStats = {
+  totalEvents: number;
+  activeActors: number;
+  topAction: { action: AuditLogAction; count: number } | null;
+  mostRecentActivity: Date | null;
+};

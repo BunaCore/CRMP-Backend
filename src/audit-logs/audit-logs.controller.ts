@@ -15,4 +15,10 @@ export class AuditLogsController {
   async listAuditLogs(@Query() query: GetAuditLogsQueryDto) {
     return this.auditLogsService.list(query);
   }
+
+  @Get('stats')
+  @RequireCasl({ action: 'read', subject: 'AuditLog' })
+  async auditLogStats(@Query() query: GetAuditLogsQueryDto) {
+    return this.auditLogsService.stats(query);
+  }
 }

@@ -19,4 +19,8 @@ export class AuditLogsService {
       next: result.next,
     };
   }
+
+  async stats(query: GetAuditLogsQueryDto) {
+    return this.repository.getAuditLogStats(query);
+  }
 }

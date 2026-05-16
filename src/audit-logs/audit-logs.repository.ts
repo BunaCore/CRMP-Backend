@@ -3,29 +3,18 @@ import { and, desc, eq, gte, lte, SQL, sql } from 'drizzle-orm';
 import { DrizzleService } from 'src/db/db.service';
 import { auditLogs } from 'src/db/schema/notifications';
 import { users } from 'src/db/schema/user';
-import { AuditLogCreateInput, AuditLogAction } from './types/audit-log.types';
+import {
+  AuditLogCreateInput,
+  AuditLogAction,
+  AuditLogStats,
+} from './types/audit-log.types';
 import { GetAuditLogsQueryDto } from './dto/get-audit-logs-query.dto';
 
 @Injectable()
 export class AuditLogsRepository {
   constructor(private readonly drizzle: DrizzleService) {}
 
-  async insertAuditLog(input: AuditLogCreateInput) {
-    const [log] = await this.drizzle.db
-      .insert(auditLogs)
-      .values({
-        actorUserId: input.actorUserId ?? null,
-        action: input.action,
-        entityType: input.entityType,
-        entityId: input.entityId ?? null,
-        metadata: input.metadata ?? null,
-      })
-      .returning();
-
-    return log;
-  }
-
-  async findAuditLogs(query: GetAuditLogsQueryDto) {
+  private buildConditions(query: GetAuditLogsQueryDto, includeCursor = true) {
     const conditions: SQL<unknown>[] = [];
 
     if (query.actorUserId) {
@@ -52,26 +41,42 @@ export class AuditLogsRepository {
       conditions.push(lte(auditLogs.createdAt, query.to));
     }
 
-    const limit = (query.limit ?? 20) + 1; // +1 to detect if more items exist
-
-    // Decode cursor: { createdAt: ISO string, id: UUID }
-    let cursorCondition: SQL<unknown> | undefined;
-    if (query.cursor) {
+    if (includeCursor && query.cursor) {
       try {
         const decoded = JSON.parse(
           Buffer.from(query.cursor, 'base64').toString('utf-8'),
         );
         const cursorDate = new Date(decoded.createdAt);
-        // Fetch items where createdAt < cursorDate OR (createdAt == cursorDate AND id < cursorId)
-        cursorCondition = sql`(${auditLogs.createdAt} < ${cursorDate} OR (${auditLogs.createdAt} = ${cursorDate} AND ${auditLogs.id} < ${decoded.id}))`;
+        conditions.push(
+          sql`(${auditLogs.createdAt} < ${cursorDate} OR (${auditLogs.createdAt} = ${cursorDate} AND ${auditLogs.id} < ${decoded.id}))`,
+        );
       } catch (error) {
         // Invalid cursor, ignore
       }
     }
 
-    if (cursorCondition) {
-      conditions.push(cursorCondition);
-    }
+    return conditions;
+  }
+
+  async insertAuditLog(input: AuditLogCreateInput) {
+    const [log] = await this.drizzle.db
+      .insert(auditLogs)
+      .values({
+        actorUserId: input.actorUserId ?? null,
+        action: input.action,
+        entityType: input.entityType,
+        entityId: input.entityId ?? null,
+        metadata: input.metadata ?? null,
+      })
+      .returning();
+
+    return log;
+  }
+
+  async findAuditLogs(query: GetAuditLogsQueryDto) {
+    const limit = (query.limit ?? 20) + 1; // +1 to detect if more items exist
+
+    const conditions = this.buildConditions(query, true);
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -111,6 +116,40 @@ export class AuditLogsRepository {
     return {
       items,
       next,
+    };
+  }
+
+  async getAuditLogStats(query: GetAuditLogsQueryDto): Promise<AuditLogStats> {
+    const conditions = this.buildConditions(query, false);
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [totals] = await this.drizzle.db
+      .select({
+        totalEvents: sql<number>`count(*)`,
+        activeActors: sql<number>`count(distinct ${auditLogs.actorUserId})`,
+        mostRecentActivity: sql<Date | null>`max(${auditLogs.createdAt})`,
+      })
+      .from(auditLogs)
+      .where(where);
+
+    const actionRows = await this.drizzle.db
+      .select({
+        action: auditLogs.action,
+        count: sql<number>`count(*)`,
+      })
+      .from(auditLogs)
+      .where(where)
+      .groupBy(auditLogs.action);
+
+    const topActionRow = actionRows
+      .map((row) => ({ action: row.action, count: Number(row.count) }))
+      .sort((left, right) => right.count - left.count)[0];
+
+    return {
+      totalEvents: Number(totals?.totalEvents ?? 0),
+      activeActors: Number(totals?.activeActors ?? 0),
+      topAction: topActionRow ?? null,
+      mostRecentActivity: totals?.mostRecentActivity ?? null,
     };
   }
 }
