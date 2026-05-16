@@ -90,4 +90,22 @@ export class FinanceBudgetController {
       body.feedback,
     );
   }
+
+  /**
+   * PATCH /budget/admin/requests/:requestId/reject
+   * Permanently rejects a request. Requires BUDGET_REJECT permission.
+   */
+  @Patch('requests/:requestId/reject')
+  @RequirePermission(Permission.BUDGET_REJECT)
+  async rejectRequest(
+    @Req() req,
+    @Param('requestId') requestId: string,
+    @Body() body: ReturnDisbursementDto,
+  ) {
+    return this.financeService.rejectRequest(
+      requestId,
+      req.user.id,
+      body.feedback,
+    );
+  }
 }

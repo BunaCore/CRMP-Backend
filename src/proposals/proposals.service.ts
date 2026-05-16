@@ -982,7 +982,7 @@ export class ProposalsService {
     }
 
     console.debug(
-      `Upserting ${dto.scores.length} scores for proposal ${proposalId}`,
+      `Upserting ${dto.scores.length} scores for proposal ${proposal.id}`,
     );
 
     // 3. Upsert all scores — one row per (rubricId, proposalId, studentId)
@@ -991,8 +991,8 @@ export class ProposalsService {
       dto.scores.map((s) =>
         this.repository.upsertEvaluationScore({
           rubricId: s.rubricId,
-          proposalId,
-          projectId: s.projectId ?? undefined,
+          proposalId: proposal.id,
+          projectId: proposal.projectId ?? undefined,
           studentId: s.studentId,
           evaluatorId,
           score: s.score.toString(),
@@ -1017,4 +1017,77 @@ export class ProposalsService {
   //     location: dto.location,
   //   });
   // }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Proposal Defence Scheduling
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Schedule a defence session for a proposal (proposal phase).
+   * Multiple defences per proposal are allowed (rescheduling).
+   *
+   * @param proposalId - Proposal ID
+   * @param scheduledBy - User ID of the caller
+   * @param dto - { defenceDate, location, note? }
+   */
+  async scheduleProposalDefence(
+    proposalId: string,
+    scheduledBy: string,
+    dto: { defenceDate: string; location: string; note?: string },
+  ) {
+    // 1. Ensure proposal exists
+    const proposal = await this.repository.findById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException(`Proposal ${proposalId} not found`);
+    }
+
+    // 2. Insert the defence row
+    const defence = await this.repository.createProposalDefence({
+      proposalId,
+      scheduledBy,
+      defenceDate: new Date(dto.defenceDate),
+      location: dto.location,
+      note: dto.note,
+    });
+
+    // 3. Automatically update proposal status to 'Under_Review'
+    await this.drizzle.db
+      .update(schema.proposals)
+      .set({ currentStatus: 'Under_Review', updatedAt: new Date() })
+      .where(eq(schema.proposals.id, proposalId));
+
+    // 4. Send email to all proposal members (fire-and-forget)
+    const members = await this.repository.getProposalMembers(proposalId);
+    for (const member of members) {
+      const email = (member as any).user?.email ?? null;
+      if (email) {
+        this.mailService
+          .sendEmail(EmailType.DEFENSE_SCHEDULED, email, {
+            recipientName: (member as any).user?.fullName || 'Member',
+            proposalTitle: proposal.title,
+            defenseDate: defence.defenceDate.toLocaleDateString(),
+            defenseTime: defence.defenceDate.toLocaleTimeString(),
+          })
+          .catch((err: Error) =>
+            this.logger.error(
+              `Failed to send email to ${email}: ${err.message}`,
+            ),
+          );
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Proposal defence scheduled successfully',
+      defence: {
+        id: defence.id,
+        proposalId: defence.proposalId,
+        defenceDate: defence.defenceDate?.toISOString(),
+        location: defence.location,
+        note: defence.note ?? null,
+        scheduledBy: defence.scheduledBy ?? null,
+        createdAt: defence.createdAt?.toISOString() ?? new Date().toISOString(),
+      },
+    };
+  }
 }

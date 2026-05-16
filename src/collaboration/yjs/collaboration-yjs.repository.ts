@@ -7,7 +7,9 @@ import * as schema from 'src/db/schema';
 export class CollaborationYjsRepository {
   constructor(private readonly drizzle: DrizzleService) {}
 
-  async getYjsStateByWorkspaceId(workspaceId: string): Promise<Uint8Array | null> {
+  async getYjsStateByWorkspaceId(
+    workspaceId: string,
+  ): Promise<Uint8Array | null> {
     const [row] = await this.drizzle.db
       .select({ yjsState: schema.documents.yjsState })
       .from(schema.documents)
@@ -24,11 +26,13 @@ export class CollaborationYjsRepository {
     return null;
   }
 
-  async setYjsStateByWorkspaceId(workspaceId: string, state: Uint8Array): Promise<void> {
+  async setYjsStateByWorkspaceId(
+    workspaceId: string,
+    state: Uint8Array,
+  ): Promise<void> {
     await this.drizzle.db
       .update(schema.documents)
       .set({ yjsState: Buffer.from(state) })
       .where(eq(schema.documents.workspaceId, workspaceId));
   }
 }
-

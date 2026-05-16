@@ -197,6 +197,9 @@ export class AbilityFactory {
       [Permission.SYSTEM_CONFIG]: [{ action: 'manage', subject: 'System' }],
       [Permission.AUDIT_LOG_VIEW]: [{ action: 'read', subject: 'AuditLog' }],
       [Permission.REPORT_EXPORT]: [{ action: 'export', subject: 'Report' }],
+      [Permission.ADMIN_VIEW]: [
+        { action: 'access', subject: 'AdminDashboard' },
+      ],
     };
 
     // Apply all rules for each permission

@@ -1,15 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DrizzleService } from 'src/db/db.service';
 import * as schema from 'src/db/schema';
-import {
-  eq,
-  and,
-  sql,
-  gte,
-  lte,
-  desc,
-  count,
-} from 'drizzle-orm';
+import { eq, and, sql, gte, lte, desc, count } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 // ─── Helper: derive initials from a full name ───────────────────────────────
@@ -59,7 +51,11 @@ export class TasksRepository {
   // ─── Shape a raw DB row into the canonical Task response object ────────────
   private shapeTask(row: {
     task: typeof schema.tasks.$inferSelect;
-    assignee: { id: string | null; fullName: string | null; avatarUrl: string | null } | null;
+    assignee: {
+      id: string | null;
+      fullName: string | null;
+      avatarUrl: string | null;
+    } | null;
   }) {
     const { task, assignee } = row;
     return {
@@ -72,7 +68,9 @@ export class TasksRepository {
       priority: task.priority,
       assigneeId: task.assigneeId ?? null,
       assigneeName: assignee?.fullName ?? null,
-      assigneeInitials: assignee?.fullName ? toInitials(assignee.fullName) : null,
+      assigneeInitials: assignee?.fullName
+        ? toInitials(assignee.fullName)
+        : null,
       assigneeAvatarUrl: assignee?.avatarUrl ?? null,
       dueDate: task.dueDate ?? null,
       createdAt: task.createdAt,
@@ -477,10 +475,7 @@ export class TasksRepository {
         userAvatar: schema.users.avatarUrl,
       })
       .from(schema.taskComments)
-      .leftJoin(
-        schema.users,
-        eq(schema.taskComments.userId, schema.users.id),
-      )
+      .leftJoin(schema.users, eq(schema.taskComments.userId, schema.users.id))
       .where(eq(schema.taskComments.taskId, taskId))
       .orderBy(schema.taskComments.createdAt);
 

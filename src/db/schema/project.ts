@@ -8,6 +8,7 @@ import {
   primaryKey,
   timestamp,
   boolean,
+  varchar,
 } from 'drizzle-orm/pg-core';
 import { departments } from './department';
 import { users } from './user';
@@ -87,3 +88,21 @@ export const projectMembers = pgTable(
     pk: primaryKey({ columns: [t.projectId, t.userId] }),
   }),
 );
+
+/**
+ * Stores defence sessions scheduled for a project (project phase).
+ * A project can have multiple defences (initial + rescheduled).
+ */
+export const projectDefences = pgTable('project_defences', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  projectId: uuid('project_id')
+    .notNull()
+    .references(() => projects.projectId, { onDelete: 'cascade' }),
+  scheduledBy: uuid('scheduled_by').references(() => users.id, {
+    onDelete: 'set null',
+  }),
+  defenceDate: timestamp('defence_date', { withTimezone: true }).notNull(),
+  location: varchar('location', { length: 255 }).notNull(),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});

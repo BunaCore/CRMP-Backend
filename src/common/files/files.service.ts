@@ -104,6 +104,49 @@ export class FilesService {
   }
 
   /**
+   * Upload a file buffer directly to storage and create a TEMP record.
+   * Useful for internal API uploads (e.g. Multer) instead of presigned URLs.
+   */
+  async uploadTempFile(
+    buffer: Buffer,
+    originalName: string,
+    mimeType: string,
+    size: number,
+    resourceType: string,
+    userId: string,
+  ): Promise<{ fileId: string; storageKey: string }> {
+    const fileId = randomUUID();
+    const key = this.buildStorageKey(userId, fileId, originalName);
+    const { bucket } = this.resolveBucket(resourceType);
+
+    // Upload directly to storage
+    await this.storageService.putObject({
+      bucket,
+      key,
+      body: buffer,
+      contentType: mimeType,
+    });
+
+    const dbFile = await this.filesRepository.createFile({
+      bucket,
+      storagePath: key,
+      uploadedBy: userId,
+      originalName,
+      mimeType,
+      size,
+      resourceType: resourceType || null,
+      resourceId: null,
+      purpose: null,
+      status: 'TEMP',
+    });
+
+    return {
+      fileId: dbFile.id,
+      storageKey: key,
+    };
+  }
+
+  /**
    * Attach file to a resource.
    *
    * LIFECYCLE STEP 2: Attach

@@ -77,7 +77,12 @@ export class ProposalsRepository {
     const [proposal] = await this.drizzle.db
       .select()
       .from(schema.proposals)
-      .where(eq(schema.proposals.id, proposalId));
+      .where(
+        or(
+          eq(schema.proposals.id, proposalId),
+          eq(schema.proposals.projectId, proposalId),
+        ),
+      );
 
     return proposal || null;
   }
@@ -777,7 +782,25 @@ export class ProposalsRepository {
   /**
    * Fetch all evaluation scores across all rubrics for a single proposal
    */
-  async getEvaluationScoresByProposal(proposalId: string) {
+  async getEvaluationScoresByProposal(targetId: string) {
+    // Determine the actual proposalId and projectId from the targetId
+    const [record] = await this.drizzle.db
+      .select({
+        id: schema.proposals.id,
+        projectId: schema.proposals.projectId,
+      })
+      .from(schema.proposals)
+      .where(
+        or(
+          eq(schema.proposals.id, targetId),
+          eq(schema.proposals.projectId, targetId),
+        ),
+      )
+      .limit(1);
+
+    const actualProposalId = record?.id ?? targetId;
+    const actualProjectId = record?.projectId ?? targetId;
+
     return this.drizzle.db
       .select({
         id: evaluationScores.id,
@@ -790,7 +813,12 @@ export class ProposalsRepository {
         updatedAt: evaluationScores.updatedAt,
       })
       .from(evaluationScores)
-      .where(eq(evaluationScores.proposalId, proposalId));
+      .where(
+        or(
+          eq(evaluationScores.proposalId, actualProposalId),
+          eq(evaluationScores.projectId, actualProjectId),
+        ),
+      );
   }
 
   /**
@@ -832,5 +860,30 @@ export class ProposalsRepository {
         },
       })
       .returning();
+  }
+
+  /**
+   * Insert a new defence schedule row for a proposal (proposal phase).
+   * Multiple rows per proposal are allowed (rescheduling).
+   */
+  async createProposalDefence(data: {
+    proposalId: string;
+    scheduledBy: string;
+    defenceDate: Date;
+    location: string;
+    note?: string;
+  }) {
+    const [defence] = await this.drizzle.db
+      .insert(schema.proposalDefences)
+      .values({
+        proposalId: data.proposalId,
+        scheduledBy: data.scheduledBy,
+        defenceDate: data.defenceDate,
+        location: data.location,
+        note: data.note ?? null,
+      })
+      .returning();
+
+    return defence;
   }
 }

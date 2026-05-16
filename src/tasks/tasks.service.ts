@@ -126,7 +126,8 @@ export class TasksService {
 
     const updatePayload: Record<string, any> = {};
     if (dto.title !== undefined) updatePayload.title = dto.title;
-    if (dto.description !== undefined) updatePayload.description = dto.description;
+    if (dto.description !== undefined)
+      updatePayload.description = dto.description;
     if (dto.priority !== undefined) updatePayload.priority = dto.priority;
     if (dto.assigneeId !== undefined) updatePayload.assigneeId = dto.assigneeId;
     if (dto.dueDate !== undefined) {
@@ -163,7 +164,10 @@ export class TasksService {
       );
     }
 
-    if (dto.assigneeId !== undefined && dto.assigneeId !== existing.assigneeId) {
+    if (
+      dto.assigneeId !== undefined &&
+      dto.assigneeId !== existing.assigneeId
+    ) {
       activities.push(
         this.repo.createActivity({
           taskId,
@@ -194,7 +198,9 @@ export class TasksService {
       .limit(1);
 
     if (raw?.createdBy && raw.createdBy !== userId) {
-      throw new ForbiddenException('Only the task creator can delete this task');
+      throw new ForbiddenException(
+        'Only the task creator can delete this task',
+      );
     }
 
     await this.repo.deleteTask(taskId);
@@ -271,7 +277,7 @@ export class TasksService {
       projectId: task.projectId,
       userId,
       action: 'commented',
-      detail: dto.comment,   // ← the actual comment text
+      detail: dto.comment, // ← the actual comment text
     });
 
     // Return the latest activity entry for this task (activity-shaped, not comment-shaped)

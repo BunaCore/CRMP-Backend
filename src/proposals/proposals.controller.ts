@@ -28,6 +28,7 @@ import {
 } from './dto/manage-members.dto';
 import { SubmitEvaluationScoresDto } from './dto/evaluation.dto';
 import { GetProposalsQueryDto } from './dto/get-proposals-query.dto';
+import { CreateDefenceDto } from './dto/create-defence.dto';
 import { JwtAuthGuard } from 'src/auth/jwt.guard';
 import {
   CurrentUser,
@@ -452,6 +453,33 @@ export class ProposalsController {
     @Body() dto: SubmitEvaluationScoresDto,
   ) {
     return this.proposalsService.submitEvaluationScore(
+      proposalId,
+      user.id,
+      dto,
+    );
+  }
+
+  /**
+   * POST /proposals/:id/defence
+   * Schedule a defence session for a proposal (proposal phase).
+   *
+   * Receives:
+   *   { defenceDate: ISO string, location: string, note?: string }
+   *
+   * Returns:
+   *   { success, message, defence: { id, proposalId, defenceDate, location, note, scheduledBy, createdAt } }
+   *
+   * The scheduled defence is then embedded in GET /proposals/detail
+   * under each proposal’s `defenceSchedules[]` array, which the
+   * dashboard uses to render upcoming defence alerts.
+   */
+  @Post(':id/defence')
+  async scheduleDefence(
+    @Param('id', new ParseUUIDPipe()) proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateDefenceDto,
+  ) {
+    return this.proposalsService.scheduleProposalDefence(
       proposalId,
       user.id,
       dto,

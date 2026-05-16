@@ -24,7 +24,7 @@ import { CollaborationModule } from './collaboration/collaboration.module';
 import { AiModule } from './ai/ai.module';
 import { TasksModule } from './tasks/tasks.module';
 import { BudgetModule } from './budget/budget.module';
-
+import { EvaluationsModule } from './evaluations/evaluations.module';
 
 @Module({
   imports: [
@@ -52,6 +52,7 @@ import { BudgetModule } from './budget/budget.module';
     AiModule,
     TasksModule,
     BudgetModule,
+    EvaluationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

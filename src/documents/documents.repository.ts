@@ -92,7 +92,10 @@ export class DocumentsRepository {
     return version;
   }
 
-  async isUserMemberOfProject(userId: string, projectId: string): Promise<boolean> {
+  async isUserMemberOfProject(
+    userId: string,
+    projectId: string,
+  ): Promise<boolean> {
     const [member] = await this.drizzle.db
       .select()
       .from(schema.projectMembers)
@@ -115,7 +118,9 @@ export class DocumentsRepository {
 
   async getNextVersionNumber(documentId: string): Promise<number> {
     const result = await this.drizzle.db
-      .select({ maxVersion: sql<number>`MAX(${schema.documentVersions.versionNumber})` })
+      .select({
+        maxVersion: sql<number>`MAX(${schema.documentVersions.versionNumber})`,
+      })
       .from(schema.documentVersions)
       .where(eq(schema.documentVersions.documentId, documentId));
     return (result[0]?.maxVersion || 0) + 1;
@@ -138,7 +143,10 @@ export class DocumentsRepository {
         createdAt: schema.projects.createdAt,
       })
       .from(schema.projects)
-      .innerJoin(schema.projectMembers, eq(schema.projectMembers.projectId, schema.projects.projectId))
+      .innerJoin(
+        schema.projectMembers,
+        eq(schema.projectMembers.projectId, schema.projects.projectId),
+      )
       .where(eq(schema.projectMembers.userId, userId));
   }
 
@@ -180,7 +188,9 @@ export class DocumentsRepository {
       `,
     );
 
-    const oldDailyIds: string[] = (oldDailyRows.rows as { id: string }[]).map((r) => r.id);
+    const oldDailyIds: string[] = (oldDailyRows.rows as { id: string }[]).map(
+      (r) => r.id,
+    );
 
     const keepIds = [...new Set([...recentIds, ...oldDailyIds])];
 
