@@ -23,6 +23,7 @@ import { UpdateUserAdminDto } from './dto/update-user-admin.dto';
 import { Permission } from 'src/access-control/permission.enum';
 import { UserWithPermissions } from 'src/types/user-with-permissions';
 import { FilesService } from 'src/common/files/files.service';
+import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
 
 @Injectable()
 export class UsersService {
@@ -35,6 +36,7 @@ export class UsersService {
     private readonly mailProducer: MailProducer,
     private readonly configService: ConfigService,
     private readonly filesService: FilesService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async findByEmail(email: string): Promise<User | null> {
@@ -75,7 +77,11 @@ export class UsersService {
     return this.usersRepository.getUserRoles(userId);
   }
 
-  async replaceUserRoles(userId: string, roleIds: string[]) {
+  async replaceUserRoles(
+    userId: string,
+    roleIds: string[],
+    actorUserId?: string,
+  ) {
     const user = await this.usersRepository.findById(userId);
     if (!user) {
       throw new NotFoundException(`User "${userId}" not found`);
@@ -98,6 +104,18 @@ export class UsersService {
     });
 
     const updatedRoles = await this.usersRepository.getUserRoles(userId);
+
+    void this.logAudit({
+      actorUserId: actorUserId ?? userId,
+      action: 'STATUS_CHANGED',
+      entityType: 'user_roles',
+      entityId: userId,
+      metadata: {
+        operation: 'REPLACE_USER_ROLES',
+        roleIds,
+        ignoredRoleIds: invalidRoleIds,
+      },
+    });
 
     return {
       userId,
@@ -313,6 +331,19 @@ export class UsersService {
       expiresAt,
     });
 
+    void this.logAudit({
+      actorUserId: invitedBy,
+      action: 'CREATED',
+      entityType: 'invitations',
+      entityId: invitation.id,
+      metadata: {
+        operation: 'INVITE_USER',
+        email,
+        roleId: dto.roleId,
+        expiresAt,
+      },
+    });
+
     return {
       id: invitation.id,
       email: invitation.email,
@@ -322,7 +353,11 @@ export class UsersService {
     };
   }
 
-  async updateUserStatus(userId: string, status: AccountStatusValue) {
+  async updateUserStatus(
+    userId: string,
+    status: AccountStatusValue,
+    actorUserId?: string,
+  ) {
     const user = await this.usersRepository.findById(userId);
     if (!user) {
       throw new NotFoundException(`User "${userId}" not found`);
@@ -335,6 +370,17 @@ export class UsersService {
     if (!updatedUser) {
       throw new NotFoundException(`User "${userId}" not found`);
     }
+
+    void this.logAudit({
+      actorUserId: actorUserId ?? userId,
+      action: 'STATUS_CHANGED',
+      entityType: 'users',
+      entityId: userId,
+      metadata: {
+        operation: 'UPDATE_USER_STATUS',
+        status,
+      },
+    });
 
     return {
       id: updatedUser.id,
@@ -361,6 +407,18 @@ export class UsersService {
     if (!updatedUser) {
       throw new NotFoundException(`User "${userId}" not found`);
     }
+
+    void this.logAudit({
+      actorUserId: userId,
+      action: 'STATUS_CHANGED',
+      entityType: 'users',
+      entityId: userId,
+      metadata: {
+        operation: 'UPDATE_SELF_PROFILE',
+        fullName: dto.fullName ?? null,
+        phoneNumber: dto.phoneNumber ?? null,
+      },
+    });
 
     return this.buildUserWithPermissions(updatedUser);
   }
@@ -427,7 +485,45 @@ export class UsersService {
       throw new NotFoundException(`User "${userId}" not found`);
     }
 
+    void this.logAudit({
+      actorUserId: actor.id,
+      action: 'STATUS_CHANGED',
+      entityType: 'users',
+      entityId: userId,
+      metadata: {
+        operation: 'UPDATE_USER_BY_ADMIN',
+        fullName: dto.fullName ?? null,
+        email: dto.email ?? null,
+        departmentId: dto.departmentId ?? null,
+        isExternal: dto.isExternal ?? null,
+        accountStatus: dto.accountStatus ?? null,
+        userProgram: dto.userProgram ?? null,
+      },
+    });
+
     return this.buildUserWithPermissions(updatedUser);
+  }
+
+  private async logAudit(input: {
+    actorUserId?: string | null;
+    action:
+      | 'CREATED'
+      | 'STATUS_CHANGED'
+      | 'DECISION_MADE'
+      | 'BUDGET_RELEASED'
+      | 'WORKSPACE_UNLOCKED'
+      | 'EVALUATOR_ASSIGNED';
+    entityType: string;
+    entityId?: string | null;
+    metadata?: Record<string, any> | null;
+  }) {
+    try {
+      await this.auditLogsService.record(input);
+    } catch (error) {
+      console.warn(
+        `Failed to record audit log for ${input.entityType}/${input.entityId ?? 'n/a'}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   private async buildUserWithPermissions(

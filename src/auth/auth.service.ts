@@ -19,6 +19,7 @@ import { UserWithPermissions } from 'src/types/user-with-permissions';
 import { User } from 'src/users/types/user';
 import { MailProducer } from 'src/queues/mail/mail.producer';
 import { Permission } from 'src/access-control/permission.enum';
+import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
 
 import * as bcrypt from 'bcrypt';
 import { DB } from 'src/db/db.type';
@@ -37,6 +38,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private mailProducer: MailProducer,
+    private auditLogsService: AuditLogsService,
   ) {}
 
   /**
@@ -132,6 +134,18 @@ export class AuthService {
         );
       });
 
+    void this.logAudit({
+      actorUserId: user.id,
+      action: 'CREATED',
+      entityType: 'users',
+      entityId: user.id,
+      metadata: {
+        operation: 'REGISTER',
+        email: user.email,
+        isExternal: dto.isExternal ?? false,
+      },
+    });
+
     return this.buildAuthResponse(user, tokens);
   }
 
@@ -226,6 +240,18 @@ export class AuthService {
         return { user: createdUser, tokens: generatedTokens };
       },
     );
+
+    void this.logAudit({
+      actorUserId: user.id,
+      action: 'CREATED',
+      entityType: 'users',
+      entityId: user.id,
+      metadata: {
+        operation: 'ACCEPT_INVITATION',
+        email: invitation.email,
+        roleId: invitation.roleId,
+      },
+    });
 
     return this.buildAuthResponse(user, tokens);
   }
@@ -419,5 +445,27 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  private async logAudit(input: {
+    actorUserId?: string | null;
+    action:
+      | 'CREATED'
+      | 'STATUS_CHANGED'
+      | 'DECISION_MADE'
+      | 'BUDGET_RELEASED'
+      | 'WORKSPACE_UNLOCKED'
+      | 'EVALUATOR_ASSIGNED';
+    entityType: string;
+    entityId?: string | null;
+    metadata?: Record<string, any> | null;
+  }) {
+    try {
+      await this.auditLogsService.record(input);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record audit log for ${input.entityType}/${input.entityId ?? 'n/a'}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 }
