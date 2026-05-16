@@ -89,8 +89,9 @@ export class UsersController {
   async replaceUserRoles(
     @Param('id', new ParseUUIDPipe()) userId: string,
     @Body() dto: ReplaceUserRolesDto,
+    @CurrentUser() actor: AuthenticatedUser,
   ) {
-    return this.usersService.replaceUserRoles(userId, dto.roleIds);
+    return this.usersService.replaceUserRoles(userId, dto.roleIds, actor.id);
   }
 
   @Post('invitations')
@@ -107,8 +108,9 @@ export class UsersController {
   async updateUserStatus(
     @Param('id', new ParseUUIDPipe()) userId: string,
     @Body() dto: UpdateUserStatusDto,
+    @CurrentUser() actor: AuthenticatedUser,
   ) {
-    return this.usersService.updateUserStatus(userId, dto.status);
+    return this.usersService.updateUserStatus(userId, dto.status, actor.id);
   }
 
   @Patch(':id')

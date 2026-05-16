@@ -15,6 +15,11 @@ import {
   STORAGE_SERVICE,
   type StorageService,
 } from './storage/storage.interface';
+import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
+import {
+  AuditAction,
+  AuditActionValue,
+} from 'src/audit-logs/types/audit-action.enum';
 
 /**
  * FilesService is a generic, workflow-agnostic file management service.
@@ -43,6 +48,7 @@ export class FilesService {
     private readonly filesRepository: FilesRepository,
     private readonly configService: ConfigService,
     @Inject(STORAGE_SERVICE) private readonly storageService: StorageService,
+    private readonly auditLogsService: AuditLogsService,
   ) {
     this.publicBucket =
       this.configService.get<string>('S3_BUCKET_PUBLIC') || 'crmp-public';
@@ -95,6 +101,18 @@ export class FilesService {
       expiresInSeconds: this.signedUrlExpiresSeconds,
     });
 
+    void this.logAudit({
+      actorUserId: userId,
+      action: AuditAction.CREATED,
+      entityType: 'files',
+      entityId: dbFile.id,
+      metadata: {
+        operation: 'INITIATE_UPLOAD',
+        storageKey: key,
+        resourceType: dto.resourceType ?? null,
+      },
+    });
+
     return {
       fileId: dbFile.id,
       storageKey: key,
@@ -136,6 +154,18 @@ export class FilesService {
       key,
       contentType: dto.mimeType,
       expiresInSeconds: Math.min(this.signedUrlExpiresSeconds, 300),
+    });
+
+    void this.logAudit({
+      actorUserId: null,
+      action: AuditAction.CREATED,
+      entityType: 'files',
+      entityId: dbFile.id,
+      metadata: {
+        operation: 'INITIATE_GUEST_UPLOAD',
+        storageKey: key,
+        resourceType: dto.resourceType ?? null,
+      },
     });
 
     return {
@@ -186,6 +216,19 @@ export class FilesService {
       resourceId,
       purpose || null,
     );
+
+    void this.logAudit({
+      actorUserId: dbFile.uploadedBy,
+      action: AuditAction.STATUS_CHANGED,
+      entityType: 'files',
+      entityId: fileId,
+      metadata: {
+        operation: 'ATTACH_FILE',
+        resourceType,
+        resourceId,
+        purpose: purpose ?? null,
+      },
+    });
   }
 
   /**
@@ -279,6 +322,17 @@ export class FilesService {
 
     // Delete from DB
     await this.filesRepository.delete(fileId);
+
+    void this.logAudit({
+      actorUserId: dbFile.uploadedBy,
+      action: AuditAction.DELETED,
+      entityType: 'files',
+      entityId: fileId,
+      metadata: {
+        operation: 'DELETE_FILE',
+        storagePath: dbFile.storagePath,
+      },
+    });
   }
 
   /**
@@ -410,9 +464,38 @@ export class FilesService {
 
     const url = this.buildPublicUrl(key);
 
+    void this.logAudit({
+      actorUserId: userId,
+      action: AuditAction.CREATED,
+      entityType: 'files',
+      entityId: dbFile.id,
+      metadata: {
+        operation: 'UPLOAD_AND_ATTACH_PUBLIC_FILE',
+        resourceType,
+        resourceId,
+        storageKey: key,
+      },
+    });
+
     return {
       fileId: dbFile.id,
       url,
     };
+  }
+
+  private async logAudit(input: {
+    actorUserId?: string | null;
+    action: AuditActionValue;
+    entityType: string;
+    entityId?: string | null;
+    metadata?: Record<string, any> | null;
+  }) {
+    try {
+      await this.auditLogsService.record(input);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record audit log for ${input.entityType}/${input.entityId ?? 'n/a'}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 }

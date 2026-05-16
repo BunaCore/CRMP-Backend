@@ -17,6 +17,10 @@ import { AccessService } from './access.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { ReplaceRolePermissionsDto } from './dto/replace-role-permissions.dto';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from 'src/auth/decorators/current-user.decorator';
 
 @Controller('access-control')
 @UseGuards(JwtAuthGuard, AccessGuard)
@@ -31,8 +35,11 @@ export class AccessController {
 
   @Post('roles')
   @RequireCasl({ action: 'create', subject: 'Role' })
-  async createRole(@Body() dto: CreateRoleDto) {
-    return this.accessService.createRole(dto);
+  async createRole(
+    @Body() dto: CreateRoleDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.accessService.createRole(dto, actor.id);
   }
 
   @Patch('roles/:id')
@@ -40,14 +47,18 @@ export class AccessController {
   async updateRole(
     @Param('id', new ParseUUIDPipe()) roleId: string,
     @Body() dto: UpdateRoleDto,
+    @CurrentUser() actor: AuthenticatedUser,
   ) {
-    return this.accessService.updateRole(roleId, dto);
+    return this.accessService.updateRole(roleId, dto, actor.id);
   }
 
   @Delete('roles/:id')
   @RequireCasl({ action: 'delete', subject: 'Role' })
-  async deleteRole(@Param('id', new ParseUUIDPipe()) roleId: string) {
-    return this.accessService.deleteRole(roleId);
+  async deleteRole(
+    @Param('id', new ParseUUIDPipe()) roleId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.accessService.deleteRole(roleId, actor.id);
   }
 
   @Get('permissions')
@@ -67,7 +78,12 @@ export class AccessController {
   async replaceRolePermissions(
     @Param('id', new ParseUUIDPipe()) roleId: string,
     @Body() dto: ReplaceRolePermissionsDto,
+    @CurrentUser() actor: AuthenticatedUser,
   ) {
-    return this.accessService.replaceRolePermissions(roleId, dto.permissionIds);
+    return this.accessService.replaceRolePermissions(
+      roleId,
+      dto.permissionIds,
+      actor.id,
+    );
   }
 }

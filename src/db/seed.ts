@@ -28,49 +28,49 @@ const UNIVERSAL_PASSWORD = 'Password@1234';
 
 const USERS: SeedUserConfig[] = [
   {
-    name: 'System Admin',
+    name: 'Yohannes Abebe',
     email: 'admin@crmp.edu',
     password: UNIVERSAL_PASSWORD,
     roles: [Role.SYSTEM_ADMIN],
   },
   {
-    name: 'Dr. Advisor (Supervisor)',
+    name: 'Dr. Tadesse Mengistu',
     email: 'advisor@crmp.edu',
     password: UNIVERSAL_PASSWORD,
     roles: [Role.FACULTY, Role.ADVISOR],
   },
   {
-    name: 'DGC Member (Dept Head)',
+    name: 'Prof. Girma Wolde',
     email: 'dgc@crmp.edu',
     password: UNIVERSAL_PASSWORD,
     roles: [Role.FACULTY, Role.DGC_MEMBER],
   },
   {
-    name: 'Peer Evaluator',
+    name: 'Dr. Haile Yohannes',
     email: 'evaluator@crmp.edu',
     password: UNIVERSAL_PASSWORD,
     roles: [Role.FACULTY, Role.EVALUATOR],
   },
   {
-    name: 'College Dean (ADRPM)',
+    name: 'Prof. Alemayehu Teshome',
     email: 'adrpm@crmp.edu',
     password: UNIVERSAL_PASSWORD,
     roles: [Role.FACULTY, Role.ADRPM],
   },
   {
-    name: 'SGS Dean (PG Office)',
+    name: 'Prof. Sehin Debas',
     email: 'pgoffice@crmp.edu',
     password: UNIVERSAL_PASSWORD,
     roles: [Role.FACULTY, Role.PG_OFFICE],
   },
   {
-    name: 'UG Coordinator',
+    name: 'Marta Kebede',
     email: 'coordinator@crmp.edu',
     password: UNIVERSAL_PASSWORD,
     roles: [Role.FACULTY, Role.COORDINATOR],
   },
   {
-    name: 'Samuel Student',
+    name: 'Samuel Tekle',
     email: 'student@crmp.edu',
     password: UNIVERSAL_PASSWORD,
     roles: [Role.STUDENT],
@@ -91,25 +91,25 @@ const USERS: SeedUserConfig[] = [
     userProgram: 'PG',
   },
   {
-    name: 'Director of RAD',
+    name: 'Dr. Yosef Bereket',
     email: 'rad@crmp.edu',
     password: UNIVERSAL_PASSWORD,
     roles: [Role.FACULTY, Role.RAD],
   },
   {
-    name: 'Finance Officer',
+    name: 'Meseret Gebreselassie',
     email: 'finance@crmp.edu',
     password: UNIVERSAL_PASSWORD,
     roles: [Role.FACULTY, Role.FINANCE],
   },
   {
-    name: 'VP of RTT',
+    name: 'Prof. Aklilu Habte',
     email: 'vprtt@crmp.edu',
     password: UNIVERSAL_PASSWORD,
     roles: [Role.FACULTY, Role.VPRTT, Role.AC_MEMBER],
   },
   {
-    name: 'Academic Council Rep',
+    name: 'Dr. Henok Desta',
     email: 'ac@crmp.edu',
     password: UNIVERSAL_PASSWORD,
     roles: [Role.FACULTY, Role.AC_MEMBER],
@@ -939,12 +939,42 @@ async function seed() {
     // 8. Seed Evaluation Rubrics
     console.log('Seeding evaluation rubrics...');
     await tx.insert(schema.evaluationRubrics).values([
-      { name: 'Advisor', phase: 'PROPOSAL', type: 'continuous', maxPoints: '20.00' },
-      { name: 'Proposal Defence', phase: 'PROPOSAL', type: 'continuous', maxPoints: '15.00' },
-      { name: 'Advisor', phase: 'PROJECT', type: 'continuous', maxPoints: '20.00' },
-      { name: 'Documentation', phase: 'PROJECT', type: 'continuous', maxPoints: '20.00' },
-      { name: 'Defence Individual', phase: 'PROJECT', type: 'continuous', maxPoints: '15.00' },
-      { name: 'Defence Group', phase: 'PROJECT', type: 'final', maxPoints: '30.00' },
+      {
+        name: 'Advisor',
+        phase: 'PROPOSAL',
+        type: 'continuous',
+        maxPoints: '20.00',
+      },
+      {
+        name: 'Proposal Defence',
+        phase: 'PROPOSAL',
+        type: 'continuous',
+        maxPoints: '15.00',
+      },
+      {
+        name: 'Advisor',
+        phase: 'PROJECT',
+        type: 'continuous',
+        maxPoints: '20.00',
+      },
+      {
+        name: 'Documentation',
+        phase: 'PROJECT',
+        type: 'continuous',
+        maxPoints: '20.00',
+      },
+      {
+        name: 'Defence Individual',
+        phase: 'PROJECT',
+        type: 'continuous',
+        maxPoints: '15.00',
+      },
+      {
+        name: 'Defence Group',
+        phase: 'PROJECT',
+        type: 'final',
+        maxPoints: '30.00',
+      },
     ]);
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -956,11 +986,11 @@ async function seed() {
 
     // Dedicated demo users (separate from the main USERS list above)
     const demoPgUsers = [
-      { name: 'PG Advisor (Demo)',   email: 'seed-pg-advisor@crmp.edu'  },
-      { name: 'PG Student (Demo)',   email: 'seed-pg-student@crmp.edu'  },
-      { name: 'PG DGC Member (Demo)',email: 'seed-pg-dgc@crmp.edu'      },
-      { name: 'PG ADRPM (Demo)',     email: 'seed-pg-adrpm@crmp.edu'    },
-      { name: 'PG Office (Demo)',    email: 'seed-pg-office@crmp.edu'   },
+      { name: 'PG Advisor (Demo)', email: 'seed-pg-advisor@crmp.edu' },
+      { name: 'PG Student (Demo)', email: 'seed-pg-student@crmp.edu' },
+      { name: 'PG DGC Member (Demo)', email: 'seed-pg-dgc@crmp.edu' },
+      { name: 'PG ADRPM (Demo)', email: 'seed-pg-adrpm@crmp.edu' },
+      { name: 'PG Office (Demo)', email: 'seed-pg-office@crmp.edu' },
     ] as const;
 
     const demoPgMap = new Map<string, typeof schema.users.$inferSelect>();
@@ -977,16 +1007,16 @@ async function seed() {
       demoPgMap.set(u.email, demoUser);
     }
 
-    const demoPiUser      = demoPgMap.get('seed-pg-student@crmp.edu')!;
-    const demoAdvisor     = demoPgMap.get('seed-pg-advisor@crmp.edu')!;
-    const demoDgcUser     = demoPgMap.get('seed-pg-dgc@crmp.edu')!;
-    const demoAdrpmUser   = demoPgMap.get('seed-pg-adrpm@crmp.edu')!;
-    const demoPgOffice    = demoPgMap.get('seed-pg-office@crmp.edu')!;
+    const demoPiUser = demoPgMap.get('seed-pg-student@crmp.edu')!;
+    const demoAdvisor = demoPgMap.get('seed-pg-advisor@crmp.edu')!;
+    const demoDgcUser = demoPgMap.get('seed-pg-dgc@crmp.edu')!;
+    const demoAdrpmUser = demoPgMap.get('seed-pg-adrpm@crmp.edu')!;
+    const demoPgOffice = demoPgMap.get('seed-pg-office@crmp.edu')!;
 
     // Grant the PI the STUDENT + FINANCE roles so they appear as a researcher
     // and can also be used to test the budget request flow end-to-end.
-    const financeRoleId  = roleNameToId.get(Role.FINANCE)!;
-    const studentRoleId  = roleNameToId.get(Role.STUDENT)!;
+    const financeRoleId = roleNameToId.get(Role.FINANCE)!;
+    const studentRoleId = roleNameToId.get(Role.STUDENT)!;
     await tx.insert(schema.userRoles).values([
       { userId: demoPiUser.id, roleId: studentRoleId, grantedBy: adminUser.id },
       { userId: demoPiUser.id, roleId: financeRoleId, grantedBy: adminUser.id },
@@ -998,7 +1028,8 @@ async function seed() {
       .values({
         createdBy: demoPiUser.id,
         title: 'Created PG Demo',
-        abstract: 'A postgraduate research proposal created for demo workflows and budget approval testing.',
+        abstract:
+          'A postgraduate research proposal created for demo workflows and budget approval testing.',
         proposalProgram: 'PG',
         isFunded: true,
         degreeLevel: 'PhD',
@@ -1016,29 +1047,44 @@ async function seed() {
       .returning();
 
     await tx.insert(schema.proposalMembers).values([
-      { proposalId: demoProposal.id, userId: demoPiUser.id,   role: 'PI'     },
-      { proposalId: demoProposal.id, userId: demoAdvisor.id,  role: 'ADVISOR' },
+      { proposalId: demoProposal.id, userId: demoPiUser.id, role: 'PI' },
+      { proposalId: demoProposal.id, userId: demoAdvisor.id, role: 'ADVISOR' },
     ]);
 
     // Fully accepted approval trail
     await tx.insert(schema.proposalApprovals).values([
       {
-        proposalId: demoProposal.id, stepOrder: 1,
-        approverRole: 'DGC_MEMBER', approverUserId: demoDgcUser.id,
-        stepLabel: 'DGC Committee Review', stepType: 'FORM',
-        isActive: false, decision: 'Accepted', decisionAt: new Date(),
+        proposalId: demoProposal.id,
+        stepOrder: 1,
+        approverRole: 'DGC_MEMBER',
+        approverUserId: demoDgcUser.id,
+        stepLabel: 'DGC Committee Review',
+        stepType: 'FORM',
+        isActive: false,
+        decision: 'Accepted',
+        decisionAt: new Date(),
       },
       {
-        proposalId: demoProposal.id, stepOrder: 2,
-        approverRole: 'ADRPM', approverUserId: demoAdrpmUser.id,
-        stepLabel: 'ADRPM Approval', stepType: 'APPROVAL',
-        isActive: false, decision: 'Accepted', decisionAt: new Date(),
+        proposalId: demoProposal.id,
+        stepOrder: 2,
+        approverRole: 'ADRPM',
+        approverUserId: demoAdrpmUser.id,
+        stepLabel: 'ADRPM Approval',
+        stepType: 'APPROVAL',
+        isActive: false,
+        decision: 'Accepted',
+        decisionAt: new Date(),
       },
       {
-        proposalId: demoProposal.id, stepOrder: 3,
-        approverRole: 'PG_OFFICE', approverUserId: demoPgOffice.id,
-        stepLabel: 'PG Office Finalization', stepType: 'APPROVAL',
-        isActive: false, decision: 'Accepted', decisionAt: new Date(),
+        proposalId: demoProposal.id,
+        stepOrder: 3,
+        approverRole: 'PG_OFFICE',
+        approverUserId: demoPgOffice.id,
+        stepLabel: 'PG Office Finalization',
+        stepType: 'APPROVAL',
+        isActive: false,
+        decision: 'Accepted',
+        decisionAt: new Date(),
       },
     ]);
 
@@ -1060,8 +1106,12 @@ async function seed() {
       .returning();
 
     await tx.insert(schema.projectMembers).values([
-      { projectId: demoProject.projectId, userId: demoPiUser.id,  role: 'PI'      },
-      { projectId: demoProject.projectId, userId: demoAdvisor.id, role: 'ADVISOR' },
+      { projectId: demoProject.projectId, userId: demoPiUser.id, role: 'PI' },
+      {
+        projectId: demoProject.projectId,
+        userId: demoAdvisor.id,
+        role: 'ADVISOR',
+      },
     ]);
 
     // Link proposal to project
@@ -1074,15 +1124,36 @@ async function seed() {
     const demoBudgetItems = await tx
       .insert(schema.projectBudgetItems)
       .values([
-        { projectId: demoProject.projectId, description: 'Lab equipment and consumables',        category: 'Equipment', amount: '12000.00', status: 'AVAILABLE' },
-        { projectId: demoProject.projectId, description: 'Field travel and data collection',     category: 'Travel',    amount: '8500.00',  status: 'AVAILABLE' },
-        { projectId: demoProject.projectId, description: 'Software licenses and publication fees',category: 'Materials', amount: '6800.00',  status: 'AVAILABLE' },
+        {
+          projectId: demoProject.projectId,
+          description: 'Lab equipment and consumables',
+          category: 'Equipment',
+          amount: '12000.00',
+          status: 'AVAILABLE',
+        },
+        {
+          projectId: demoProject.projectId,
+          description: 'Field travel and data collection',
+          category: 'Travel',
+          amount: '8500.00',
+          status: 'AVAILABLE',
+        },
+        {
+          projectId: demoProject.projectId,
+          description: 'Software licenses and publication fees',
+          category: 'Materials',
+          amount: '6800.00',
+          status: 'AVAILABLE',
+        },
       ])
       .returning();
 
     // PENDING disbursement request for the first 2 items
-    const requestedItems  = demoBudgetItems.slice(0, 2);
-    const requestedAmount = requestedItems.reduce((s, i) => s + parseFloat(i.amount), 0);
+    const requestedItems = demoBudgetItems.slice(0, 2);
+    const requestedAmount = requestedItems.reduce(
+      (s, i) => s + parseFloat(i.amount),
+      0,
+    );
 
     const [demoDisbursement] = await tx
       .insert(schema.disbursementRequests)
@@ -1107,35 +1178,60 @@ async function seed() {
     await tx
       .update(schema.projectBudgetItems)
       .set({ status: 'PENDING_DISBURSEMENT' })
-      .where(inArray(schema.projectBudgetItems.id, requestedItems.map((i) => i.id)));
+      .where(
+        inArray(
+          schema.projectBudgetItems.id,
+          requestedItems.map((i) => i.id),
+        ),
+      );
 
     // Default workspace + document for the demo project
     const [demoWorkspace] = await tx
       .insert(schema.workspaces)
-      .values({ projectId: demoProject.projectId, name: 'Main Document', createdBy: adminUser.id })
+      .values({
+        projectId: demoProject.projectId,
+        name: 'Main Document',
+        createdBy: adminUser.id,
+      })
       .returning();
 
     const demoContent = {
       type: 'doc',
-      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'PG demo document workspace.' }] }],
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'PG demo document workspace.' }],
+        },
+      ],
     };
     const [demoDoc] = await tx
       .insert(schema.documents)
       .values({ workspaceId: demoWorkspace.id, currentContent: demoContent })
       .returning();
 
-    const demoHash = createHash('sha256').update(JSON.stringify(demoContent)).digest('hex');
+    const demoHash = createHash('sha256')
+      .update(JSON.stringify(demoContent))
+      .digest('hex');
     const [demoVer] = await tx
       .insert(schema.documentVersions)
       .values({
-        documentId: demoDoc.id, versionNumber: 1, content: demoContent,
-        createdBy: adminUser.id, sourceAction: 'initial', contentHash: demoHash,
+        documentId: demoDoc.id,
+        versionNumber: 1,
+        content: demoContent,
+        createdBy: adminUser.id,
+        sourceAction: 'initial',
+        contentHash: demoHash,
       })
       .returning();
 
-    await tx.update(schema.documents).set({ currentVersionId: demoVer.id }).where(eq(schema.documents.id, demoDoc.id));
+    await tx
+      .update(schema.documents)
+      .set({ currentVersionId: demoVer.id })
+      .where(eq(schema.documents.id, demoDoc.id));
 
-    console.log('  ✅ Demo PG budget project seeded (login: seed-pg-student@crmp.edu / Password@1234)');
+    console.log(
+      '  ✅ Demo PG budget project seeded (login: seed-pg-student@crmp.edu / Password@1234)',
+    );
 
     console.log('✅ Database seeded successfully!');
   });
