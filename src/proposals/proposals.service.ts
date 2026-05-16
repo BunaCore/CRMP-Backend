@@ -38,6 +38,7 @@ import {
 } from './conditions/proposal.condition';
 import { FilesService } from 'src/common/files/files.service';
 import { UpdateProposalDto } from './dto/update-proposal.dto';
+import { AuditAction } from 'src/audit-logs/types/audit-action.enum';
 @Injectable()
 export class ProposalsService {
   private readonly logger = new Logger(ProposalsService.name);
@@ -177,7 +178,7 @@ export class ProposalsService {
       // 2.6 Audit log
       await this.repository.createAuditLog(tx, {
         actorUserId: user.id,
-        action: 'CREATED',
+        action: AuditAction.CREATED,
         entityType: 'proposals',
         entityId: created.id,
         metadata: {
@@ -879,7 +880,7 @@ export class ProposalsService {
       // 7. Audit log
       await this.repository.createAuditLog(tx, {
         actorUserId: userId,
-        action: 'STATUS_CHANGED',
+        action: AuditAction.UPDATED,
         entityType: 'proposals',
         entityId: proposalId,
         metadata: {

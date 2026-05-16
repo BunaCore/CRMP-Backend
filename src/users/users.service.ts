@@ -24,6 +24,10 @@ import { Permission } from 'src/access-control/permission.enum';
 import { UserWithPermissions } from 'src/types/user-with-permissions';
 import { FilesService } from 'src/common/files/files.service';
 import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
+import {
+  AuditAction,
+  AuditActionValue,
+} from 'src/audit-logs/types/audit-action.enum';
 
 @Injectable()
 export class UsersService {
@@ -107,7 +111,7 @@ export class UsersService {
 
     void this.logAudit({
       actorUserId: actorUserId ?? userId,
-      action: 'STATUS_CHANGED',
+      action: AuditAction.PERMISSION_CHANGED,
       entityType: 'user_roles',
       entityId: userId,
       metadata: {
@@ -333,7 +337,7 @@ export class UsersService {
 
     void this.logAudit({
       actorUserId: invitedBy,
-      action: 'CREATED',
+      action: AuditAction.CREATED,
       entityType: 'invitations',
       entityId: invitation.id,
       metadata: {
@@ -373,7 +377,7 @@ export class UsersService {
 
     void this.logAudit({
       actorUserId: actorUserId ?? userId,
-      action: 'STATUS_CHANGED',
+      action: AuditAction.STATUS_CHANGED,
       entityType: 'users',
       entityId: userId,
       metadata: {
@@ -410,7 +414,7 @@ export class UsersService {
 
     void this.logAudit({
       actorUserId: userId,
-      action: 'STATUS_CHANGED',
+      action: AuditAction.UPDATED,
       entityType: 'users',
       entityId: userId,
       metadata: {
@@ -487,7 +491,7 @@ export class UsersService {
 
     void this.logAudit({
       actorUserId: actor.id,
-      action: 'STATUS_CHANGED',
+      action: AuditAction.UPDATED,
       entityType: 'users',
       entityId: userId,
       metadata: {
@@ -506,13 +510,7 @@ export class UsersService {
 
   private async logAudit(input: {
     actorUserId?: string | null;
-    action:
-      | 'CREATED'
-      | 'STATUS_CHANGED'
-      | 'DECISION_MADE'
-      | 'BUDGET_RELEASED'
-      | 'WORKSPACE_UNLOCKED'
-      | 'EVALUATOR_ASSIGNED';
+    action: AuditActionValue;
     entityType: string;
     entityId?: string | null;
     metadata?: Record<string, any> | null;

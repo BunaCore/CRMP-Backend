@@ -20,6 +20,10 @@ import { User } from 'src/users/types/user';
 import { MailProducer } from 'src/queues/mail/mail.producer';
 import { Permission } from 'src/access-control/permission.enum';
 import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
+import {
+  AuditAction,
+  AuditActionValue,
+} from 'src/audit-logs/types/audit-action.enum';
 
 import * as bcrypt from 'bcrypt';
 import { DB } from 'src/db/db.type';
@@ -136,7 +140,7 @@ export class AuthService {
 
     void this.logAudit({
       actorUserId: user.id,
-      action: 'CREATED',
+      action: AuditAction.CREATED,
       entityType: 'users',
       entityId: user.id,
       metadata: {
@@ -243,7 +247,7 @@ export class AuthService {
 
     void this.logAudit({
       actorUserId: user.id,
-      action: 'CREATED',
+      action: AuditAction.CREATED,
       entityType: 'users',
       entityId: user.id,
       metadata: {
@@ -449,13 +453,7 @@ export class AuthService {
 
   private async logAudit(input: {
     actorUserId?: string | null;
-    action:
-      | 'CREATED'
-      | 'STATUS_CHANGED'
-      | 'DECISION_MADE'
-      | 'BUDGET_RELEASED'
-      | 'WORKSPACE_UNLOCKED'
-      | 'EVALUATOR_ASSIGNED';
+    action: AuditActionValue;
     entityType: string;
     entityId?: string | null;
     metadata?: Record<string, any> | null;

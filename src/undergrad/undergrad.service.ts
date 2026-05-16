@@ -7,6 +7,7 @@ import {
 import { UndergradRepository } from './undergrad.repository';
 import { DecisionDto, CoordinatorDecision } from './dto/decision.dto';
 import { AssignAdvisorDto } from './dto/assign-advisor.dto';
+import { AuditAction } from 'src/audit-logs/types/audit-action.enum';
 
 /**
  * UndergradService
@@ -292,10 +293,11 @@ export class UndergradService {
     // ── Write 4: Audit log ───────────────────────────────────────────
     await this.repo.insertAuditLogAction({
       actorUserId: coordinator.id,
-      action: 'EVALUATOR_ASSIGNED',
+      action: AuditAction.ASSIGNED,
       entityType: 'evaluator_assignments',
       entityId: assignment.id,
       metadata: {
+        operation: 'EVALUATOR_ASSIGNED',
         proposalId,
         proposalTitle: proposal.title,
         advisorId: dto.advisorUserId,

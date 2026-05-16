@@ -18,6 +18,7 @@ import { ApproverResolution } from './types/proposal';
 import { EvaluationContext, BranchCondition } from './types/branch-condition';
 import { MailProducer } from 'src/queues/mail/mail.producer';
 import { ChatService } from 'src/chat/chat.service';
+import { AuditAction } from 'src/audit-logs/types/audit-action.enum';
 
 type DecisionOutcome = 'Accepted' | 'Rejected' | 'Needs_Revision';
 
@@ -1370,7 +1371,12 @@ export class WorkflowService {
         const lineItems = await tx
           .select()
           .from(schema.budgetRequestItems)
-          .where(eq(schema.budgetRequestItems.budgetRequestId, updatedBudgetReqs[0].id));
+          .where(
+            eq(
+              schema.budgetRequestItems.budgetRequestId,
+              updatedBudgetReqs[0].id,
+            ),
+          );
 
         if (lineItems.length > 0) {
           const seedValues = lineItems.map((item) => ({
@@ -1439,7 +1445,7 @@ export class WorkflowService {
       // 8. Audit log
       await tx.insert(schema.auditLogs).values({
         actorUserId: approverUserId,
-        action: 'CREATED',
+        action: AuditAction.CREATED,
         entityType: 'projects',
         entityId: project.projectId,
         metadata: {

@@ -21,6 +21,10 @@ import { sql } from 'drizzle-orm';
 import { DrizzleService } from 'src/db/db.service';
 import { FilesService } from 'src/common/files/files.service';
 import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
+import {
+  AuditAction,
+  AuditActionValue,
+} from 'src/audit-logs/types/audit-action.enum';
 
 @Injectable()
 export class ProjectsService {
@@ -99,7 +103,7 @@ export class ProjectsService {
 
     void this.logAudit({
       actorUserId: userId,
-      action: 'STATUS_CHANGED',
+      action: AuditAction.STATUS_CHANGED,
       entityType: 'projects',
       entityId: projectId,
       metadata: {
@@ -232,7 +236,7 @@ export class ProjectsService {
 
     void this.logAudit({
       actorUserId: userId,
-      action: 'STATUS_CHANGED',
+      action: AuditAction.STATUS_CHANGED,
       entityType: 'projects',
       entityId: projectId,
       metadata: {
@@ -271,7 +275,7 @@ export class ProjectsService {
 
     void this.logAudit({
       actorUserId: userId,
-      action: 'STATUS_CHANGED',
+      action: AuditAction.UPDATED,
       entityType: 'projects',
       entityId: projectId,
       metadata: {
@@ -324,7 +328,7 @@ export class ProjectsService {
 
     void this.logAudit({
       actorUserId: userId,
-      action: 'CREATED',
+      action: AuditAction.CREATED,
       entityType: 'files',
       entityId: result.fileId,
       metadata: {
@@ -377,7 +381,7 @@ export class ProjectsService {
 
     void this.logAudit({
       actorUserId: userId,
-      action: 'CREATED',
+      action: AuditAction.CREATED,
       entityType: 'files',
       entityId: result.fileId,
       metadata: {
@@ -392,13 +396,7 @@ export class ProjectsService {
 
   private async logAudit(input: {
     actorUserId?: string | null;
-    action:
-      | 'CREATED'
-      | 'STATUS_CHANGED'
-      | 'DECISION_MADE'
-      | 'BUDGET_RELEASED'
-      | 'WORKSPACE_UNLOCKED'
-      | 'EVALUATOR_ASSIGNED';
+    action: AuditActionValue;
     entityType: string;
     entityId?: string | null;
     metadata?: Record<string, any> | null;

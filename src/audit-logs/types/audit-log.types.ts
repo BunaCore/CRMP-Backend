@@ -1,4 +1,4 @@
-import { AuditAction, AuditActionValue } from './audit-action.enum';
+import { AuditActionValue } from './audit-action.enum';
 
 export type AuditLogAction = AuditActionValue;
 

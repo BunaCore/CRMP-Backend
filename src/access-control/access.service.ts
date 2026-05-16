@@ -12,6 +12,10 @@ import { AccessRepository } from './access.repository';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
+import {
+  AuditAction,
+  AuditActionValue,
+} from 'src/audit-logs/types/audit-action.enum';
 
 /**
  * User interface for authorization context
@@ -65,7 +69,7 @@ export class AccessService {
 
     void this.logAudit({
       actorUserId,
-      action: 'CREATED',
+      action: AuditAction.CREATED,
       entityType: 'roles',
       entityId: created.id,
       metadata: {
@@ -98,7 +102,7 @@ export class AccessService {
 
     void this.logAudit({
       actorUserId,
-      action: 'STATUS_CHANGED',
+      action: AuditAction.UPDATED,
       entityType: 'roles',
       entityId: roleId,
       metadata: {
@@ -120,7 +124,7 @@ export class AccessService {
     const deleted = await this.accessRepository.deleteRole(roleId);
     void this.logAudit({
       actorUserId,
-      action: 'STATUS_CHANGED',
+      action: AuditAction.DELETED,
       entityType: 'roles',
       entityId: roleId,
       metadata: {
@@ -180,7 +184,7 @@ export class AccessService {
 
     void this.logAudit({
       actorUserId,
-      action: 'STATUS_CHANGED',
+      action: AuditAction.PERMISSION_CHANGED,
       entityType: 'role_permissions',
       entityId: roleId,
       metadata: {
@@ -203,13 +207,7 @@ export class AccessService {
 
   private async logAudit(input: {
     actorUserId?: string | null;
-    action:
-      | 'CREATED'
-      | 'STATUS_CHANGED'
-      | 'DECISION_MADE'
-      | 'BUDGET_RELEASED'
-      | 'WORKSPACE_UNLOCKED'
-      | 'EVALUATOR_ASSIGNED';
+    action: AuditActionValue;
     entityType: string;
     entityId?: string | null;
     metadata?: Record<string, any> | null;

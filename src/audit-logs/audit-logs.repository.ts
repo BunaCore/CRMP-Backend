@@ -52,16 +52,28 @@ export class AuditLogsRepository {
       conditions.push(lte(auditLogs.createdAt, query.to));
     }
 
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
-    const offset = (page - 1) * limit;
+    const limit = (query.limit ?? 20) + 1; // +1 to detect if more items exist
 
-    const [countRow] = await this.drizzle.db
-      .select({ total: sql<number>`count(*)::int` })
-      .from(auditLogs)
-      .leftJoin(users, eq(auditLogs.actorUserId, users.id))
-      .where(where);
+    // Decode cursor: { createdAt: ISO string, id: UUID }
+    let cursorCondition: SQL<unknown> | undefined;
+    if (query.cursor) {
+      try {
+        const decoded = JSON.parse(
+          Buffer.from(query.cursor, 'base64').toString('utf-8'),
+        );
+        const cursorDate = new Date(decoded.createdAt);
+        // Fetch items where createdAt < cursorDate OR (createdAt == cursorDate AND id < cursorId)
+        cursorCondition = sql`(${auditLogs.createdAt} < ${cursorDate} OR (${auditLogs.createdAt} = ${cursorDate} AND ${auditLogs.id} < ${decoded.id}))`;
+      } catch (error) {
+        // Invalid cursor, ignore
+      }
+    }
+
+    if (cursorCondition) {
+      conditions.push(cursorCondition);
+    }
+
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
 
     const rows = await this.drizzle.db
       .select({
@@ -78,13 +90,27 @@ export class AuditLogsRepository {
       .from(auditLogs)
       .leftJoin(users, eq(auditLogs.actorUserId, users.id))
       .where(where)
-      .orderBy(desc(auditLogs.createdAt))
-      .limit(limit)
-      .offset(offset);
+      .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
+      .limit(limit);
+
+    // Check if there are more items
+    const hasMore = rows.length > (query.limit ?? 20);
+    const items = hasMore ? rows.slice(0, -1) : rows;
+
+    // Generate next cursor from last item
+    let next: string | null = null;
+    if (hasMore && items.length > 0) {
+      const lastItem = items[items.length - 1];
+      const cursorPayload = {
+        createdAt: lastItem.createdAt?.toISOString(),
+        id: lastItem.id,
+      };
+      next = Buffer.from(JSON.stringify(cursorPayload)).toString('base64');
+    }
 
     return {
-      items: rows,
-      totalItems: countRow?.total ?? 0,
+      items,
+      next,
     };
   }
 }

@@ -16,6 +16,10 @@ import {
   type StorageService,
 } from './storage/storage.interface';
 import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
+import {
+  AuditAction,
+  AuditActionValue,
+} from 'src/audit-logs/types/audit-action.enum';
 
 /**
  * FilesService is a generic, workflow-agnostic file management service.
@@ -99,7 +103,7 @@ export class FilesService {
 
     void this.logAudit({
       actorUserId: userId,
-      action: 'CREATED',
+      action: AuditAction.CREATED,
       entityType: 'files',
       entityId: dbFile.id,
       metadata: {
@@ -154,7 +158,7 @@ export class FilesService {
 
     void this.logAudit({
       actorUserId: null,
-      action: 'CREATED',
+      action: AuditAction.CREATED,
       entityType: 'files',
       entityId: dbFile.id,
       metadata: {
@@ -215,7 +219,7 @@ export class FilesService {
 
     void this.logAudit({
       actorUserId: dbFile.uploadedBy,
-      action: 'STATUS_CHANGED',
+      action: AuditAction.STATUS_CHANGED,
       entityType: 'files',
       entityId: fileId,
       metadata: {
@@ -321,7 +325,7 @@ export class FilesService {
 
     void this.logAudit({
       actorUserId: dbFile.uploadedBy,
-      action: 'STATUS_CHANGED',
+      action: AuditAction.DELETED,
       entityType: 'files',
       entityId: fileId,
       metadata: {
@@ -462,7 +466,7 @@ export class FilesService {
 
     void this.logAudit({
       actorUserId: userId,
-      action: 'CREATED',
+      action: AuditAction.CREATED,
       entityType: 'files',
       entityId: dbFile.id,
       metadata: {
@@ -481,13 +485,7 @@ export class FilesService {
 
   private async logAudit(input: {
     actorUserId?: string | null;
-    action:
-      | 'CREATED'
-      | 'STATUS_CHANGED'
-      | 'DECISION_MADE'
-      | 'BUDGET_RELEASED'
-      | 'WORKSPACE_UNLOCKED'
-      | 'EVALUATOR_ASSIGNED';
+    action: AuditActionValue;
     entityType: string;
     entityId?: string | null;
     metadata?: Record<string, any> | null;
