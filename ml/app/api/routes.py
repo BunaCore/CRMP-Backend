@@ -48,11 +48,16 @@ async def search_members(request: SearchRequest):
 async def rag_upload(file: UploadFile = File(...)):
     try:
         print(f"Received file upload request: {file.filename}")
+        filename_lower = file.filename.lower()
         contents = await file.read()
-        if not file.filename.lower().endswith('.pdf'):
-             raise HTTPException(status_code=400, detail="Only PDF files are supported")
+        
+        if filename_lower.endswith('.pdf'):
+             result = rag_service.process_pdf(contents, file.filename)
+        elif filename_lower.endswith('.txt'):
+             result = rag_service.process_text(contents, file.filename)
+        else:
+             raise HTTPException(status_code=400, detail="Only PDF and TXT files are supported")
              
-        result = rag_service.process_pdf(contents, file.filename)
         return result
     except HTTPException as he:
         raise he

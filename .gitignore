@@ -39,3 +39,5 @@ ml/.venv/
 **/__pycache__/
 *.py[cod]
 *$py.class
+ml/rag_store.json
+scratch/
