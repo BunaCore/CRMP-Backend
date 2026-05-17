@@ -26,6 +26,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { BudgetModule } from './budget/budget.module';
 
 
+import { MlModule } from './ml/ml.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -52,6 +53,7 @@ import { BudgetModule } from './budget/budget.module';
     AiModule,
     TasksModule,
     BudgetModule,
+    MlModule,
   ],
   controllers: [AppController],
   providers: [AppService],

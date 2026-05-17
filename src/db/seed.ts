@@ -543,6 +543,24 @@ async function seed() {
         degreeLevel: 'PhD' as const,
         members: [{ email: 'student@crmp.edu', role: 'PI' as const }],
       },
+      {
+        title: 'Advanced Biology Research on Genetics',
+        proposalProgram: 'PG' as const,
+        isFunded: true,
+        currentStatus: 'Approved' as const,
+        createdBy: createdUsers.get('student3@crmp.edu')?.id || studentUser.id,
+        projectId: null,
+        promoteToProject: true,
+        abstract:
+          'A study on genetics and microbiology in the context of modern biology.',
+        submittedAt: new Date('2024-04-01'),
+        durationMonths: 24,
+        degreeLevel: 'Master' as const,
+        members: [
+          { email: 'student3@crmp.edu', role: 'PI' as const },
+          { email: 'student2@crmp.edu', role: 'MEMBER' as const },
+        ],
+      },
     ];
 
     const routingRules = await tx.select().from(schema.routingRules);

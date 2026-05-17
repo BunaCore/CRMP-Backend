@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
+from typing import List
 from app.api.schemas import RecommendationRequest, RecommendationResponse, RagChatRequest, RagChatResponse, SearchRequest
 from app.services.recommender_service import RecommenderService
 from app.services.rag_service import RAGService
@@ -8,17 +9,27 @@ recommender_service = RecommenderService(mode="db")
 rag_service = RAGService()
 
 @router.post("/recommend", response_model=RecommendationResponse)
-async def recommend(request: RecommendationRequest):
+async def get_recommendations(request: RecommendationRequest):
+    """
+    Standard hybrid recommendation for a researcher's dashboard.
+    """
     try:
-        recommendations = recommender_service.get_recommendations(
-            researcher_id=request.researcher_id, 
-            top_k=request.top_k
+        recommendations = await recommender_service.get_recommendations(
+            request.researcher_id, request.top_k
         )
-        
-        if not recommendations:
-            raise HTTPException(status_code=404, detail="Researcher not found or no recommendations available.")
-            
         return {"recommendations": recommendations}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/recommend-members", response_model=List[dict])
+async def recommend_members(request: dict):
+    """
+    Advanced member recommendation for the proposal team section.
+    Expects: {title, research_area, host_department, query, pi_id}
+    """
+    try:
+        recommendations = recommender_service.recommend_members(request)
+        return recommendations
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -55,6 +66,14 @@ async def rag_chat(request: RagChatRequest):
     try:
         result = rag_service.chat(request.document_ids, request.query)
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/retrain")
+async def retrain_model():
+    try:
+        recommender_service.train_model()
+        return {"message": "Model retrained successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

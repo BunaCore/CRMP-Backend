@@ -18,8 +18,8 @@ class RecommenderService:
     def train_model(self):
         """Loads data and trains the hybrid model."""
         logger.info("Loading data and training model...")
-        researchers_df, collaborations_df = self.loader.load_data()
-        self.recommender.fit(researchers_df, collaborations_df)
+        researchers_df, proposals_df, collaborations_df = self.loader.load_data()
+        self.recommender.fit(researchers_df, proposals_df, collaborations_df)
         self.is_trained = True
         logger.info("Model training completed.")
 
@@ -38,3 +38,11 @@ class RecommenderService:
             
         logger.info(f"Searching researchers for query: '{query}'")
         return self.recommender.search(query, top_k)
+
+    def recommend_members(self, proposal_data: dict, top_k: int = 10) -> List[Dict]:
+        """Gets member recommendations for the proposal team section."""
+        if not self.is_trained:
+            self.train_model()
+            
+        logger.info(f"Generating member recommendations for proposal: '{proposal_data.get('title')}'")
+        return self.recommender.recommend_members(proposal_data, top_k)
