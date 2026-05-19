@@ -7,6 +7,7 @@ import { AccessControlModule } from 'src/access-control/access-control.module';
 import { RolesRepository } from 'src/db/roles.repository';
 import { QueuesModule } from 'src/queues/queues.module';
 import { FilesModule } from 'src/common/files/files.module';
+import { MlModule } from 'src/ml/ml.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { FilesModule } from 'src/common/files/files.module';
     forwardRef(() => AccessControlModule),
     QueuesModule,
     FilesModule,
+    MlModule,
   ],
   controllers: [UsersController],
   providers: [UsersRepository, UsersService, RolesRepository],

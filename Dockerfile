@@ -7,7 +7,7 @@ RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml ./
 
 ENV NODE_ENV=development
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 COPY src ./src
 COPY tsconfig.json tsconfig.build.json drizzle.config.ts nest-cli.json ./
@@ -24,7 +24,7 @@ RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml ./
 
 ENV NODE_ENV=production
-RUN pnpm install --prod --frozen-lockfile
+RUN pnpm install --prod --no-frozen-lockfile
 
 COPY --from=builder /app/dist ./dist
 

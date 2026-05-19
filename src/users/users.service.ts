@@ -28,6 +28,7 @@ import {
   AuditAction,
   AuditActionValue,
 } from 'src/audit-logs/types/audit-action.enum';
+import { MlService } from 'src/ml/ml.service';
 
 @Injectable()
 export class UsersService {
@@ -41,6 +42,7 @@ export class UsersService {
     private readonly configService: ConfigService,
     private readonly filesService: FilesService,
     private readonly auditLogsService: AuditLogsService,
+    private readonly mlService: MlService,
   ) {}
 
   async findByEmail(email: string): Promise<User | null> {
@@ -158,7 +160,58 @@ export class UsersService {
     roleName?: string,
     limit: number = 50,
   ): Promise<UserSelectorDto[]> {
-    return this.usersRepository.findForSelector(searchQuery, roleName, limit);
+    const dbUsers = await this.usersRepository.findForSelector(searchQuery, roleName, limit);
+    
+    // If no search query is provided, return standard DB options directly
+    if (!searchQuery) {
+      return dbUsers;
+    }
+
+    let mlRecs: any[] = [];
+    try {
+      // Query semantic suggestions from FastAPI ML service
+      const mlRes = await this.mlService.searchMembers(searchQuery, limit);
+      mlRecs = mlRes?.recommendations || [];
+    } catch (e) {
+      console.warn('Failed to fetch semantic collaborator recommendations from ML:', e.message);
+    }
+
+    if (mlRecs.length === 0) {
+      return dbUsers;
+    }
+
+    // Deduplicate: filter out ML recommendations that are already matched by exact name in dbUsers
+    const dbUserIds = new Set(dbUsers.map(u => u.value));
+    const newMlRecs = mlRecs.filter(rec => !dbUserIds.has(rec.id));
+
+    if (newMlRecs.length === 0) {
+      return dbUsers;
+    }
+
+    // Bulk-fetch DB metadata for these additional recommended users
+    const newMlUserIds = newMlRecs.map(rec => rec.id);
+    const mlUsersDetail = await this.usersRepository.findByIds(newMlUserIds);
+
+    // Map to UserSelectorDto and attach score/reason
+    const mlUsersMapped: UserSelectorDto[] = mlUsersDetail.map(user => {
+      const rec = newMlRecs.find(r => r.id === user.id);
+      return {
+        label: user.fullName || user.id,
+        value: user.id,
+        meta: {
+          department: user.department || undefined,
+          isExternal: user.isExternal || false,
+          score: rec ? rec.score : undefined,
+          reason: rec && user.department ? `Specialist in ${user.department}` : 'Semantic match',
+        }
+      };
+    });
+
+    // Sort by recommendation score descending
+    mlUsersMapped.sort((a, b) => ((b.meta as any)?.score || 0) - ((a.meta as any)?.score || 0));
+
+    // Combine exact/partial name DB matches first, then append semantic recommendations
+    return [...dbUsers, ...mlUsersMapped].slice(0, limit);
   }
 
   /**

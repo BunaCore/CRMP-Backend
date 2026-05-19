@@ -38,10 +38,8 @@ export class BudgetItemDto {
 
 export class CreateProposalDto {
   @IsUUID()
-  @IsNotEmpty({
-    message: 'fileId is required (upload via /files/upload first)',
-  })
-  fileId: string;
+  @IsOptional()
+  fileId?: string;
 
   @IsString()
   @IsNotEmpty()

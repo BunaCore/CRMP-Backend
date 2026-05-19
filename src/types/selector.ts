@@ -11,6 +11,8 @@ export class UserSelectorDto implements SelectorOption {
     role?: string;
     department?: string;
     isExternal?: boolean;
+    score?: number;
+    reason?: string;
   };
 }
 

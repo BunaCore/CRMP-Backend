@@ -13,6 +13,7 @@ import {
   Post,
   UseInterceptors,
   UploadedFile,
+  Res,
 } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -74,6 +75,38 @@ export class ProjectsController {
       throw new NotFoundException('Project not found');
     }
     return this.projectsService.getProjectById(projectId);
+  }
+
+  @Get(':projectId/related')
+  async getRelatedProjects(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('q') query?: string,
+  ) {
+    // Check membership
+    const isMember = await this.projectsService.isUserMemberOfProject(
+      user.id,
+      projectId,
+    );
+    if (!isMember) {
+      throw new NotFoundException('Project not found');
+    }
+    return this.projectsService.getRelatedProjects(projectId, query);
+  }
+
+  @Get(':projectId/download-pdf')
+  async downloadProjectPdf(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Res() res: any,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const { buffer, filename } = await this.projectsService.downloadProjectPdf(projectId);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': buffer.length,
+    });
+    res.send(buffer);
   }
 
   @Patch(':projectId/publish')

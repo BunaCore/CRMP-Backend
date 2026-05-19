@@ -12,7 +12,7 @@ COPY drizzle ./drizzle
 RUN mkdir -p drizzle && [ -f drizzle/_journal.json ] || echo "[]" > drizzle/_journal.json
 
 # Install all dependencies (includes devDependencies)
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # Copy TS source + Drizzle config + TS configs
 COPY src ./src
