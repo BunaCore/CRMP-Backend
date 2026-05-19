@@ -17,77 +17,86 @@ class DataLoader:
         else:
             raise ValueError(f"Unknown mode: {self.mode}")
 
-    def load_mock_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def load_mock_data(self) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Generates and returns mock data."""
         researchers = generate_mock_researchers(50)
         collaborations = generate_mock_collaborations(researchers, 200)
-        return researchers, collaborations
+        return researchers, pd.DataFrame(), collaborations
 
-    def load_real_data_from_db(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def load_real_data_from_db(self) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
-        Fetches real users from the NestJS backend API.
+        Fetches real users, proposals, and collaborations directly from the PostgreSQL database using SQLAlchemy.
         """
-        import httpx
-        import numpy as np
+        import pandas as pd
+        from app.data.db import fetch_users, fetch_proposals, fetch_proposal_members
         
         try:
-            print("Fetching real users from NestJS backend...")
-            response = httpx.get("http://localhost:3001/users/selector?limit=1000", timeout=10.0)
-            response.raise_for_status()
-            users = response.json()
+            print("Fetching training data directly from PostgreSQL...")
+            users = fetch_users()
+            proposals = fetch_proposals()
+            members = fetch_proposal_members()
             
-            departments = ["Computer Science", "Physics", "Biology", "Mathematics", "Chemistry", "Economics", "Engineering", "Arts"]
-            skill_pool = [
-                "Python", "Machine Learning", "Deep Learning", "Data Analysis", "Quantum Computing",
-                "Blockchain", "NLP", "Computer Vision", "Statistics", "Optimization",
-                "Genomics", "Biotechnology", "Microbiology", "Thermodynamics", "Organic Chemistry",
-                "Econometrics", "Game Theory", "Behavioral Economics", "Cryptography", "Distributed Systems",
-                "Frontend", "React", "Next.js", "Node.js", "TypeScript"
-            ]
-            interest_pool = [
-                "Artificial Intelligence", "Sustainability", "Drug Discovery", "Financial Markets",
-                "Robotics", "Renewable Energy", "Public Health", "Space Exploration",
-                "Climate Change", "Cybersecurity", "Ethics in AI", "Neuroscience"
-            ]
-            keyword_pool = [
-                "Neural Networks", "CRISPR", "Black Holes", "Stock Prediction", "Supply Chain",
-                "Carbon Sequestration", "Edge Computing", "Personalized Medicine", "Smart Contracts"
-            ]
-            
-            data = []
+            # Format researchers/users dataframe (name, department, id) - No skills/interests
+            formatted_users = []
             for u in users:
-                uid = u.get("value")
-                uname = u.get("label")
-                
-                # Assign some mock skills/interests based on a seed or random
-                researcher_skills = list(np.random.choice(skill_pool, size=np.random.randint(3, 8), replace=False))
-                researcher_interests = list(np.random.choice(interest_pool, size=np.random.randint(2, 5), replace=False))
-                researcher_keywords = list(np.random.choice(keyword_pool, size=np.random.randint(3, 6), replace=False))
-                
-                data.append({
-                    "id": str(uid),
-                    "name": uname,
-                    "department": np.random.choice(departments),
-                    "skills": researcher_skills,
-                    "interests": researcher_interests,
-                    "publications": researcher_keywords
+                formatted_users.append({
+                    "id": str(u.get("id")),
+                    "name": u.get("fullName") or "",
+                    "department": u.get("department") or ""
                 })
                 
-            researchers_df = pd.DataFrame(data)
+            users_df = pd.DataFrame(formatted_users) if formatted_users else pd.DataFrame(columns=["id", "name", "department"])
             
-            # mock collaborations for now
-            interactions = []
-            if not researchers_df.empty:
-                researcher_ids = researchers_df["id"].tolist()
-                for _ in range(100):
-                    if len(researcher_ids) >= 2:
-                        u1, u2 = np.random.choice(researcher_ids, size=2, replace=False)
-                        interactions.append({"user_id": str(u1), "collaborator_id": str(u2), "score": float(np.random.uniform(0.5, 1.0))})
-            collaborations_df = pd.DataFrame(interactions) if interactions else pd.DataFrame(columns=["user_id", "collaborator_id", "score"])
+            # Format proposals: Group members by proposal
+            # Create a mapping of proposal_id -> list of user_ids (including creator)
+            proposal_users_map = {}
+            for p in proposals:
+                pid = p.get("id")
+                creator = p.get("createdBy")
+                proposal_users_map[pid] = [creator] if creator else []
+                
+            for m in members:
+                pid = m.get("proposalId")
+                uid = m.get("userId")
+                if pid in proposal_users_map:
+                    if uid not in proposal_users_map[pid]:
+                        proposal_users_map[pid].append(uid)
+                else:
+                    proposal_users_map[pid] = [uid]
+                    
+            formatted_proposals = []
+            for p in proposals:
+                pid = p.get("id")
+                formatted_proposals.append({
+                    "id": pid,
+                    "title": p.get("title") or "",
+                    "abstract": p.get("abstract") or "",
+                    "research_area": p.get("researchArea") or "",
+                    "department": p.get("department") or "",
+                    "user_ids": proposal_users_map.get(pid, [])
+                })
+                
+            proposals_df = pd.DataFrame(formatted_proposals) if formatted_proposals else pd.DataFrame(columns=["id", "title", "abstract", "research_area", "department", "user_ids"])
             
-            print(f"Loaded {len(researchers_df)} researchers from DB.")
-            return researchers_df, collaborations_df
+            # Format collaborations: members who worked on the same proposal
+            collaborations = []
+            for pid, uids in proposal_users_map.items():
+                # Make sure we only pair unique IDs
+                unique_uids = list(set(uids))
+                for i in range(len(unique_uids)):
+                    for j in range(i + 1, len(unique_uids)):
+                        collaborations.append({
+                            "user_id": unique_uids[i],
+                            "collaborator_id": unique_uids[j],
+                            "score": 1.0
+                        })
+                        
+            collaborations_df = pd.DataFrame(collaborations) if collaborations else pd.DataFrame(columns=["user_id", "collaborator_id", "score"])
+            
+            print(f"✅ Loaded {len(users_df)} users, {len(proposals_df)} historical proposals, and {len(collaborations_df)} collaborations.")
+            return users_df, proposals_df, collaborations_df
             
         except Exception as e:
-            print(f"Failed to load real DB data: {e}. Falling back to mock.")
-            return self.load_mock_data()
+            print(f"Failed to load real DB data: {e}. Falling back to empty dataframes.")
+            return pd.DataFrame(columns=["id", "name", "department"]), pd.DataFrame(columns=["id", "title", "abstract", "research_area", "department", "user_ids"]), pd.DataFrame(columns=["user_id", "collaborator_id", "score"])
+

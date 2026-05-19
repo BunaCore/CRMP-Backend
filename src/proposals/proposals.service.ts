@@ -148,19 +148,22 @@ export class ProposalsService {
         allMembers as Array<{ userId: string; role: ProposalMemberRole }>,
       );
 
-      // 2.3 Attach uploaded fileId to proposal (TEMP -> ATTACHED)
-      await this.filesService.attachFile(
-        dto.fileId,
-        'PROPOSAL',
-        created.id,
-        'PRIMARY_DOCUMENT',
-      );
+      // 2.3 Attach uploaded fileId to proposal (TEMP -> ATTACHED) if provided
+      if (dto.fileId) {
+        await this.filesService.attachFile(
+          dto.fileId,
+          'PROPOSAL',
+          created.id,
+          'PRIMARY_DOCUMENT',
+          tx,
+        );
+      }
 
       // 2.4 Create version snapshot (references common/files.id)
       await this.repository.createProposalVersion(tx, {
         proposalId: created.id,
         createdBy: user.id,
-        fileId: dto.fileId,
+        fileId: dto.fileId || null,
         collaborators: dto.collaborators,
       });
 

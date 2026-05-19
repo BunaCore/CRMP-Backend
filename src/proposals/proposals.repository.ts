@@ -215,7 +215,7 @@ export class ProposalsRepository {
     data: {
       proposalId: string;
       createdBy: string;
-      fileId: string;
+      fileId?: string | null;
       collaborators?: string[];
     },
   ) {

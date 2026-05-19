@@ -16,6 +16,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include the router both with and without /api prefix to support both NestJS proxy calls and direct frontend calls flawlessly
+app.include_router(router, prefix="/api")
 app.include_router(router)
 
 if __name__ == "__main__":

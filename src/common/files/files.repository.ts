@@ -21,8 +21,9 @@ export class FilesRepository {
   /**
    * Fetch file by ID
    */
-  async findById(fileId: string): Promise<File | null> {
-    const file = await this.drizzle.db
+  async findById(fileId: string, tx?: any): Promise<File | null> {
+    const db = tx ?? this.drizzle.db;
+    const file = await db
       .select()
       .from(files)
       .where(eq(files.id, fileId))
@@ -51,8 +52,10 @@ export class FilesRepository {
     resourceType: string,
     resourceId: string,
     purpose?: string | null,
+    tx?: any,
   ): Promise<void> {
-    await this.drizzle.db
+    const db = tx ?? this.drizzle.db;
+    await db
       .update(files)
       .set({
         resourceType,

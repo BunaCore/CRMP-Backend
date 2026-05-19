@@ -12,10 +12,10 @@ class HybridRecommender:
         self.collaborative_model = CollaborativeRecommender()
         self.researchers_df = None
 
-    def fit(self, researchers_df, collaborations_df):
+    def fit(self, researchers_df, proposals_df, collaborations_df):
         """Fits both models."""
         self.researchers_df = researchers_df
-        self.content_model.fit(researchers_df)
+        self.content_model.fit(researchers_df, proposals_df, collaborations_df)
         self.collaborative_model.fit(collaborations_df)
 
     def get_recommendations(self, researcher_id: int, top_k: int = 5) -> List[Dict]:
@@ -65,4 +65,12 @@ class HybridRecommender:
                 "score": round(float(score), 4)
             })
             
+        # Sort by final score
+        results = sorted(results, key=lambda x: x['score'], reverse=True)
         return results
+            
+    def recommend_members(self, proposal_data: dict, top_k: int = 5) -> List[Dict]:
+        """
+        Delegates to content_model for weighted member recommendation.
+        """
+        return self.content_model.recommend_members(proposal_data, top_k)

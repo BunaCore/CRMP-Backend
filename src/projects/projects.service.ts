@@ -28,6 +28,8 @@ import {
   AuditAction,
   AuditActionValue,
 } from 'src/audit-logs/types/audit-action.enum';
+import { MlService } from 'src/ml/ml.service';
+import { TiptapRenderer } from 'src/documents/tiptap-renderer.service';
 
 @Injectable()
 export class ProjectsService {
@@ -46,6 +48,8 @@ export class ProjectsService {
     private readonly filesService: FilesService,
     private readonly mailService: MailService,
     private readonly auditLogsService: AuditLogsService,
+    private readonly mlService: MlService,
+    private readonly tiptapRenderer: TiptapRenderer,
   ) {}
 
   async getProjectsForUser(userId: string) {
@@ -545,5 +549,116 @@ export class ProjectsService {
         throw new BadRequestException('Invalid uploaded file payload');
       }
     }
+  }
+
+  async getRelatedProjects(projectId: string, query?: string) {
+    if (query && query.trim().length > 0) {
+      return this.mlService.searchProjects(query);
+    }
+
+    const project = await this.repository.findProjectById(projectId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const metadata = {
+      id: project.projectId,
+      title: project.projectTitle,
+      abstract: project.projectDescription || '',
+      researchArea: project.researchArea || '',
+    };
+
+    return this.mlService.recommendProjects(metadata);
+  }
+
+  async downloadProjectPdf(projectId: string) {
+    const project = await this.getProjectById(projectId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    // Build a beautiful TipTap JSON document representing the project details
+    const docNode: any = {
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [{ type: 'text', text: project.projectTitle }],
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Project Details' }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Research Area: ', marks: [{ type: 'bold' }] },
+            { type: 'text', text: project.researchArea || 'N/A' },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Stage: ', marks: [{ type: 'bold' }] },
+            { type: 'text', text: project.projectStage },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Department: ', marks: [{ type: 'bold' }] },
+            { type: 'text', text: project.department || 'N/A' },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Duration: ', marks: [{ type: 'bold' }] },
+            { type: 'text', text: `${project.durationMonths} Months` },
+          ],
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Abstract' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: project.projectDescription || 'No abstract description provided.' }],
+        },
+      ],
+    };
+
+    // If there are members, add them
+    if (project.members && project.members.length > 0) {
+      docNode.content.push({
+        type: 'heading',
+        attrs: { level: 2 },
+        content: [{ type: 'text', text: 'Team Members' }],
+      });
+
+      const membersList = {
+        type: 'bulletList',
+        content: project.members.map((m) => ({
+          type: 'listItem',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: `${m.fullName} `, marks: [{ type: 'bold' }] },
+                { type: 'text', text: `(${m.role}) - ${m.email}` },
+              ],
+            },
+          ],
+        })),
+      };
+      docNode.content.push(membersList);
+    }
+
+    const buffer = await this.tiptapRenderer.renderToPdf(docNode as any, project.projectTitle);
+    const safeName = project.projectTitle.replace(/[^a-zA-Z0-9_\- ]/g, '').trim() || 'project';
+    return { buffer, filename: `${safeName}_Proposal.pdf` };
   }
 }

@@ -27,6 +27,7 @@ import { BudgetModule } from './budget/budget.module';
 import { EvaluationsModule } from './evaluations/evaluations.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
+import { MlModule } from './ml/ml.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -55,6 +56,7 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
     BudgetModule,
     EvaluationsModule,
     AuditLogsModule,
+    MlModule,
   ],
   controllers: [AppController],
   providers: [AppService],

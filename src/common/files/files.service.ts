@@ -239,8 +239,9 @@ export class FilesService {
     resourceType: string,
     resourceId: string,
     purpose?: string,
+    tx?: any,
   ): Promise<void> {
-    const dbFile = await this.filesRepository.findById(fileId);
+    const dbFile = await this.filesRepository.findById(fileId, tx);
     if (!dbFile) {
       throw new NotFoundException(`File ${fileId} not found`);
     }
@@ -258,6 +259,7 @@ export class FilesService {
       resourceType,
       resourceId,
       purpose || null,
+      tx,
     );
 
     void this.logAudit({
