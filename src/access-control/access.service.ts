@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { Permission } from './permission.enum';
 import { Role } from './role.enum';
@@ -10,6 +11,11 @@ import { DrizzleService } from 'src/db/db.service';
 import { AccessRepository } from './access.repository';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
+import {
+  AuditAction,
+  AuditActionValue,
+} from 'src/audit-logs/types/audit-action.enum';
 
 /**
  * User interface for authorization context
@@ -38,28 +44,45 @@ export interface AccessContext {
 
 @Injectable()
 export class AccessService {
+  private readonly logger = new Logger(AccessService.name);
+
   constructor(
     private readonly drizzle: DrizzleService,
     private readonly accessRepository: AccessRepository,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async listRoles() {
     return this.accessRepository.findRoles();
   }
 
-  async createRole(dto: CreateRoleDto) {
+  async createRole(dto: CreateRoleDto, actorUserId?: string) {
     const existing = await this.accessRepository.findRoleByName(dto.name);
     if (existing) {
       throw new ConflictException(`Role name "${dto.name}" already exists`);
     }
 
-    return this.accessRepository.createRole({
+    const created = await this.accessRepository.createRole({
       name: dto.name,
       description: dto.description,
     });
+
+    void this.logAudit({
+      actorUserId,
+      action: AuditAction.CREATED,
+      entityType: 'roles',
+      entityId: created.id,
+      metadata: {
+        operation: 'CREATE_ROLE',
+        name: created.name,
+        description: created.description,
+      },
+    });
+
+    return created;
   }
 
-  async updateRole(roleId: string, dto: UpdateRoleDto) {
+  async updateRole(roleId: string, dto: UpdateRoleDto, actorUserId?: string) {
     const current = await this.accessRepository.findRoleById(roleId);
     if (!current) {
       throw new NotFoundException(`Role "${roleId}" not found`);
@@ -77,16 +100,38 @@ export class AccessService {
       throw new NotFoundException(`Role "${roleId}" not found`);
     }
 
+    void this.logAudit({
+      actorUserId,
+      action: AuditAction.UPDATED,
+      entityType: 'roles',
+      entityId: roleId,
+      metadata: {
+        operation: 'UPDATE_ROLE',
+        name: dto.name ?? null,
+        description: dto.description ?? null,
+      },
+    });
+
     return updated;
   }
 
-  async deleteRole(roleId: string) {
+  async deleteRole(roleId: string, actorUserId?: string) {
     const exists = await this.accessRepository.findRoleById(roleId);
     if (!exists) {
       throw new NotFoundException(`Role "${roleId}" not found`);
     }
 
     const deleted = await this.accessRepository.deleteRole(roleId);
+    void this.logAudit({
+      actorUserId,
+      action: AuditAction.DELETED,
+      entityType: 'roles',
+      entityId: roleId,
+      metadata: {
+        operation: 'DELETE_ROLE',
+      },
+    });
+
     return { success: deleted };
   }
 
@@ -107,7 +152,11 @@ export class AccessService {
     };
   }
 
-  async replaceRolePermissions(roleId: string, permissionIds: string[]) {
+  async replaceRolePermissions(
+    roleId: string,
+    permissionIds: string[],
+    actorUserId?: string,
+  ) {
     const role = await this.accessRepository.findRoleById(roleId);
     if (!role) {
       throw new NotFoundException(`Role "${roleId}" not found`);
@@ -133,6 +182,18 @@ export class AccessService {
 
     const updated = await this.accessRepository.findRolePermissions(roleId);
 
+    void this.logAudit({
+      actorUserId,
+      action: AuditAction.PERMISSION_CHANGED,
+      entityType: 'role_permissions',
+      entityId: roleId,
+      metadata: {
+        operation: 'REPLACE_ROLE_PERMISSIONS',
+        permissionIds,
+        ignoredPermissionIds: invalidPermissionIds,
+      },
+    });
+
     return {
       role,
       permissions: updated,
@@ -142,6 +203,22 @@ export class AccessService {
           ? 'Some permissionIds were ignored because they do not exist'
           : undefined,
     };
+  }
+
+  private async logAudit(input: {
+    actorUserId?: string | null;
+    action: AuditActionValue;
+    entityType: string;
+    entityId?: string | null;
+    metadata?: Record<string, any> | null;
+  }) {
+    try {
+      await this.auditLogsService.record(input);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record audit log for ${input.entityType}/${input.entityId ?? 'n/a'}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**

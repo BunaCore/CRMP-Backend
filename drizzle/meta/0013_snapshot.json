@@ -1,6 +1,6 @@
 {
-  "id": "930f4b44-b8d6-421e-841c-9ab264d80edc",
-  "prevId": "0cca865f-a018-4a5c-a763-64e8c745c77d",
+  "id": "44a73ce7-cb35-47bd-bf60-bb2610d0a498",
+  "prevId": "f51754dc-f44d-4199-8463-66de45ce2089",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1302,16 +1302,6 @@
           "primaryKey": false,
           "notNull": true
         },
-<<<<<<< HEAD
-        "is_individual": {
-          "name": "is_individual",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
-        },
-=======
->>>>>>> origin/main
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1673,6 +1663,12 @@
           "primaryKey": false,
           "notNull": false,
           "default": false
+        },
+        "supporting_document_file_id": {
+          "name": "supporting_document_file_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "account_status": {
           "name": "account_status",
@@ -4451,11 +4447,16 @@
       "schema": "public",
       "values": [
         "CREATED",
+        "UPDATED",
+        "DELETED",
         "STATUS_CHANGED",
+        "PERMISSION_CHANGED",
+        "ASSIGNED",
         "DECISION_MADE",
         "BUDGET_RELEASED",
         "WORKSPACE_UNLOCKED",
-        "EVALUATOR_ASSIGNED"
+        "EVALUATOR_ASSIGNED",
+        "OTHER"
       ]
     },
     "public.notification_type": {

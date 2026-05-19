@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DrizzleService } from 'src/db/db.service';
 import * as schema from 'src/db/schema';
 import { and, eq, ilike, or } from 'drizzle-orm';
+import { AuditAction } from 'src/audit-logs/types/audit-action.enum';
 
 @Injectable()
 export class PgRepository {
@@ -346,7 +347,7 @@ export class PgRepository {
   }) {
     await this.drizzle.db.insert(schema.auditLogs).values({
       actorUserId: data.actorUserId,
-      action: 'DECISION_MADE',
+      action: AuditAction.DECISION_MADE,
       entityType: 'proposal_approvals',
       entityId: data.entityId,
       metadata: data.metadata,

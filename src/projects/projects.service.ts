@@ -23,6 +23,11 @@ import { DrizzleService } from 'src/db/db.service';
 import { FilesService } from 'src/common/files/files.service';
 import { MailService } from 'src/mail/mail.service';
 import { EmailType } from 'src/mail/dto/email-type.enum';
+import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
+import {
+  AuditAction,
+  AuditActionValue,
+} from 'src/audit-logs/types/audit-action.enum';
 
 @Injectable()
 export class ProjectsService {
@@ -40,6 +45,7 @@ export class ProjectsService {
     private readonly drizzle: DrizzleService,
     private readonly filesService: FilesService,
     private readonly mailService: MailService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async getProjectsForUser(userId: string) {
@@ -148,6 +154,18 @@ export class ProjectsService {
       isPublic: true,
       publicFileUrl: dto.publicFileUrl,
       bannerUrl: dto.bannerUrl,
+    });
+
+    void this.logAudit({
+      actorUserId: userId,
+      action: AuditAction.STATUS_CHANGED,
+      entityType: 'projects',
+      entityId: projectId,
+      metadata: {
+        operation: 'PUBLISH_PROJECT',
+        publicFileUrl: dto.publicFileUrl,
+        bannerUrl: dto.bannerUrl ?? null,
+      },
     });
 
     // Return published project details
@@ -271,6 +289,17 @@ export class ProjectsService {
     // Update visibility
     await this.repository.updateProjectVisibility(projectId, dto.isPublic);
 
+    void this.logAudit({
+      actorUserId: userId,
+      action: AuditAction.STATUS_CHANGED,
+      entityType: 'projects',
+      entityId: projectId,
+      metadata: {
+        operation: 'UPDATE_PROJECT_VISIBILITY',
+        isPublic: dto.isPublic,
+      },
+    });
+
     return { isPublic: dto.isPublic };
   }
 
@@ -297,6 +326,18 @@ export class ProjectsService {
     await this.repository.updateProjectAssets(projectId, {
       bannerUrl: bannerUrl ?? undefined,
       publicFileUrl: publicFileUrl ?? undefined,
+    });
+
+    void this.logAudit({
+      actorUserId: userId,
+      action: AuditAction.UPDATED,
+      entityType: 'projects',
+      entityId: projectId,
+      metadata: {
+        operation: 'UPDATE_PROJECT_ASSETS',
+        bannerUrl,
+        publicFileUrl,
+      },
     });
 
     return { bannerUrl, publicFileUrl };
@@ -340,6 +381,18 @@ export class ProjectsService {
       bannerUrl: result.url,
     });
 
+    void this.logAudit({
+      actorUserId: userId,
+      action: AuditAction.CREATED,
+      entityType: 'files',
+      entityId: result.fileId,
+      metadata: {
+        operation: 'UPLOAD_PROJECT_BANNER',
+        projectId,
+        url: result.url,
+      },
+    });
+
     return result;
   }
 
@@ -379,6 +432,18 @@ export class ProjectsService {
     await this.repository.updateProjectAssets(projectId, {
       publicFileId: result.fileId,
       publicFileUrl: result.url,
+    });
+
+    void this.logAudit({
+      actorUserId: userId,
+      action: AuditAction.CREATED,
+      entityType: 'files',
+      entityId: result.fileId,
+      metadata: {
+        operation: 'UPLOAD_PROJECT_FILE',
+        projectId,
+        url: result.url,
+      },
     });
 
     return result;
@@ -448,6 +513,22 @@ export class ProjectsService {
         createdAt: defence.createdAt?.toISOString() ?? new Date().toISOString(),
       },
     };
+  }
+
+  private async logAudit(input: {
+    actorUserId?: string | null;
+    action: AuditActionValue;
+    entityType: string;
+    entityId?: string | null;
+    metadata?: Record<string, any> | null;
+  }) {
+    try {
+      await this.auditLogsService.record(input);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record audit log for ${input.entityType}/${input.entityId ?? 'n/a'}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   private ensureUploadFile(file: unknown): asserts file is {

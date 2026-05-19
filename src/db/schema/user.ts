@@ -26,6 +26,7 @@ export const users = pgTable('users', {
   universityId: text('university_id'),
   userProgram: userProgramEnum('user_program'),
   isExternal: boolean('is_external').default(false),
+  supportingDocumentFileId: uuid('supporting_document_file_id'),
   accountStatus: accountStatusEnum('account_status')
     .default('deactive')
     .notNull(),

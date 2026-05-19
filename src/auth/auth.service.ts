@@ -19,6 +19,11 @@ import { UserWithPermissions } from 'src/types/user-with-permissions';
 import { User } from 'src/users/types/user';
 import { MailProducer } from 'src/queues/mail/mail.producer';
 import { Permission } from 'src/access-control/permission.enum';
+import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
+import {
+  AuditAction,
+  AuditActionValue,
+} from 'src/audit-logs/types/audit-action.enum';
 
 import * as bcrypt from 'bcrypt';
 import { DB } from 'src/db/db.type';
@@ -37,6 +42,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private mailProducer: MailProducer,
+    private auditLogsService: AuditLogsService,
   ) {}
 
   /**
@@ -63,6 +69,13 @@ export class AuthService {
       }
     }
 
+    // External registration requires a supporting document
+    if (dto.isExternal && !dto.supportingDocumentFileId) {
+      throw new BadRequestException(
+        'supportingDocumentFileId is required when registering an external user',
+      );
+    }
+
     // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
@@ -86,6 +99,8 @@ export class AuthService {
             university: dto.university,
             universityId: dto.universityId,
             userProgram: dto.userProgram,
+            isExternal: dto.isExternal ?? false,
+            supportingDocumentFileId: dto.supportingDocumentFileId,
             accountStatus: 'deactive',
           },
           tx,
@@ -122,6 +137,18 @@ export class AuthService {
           `Failed to queue welcome email for ${user.email}: ${message}`,
         );
       });
+
+    void this.logAudit({
+      actorUserId: user.id,
+      action: AuditAction.CREATED,
+      entityType: 'users',
+      entityId: user.id,
+      metadata: {
+        operation: 'REGISTER',
+        email: user.email,
+        isExternal: dto.isExternal ?? false,
+      },
+    });
 
     return this.buildAuthResponse(user, tokens);
   }
@@ -217,6 +244,18 @@ export class AuthService {
         return { user: createdUser, tokens: generatedTokens };
       },
     );
+
+    void this.logAudit({
+      actorUserId: user.id,
+      action: AuditAction.CREATED,
+      entityType: 'users',
+      entityId: user.id,
+      metadata: {
+        operation: 'ACCEPT_INVITATION',
+        email: invitation.email,
+        roleId: invitation.roleId,
+      },
+    });
 
     return this.buildAuthResponse(user, tokens);
   }
@@ -410,5 +449,21 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  private async logAudit(input: {
+    actorUserId?: string | null;
+    action: AuditActionValue;
+    entityType: string;
+    entityId?: string | null;
+    metadata?: Record<string, any> | null;
+  }) {
+    try {
+      await this.auditLogsService.record(input);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record audit log for ${input.entityType}/${input.entityId ?? 'n/a'}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 }

@@ -16,6 +16,7 @@ import {
 import { evaluationRubrics, evaluationScores } from 'src/db/schema/evaluation';
 import { DB } from 'src/db/db.type';
 import { ProposalMemberRole } from './dto/proposal-member.dto';
+import { AuditActionValue } from 'src/audit-logs/types/audit-action.enum';
 import {
   ProposalRow,
   BudgetRow,
@@ -330,13 +331,7 @@ export class ProposalsRepository {
     tx: DB,
     data: {
       actorUserId: string;
-      action:
-        | 'CREATED'
-        | 'STATUS_CHANGED'
-        | 'DECISION_MADE'
-        | 'BUDGET_RELEASED'
-        | 'WORKSPACE_UNLOCKED'
-        | 'EVALUATOR_ASSIGNED';
+      action: AuditActionValue;
       entityType: string;
       entityId: string;
       metadata: any;

@@ -24,11 +24,16 @@ export const notificationTypeEnum = pgEnum('notification_type', [
 ]);
 export const auditActionEnum = pgEnum('audit_action', [
   'CREATED',
+  'UPDATED',
+  'DELETED',
   'STATUS_CHANGED',
+  'PERMISSION_CHANGED',
+  'ASSIGNED',
   'DECISION_MADE',
   'BUDGET_RELEASED',
   'WORKSPACE_UNLOCKED',
   'EVALUATOR_ASSIGNED',
+  'OTHER',
 ]);
 
 export const notifications = pgTable('notifications', {

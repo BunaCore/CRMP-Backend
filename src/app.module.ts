@@ -25,6 +25,7 @@ import { AiModule } from './ai/ai.module';
 import { TasksModule } from './tasks/tasks.module';
 import { BudgetModule } from './budget/budget.module';
 import { EvaluationsModule } from './evaluations/evaluations.module';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { EvaluationsModule } from './evaluations/evaluations.module';
     TasksModule,
     BudgetModule,
     EvaluationsModule,
+    AuditLogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

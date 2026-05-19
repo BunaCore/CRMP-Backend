@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "supporting_document_file_id" uuid;

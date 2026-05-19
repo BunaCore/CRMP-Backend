@@ -15,6 +15,9 @@ import {
   type AuthenticatedUser,
 } from 'src/auth/decorators/current-user.decorator';
 import { InitiateUploadDto } from './dto/initiate-upload.dto';
+import { GuestPresignDto } from './dto/guest-presign.dto';
+import { RateLimit } from 'src/common/guards/rate-limit.decorator';
+import { RateLimitGuard } from 'src/common/guards/rate-limit.guard';
 
 /**
  * FilesController - Global file upload/download endpoints
@@ -23,7 +26,6 @@ import { InitiateUploadDto } from './dto/initiate-upload.dto';
  * - GET /files/:id - Return access URL by file ID
  */
 @Controller('files')
-@UseGuards(JwtAuthGuard)
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
@@ -42,6 +44,7 @@ export class FilesController {
    * File is stored in TEMP status until attached to a resource
    */
   @Post('upload')
+  @UseGuards(JwtAuthGuard)
   async uploadFile(
     @Body() dto: InitiateUploadDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -50,10 +53,29 @@ export class FilesController {
   }
 
   /**
+   * Guest presign endpoint - unauthenticated.
+   * Returns a TEMP file record and a short-lived presigned PUT URL.
+   */
+  @Post('guest-presign')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ points: 5, windowSeconds: 60 })
+  async guestPresign(@Body() dto: GuestPresignDto) {
+    // Basic MIME/size checks could be added here. Captcha verification
+    // should be performed by wiring a verification service.
+    return this.filesService.initiateGuestUpload({
+      originalName: dto.originalName,
+      mimeType: dto.mimeType,
+      size: dto.size,
+      resourceType: dto.resourceType,
+    });
+  }
+
+  /**
    * GET /files/:id
    * Return signed URL for private files or direct URL for public files
    */
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
   async getFileUrl(@Param('id', new ParseUUIDPipe()) fileId: string) {
     const fileData = await this.filesService.getFileById(fileId);
     if (!fileData) {

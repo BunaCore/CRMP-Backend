@@ -13,6 +13,12 @@ export const RolePermissions: Record<Role, Permission[]> = {
     // ✅ PI capability
     Permission.PROPOSAL_ADD_MEMBER,
 
+    // ✅ Project capabilities
+    Permission.PROJECT_CREATE,
+    Permission.PROJECT_READ,
+    Permission.PROJECT_UPDATE,
+    Permission.PROJECT_DELETE,
+
     // ✅ Budget capabilities
     Permission.BUDGET_VIEW,
     Permission.BUDGET_MANAGE,
@@ -28,6 +34,11 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
     Permission.EVALUATION_READ,
 
+    Permission.PROJECT_CREATE,
+    Permission.PROJECT_READ,
+    Permission.PROJECT_UPDATE,
+    Permission.PROJECT_DELETE,
+
     // ✅ Budget capabilities
     Permission.BUDGET_VIEW,
     Permission.BUDGET_MANAGE,
@@ -41,6 +52,12 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
     Permission.EVALUATION_READ,
 
+    // ✅ Project capabilities
+    Permission.PROJECT_READ,
+    Permission.PROJECT_CREATE,
+    Permission.PROJECT_UPDATE,
+    Permission.PROJECT_DELETE,
+
     Permission.ADMIN_VIEW,
   ],
 
@@ -49,6 +66,12 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
     Permission.EVALUATION_SUBMIT,
     Permission.EVALUATION_READ,
+
+    // ✅ Project capabilities
+    Permission.PROJECT_READ,
+    Permission.PROJECT_CREATE,
+    Permission.PROJECT_UPDATE,
+    Permission.PROJECT_DELETE,
 
     Permission.ADMIN_VIEW,
   ],
@@ -60,6 +83,7 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.PROPOSAL_UPDATE,
 
     Permission.PROPOSAL_ASSIGN_EVALUATOR, // ✅ key addition
+    Permission.PROPOSAL_ASSIGN_ADVISOR, // ✅ key addition
 
     Permission.PROPOSAL_APPROVE,
     Permission.PROPOSAL_REJECT,
@@ -71,6 +95,12 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
     Permission.DEFENCE_SCHEDULE, // ✅ Can schedule PI defences
 
+    // ✅ Project capabilities
+    Permission.PROJECT_CREATE,
+    Permission.PROJECT_READ,
+    Permission.PROJECT_UPDATE,
+    Permission.PROJECT_DELETE,
+
     Permission.USER_READ,
 
     Permission.ADMIN_VIEW,
@@ -79,6 +109,8 @@ export const RolePermissions: Record<Role, Permission[]> = {
   [Role.DGC_MEMBER]: [
     Permission.PROPOSAL_READ,
 
+    Permission.PROPOSAL_ASSIGN_ADVISOR, // ✅ key addition
+
     Permission.PROPOSAL_APPROVE,
     Permission.PROPOSAL_REJECT,
     Permission.PROPOSAL_REQUEST_REVISION,
@@ -86,6 +118,12 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.EVALUATION_READ,
 
     Permission.DEFENCE_SCHEDULE, // ✅ Can schedule PI defences
+
+    // ✅ Project capabilities
+    Permission.PROJECT_CREATE,
+    Permission.PROJECT_READ,
+    Permission.PROJECT_UPDATE,
+    Permission.PROJECT_DELETE,
 
     Permission.ADMIN_VIEW,
   ],
@@ -98,6 +136,12 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.PROPOSAL_APPROVE,
     Permission.PROPOSAL_REJECT,
 
+    // ✅ Project capabilities
+    Permission.PROJECT_CREATE,
+    Permission.PROJECT_READ,
+    Permission.PROJECT_UPDATE,
+    Permission.PROJECT_DELETE,
+
     Permission.REPORT_EXPORT,
 
     Permission.ADMIN_VIEW,
@@ -106,8 +150,16 @@ export const RolePermissions: Record<Role, Permission[]> = {
   [Role.PG_OFFICE]: [
     Permission.PROPOSAL_READ,
 
+    Permission.PROPOSAL_ASSIGN_ADVISOR, // ✅ key addition
+
     Permission.PROPOSAL_APPROVE,
     Permission.PROPOSAL_REJECT,
+
+    // ✅ Project capabilities
+    Permission.PROJECT_CREATE,
+    Permission.PROJECT_READ,
+    Permission.PROJECT_UPDATE,
+    Permission.PROJECT_DELETE,
 
     Permission.REPORT_EXPORT,
 
@@ -119,6 +171,7 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
     // ✅ RAD handles research/grants evaluator assignment
     Permission.PROPOSAL_ASSIGN_EVALUATOR,
+    Permission.PROPOSAL_ASSIGN_ADVISOR, // ✅ key addition
 
     Permission.PROPOSAL_APPROVE,
     Permission.PROPOSAL_REJECT,
@@ -127,6 +180,12 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.EVALUATION_READ,
 
     Permission.DEFENCE_SCHEDULE, // ✅ Can schedule PI defences
+
+    // ✅ Project capabilities
+    Permission.PROJECT_CREATE,
+    Permission.PROJECT_READ,
+    Permission.PROJECT_UPDATE,
+    Permission.PROJECT_DELETE,
 
     Permission.BUDGET_VIEW,
 
@@ -137,6 +196,12 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
   [Role.FINANCE]: [
     Permission.PROPOSAL_READ, // ⚠️ you may later scope this
+
+    // ✅ Project capabilities
+    Permission.PROJECT_CREATE,
+    Permission.PROJECT_READ,
+    Permission.PROJECT_UPDATE,
+    Permission.PROJECT_DELETE,
 
     Permission.BUDGET_VIEW,
     Permission.BUDGET_MANAGE,
@@ -154,6 +219,12 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.PROPOSAL_APPROVE,
     Permission.PROPOSAL_REJECT,
 
+    // ✅ Project capabilities
+    Permission.PROJECT_CREATE,
+    Permission.PROJECT_READ,
+    Permission.PROJECT_UPDATE,
+    Permission.PROJECT_DELETE,
+
     Permission.REPORT_EXPORT,
 
     Permission.ADMIN_VIEW,
@@ -164,6 +235,12 @@ export const RolePermissions: Record<Role, Permission[]> = {
 
     Permission.PROPOSAL_APPROVE,
     Permission.PROPOSAL_REJECT,
+
+    // ✅ Project capabilities
+    Permission.PROJECT_CREATE,
+    Permission.PROJECT_READ,
+    Permission.PROJECT_UPDATE,
+    Permission.PROJECT_DELETE,
 
     Permission.ADMIN_VIEW,
   ],
@@ -204,6 +281,9 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.PROPOSAL_READ,
     Permission.EVALUATION_SUBMIT,
     Permission.EVALUATION_READ,
+
+    // ✅ Project capabilities
+    Permission.PROJECT_READ,
 
     Permission.ADMIN_VIEW,
   ],
