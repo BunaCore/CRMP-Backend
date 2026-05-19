@@ -1302,7 +1302,6 @@
           "primaryKey": false,
           "notNull": true
         },
-<<<<<<< HEAD
         "is_individual": {
           "name": "is_individual",
           "type": "boolean",
@@ -1310,8 +1309,6 @@
           "notNull": false,
           "default": false
         },
-=======
->>>>>>> origin/main
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
