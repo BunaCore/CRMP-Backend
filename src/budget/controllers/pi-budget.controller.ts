@@ -39,10 +39,7 @@ export class PiBudgetController {
    * Returns full budget dashboard for one project.
    */
   @Get('project/:projectId/dashboard')
-  async getProjectDashboard(
-    @Req() req,
-    @Param('projectId') projectId: string,
-  ) {
+  async getProjectDashboard(@Req() req, @Param('projectId') projectId: string) {
     return this.piService.getProjectDashboard(projectId, req.user.id);
   }
 
@@ -89,6 +86,10 @@ export class PiBudgetController {
         'A clearance document file is required for resubmission.',
       );
     }
-    return this.piService.resubmitRequest(requestId, req.user.id, clearanceFile);
+    return this.piService.resubmitRequest(
+      requestId,
+      req.user.id,
+      clearanceFile,
+    );
   }
 }

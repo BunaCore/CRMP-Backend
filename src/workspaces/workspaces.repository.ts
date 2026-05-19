@@ -50,8 +50,14 @@ export class WorkspacesRepository {
     return document;
   }
 
-  async createInitialVersion(documentId: string, content: any, createdBy: string) {
-    const contentHash = createHash('sha256').update(JSON.stringify(content)).digest('hex');
+  async createInitialVersion(
+    documentId: string,
+    content: any,
+    createdBy: string,
+  ) {
+    const contentHash = createHash('sha256')
+      .update(JSON.stringify(content))
+      .digest('hex');
     const [version] = await this.drizzle.db
       .insert(schema.documentVersions)
       .values({
@@ -66,7 +72,11 @@ export class WorkspacesRepository {
     return version;
   }
 
-  async updateDocumentWithVersion(documentId: string, content: any, versionId: string) {
+  async updateDocumentWithVersion(
+    documentId: string,
+    content: any,
+    versionId: string,
+  ) {
     const [document] = await this.drizzle.db
       .update(schema.documents)
       .set({ currentContent: content, currentVersionId: versionId })

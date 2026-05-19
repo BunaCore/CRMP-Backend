@@ -16,7 +16,10 @@ import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { SaveDocumentDto } from './dto/save-document.dto';
 import { ImportMarkdownDto } from './dto/import-markdown.dto';
 import { JwtAuthGuard } from 'src/auth/jwt.guard';
-import { CurrentUser, type AuthenticatedUser } from 'src/auth/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from 'src/auth/decorators/current-user.decorator';
 import { AccessService } from 'src/access-control/access.service';
 import { RequirePermission } from 'src/access-control/require-permission.decorator';
 import { WorkspaceManagerService } from './workspace-manager.service';
@@ -86,7 +89,11 @@ export class DocumentsController {
     @Param('versionId', ParseUUIDPipe) versionId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.documentsService.getVersionDetail(workspaceId, versionId, user.id);
+    return this.documentsService.getVersionDetail(
+      workspaceId,
+      versionId,
+      user.id,
+    );
   }
 
   @Post(':workspaceId/versions/:versionId/restore')
@@ -95,7 +102,11 @@ export class DocumentsController {
     @Param('versionId', ParseUUIDPipe) versionId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.documentsService.restoreVersion(workspaceId, versionId, user.id);
+    return this.documentsService.restoreVersion(
+      workspaceId,
+      versionId,
+      user.id,
+    );
   }
 
   // ─── Import ─────────────────────────────────────────────────────────
@@ -122,14 +133,13 @@ export class DocumentsController {
     @Query('download') download?: string,
     @Res() res?: Response,
   ) {
-    const { markdown, workspaceName } = await this.documentsService.exportMarkdown(
-      workspaceId,
-      user.id,
-    );
+    const { markdown, workspaceName } =
+      await this.documentsService.exportMarkdown(workspaceId, user.id);
 
     // ?download=true → send as .md file attachment
     if (download === 'true' && res) {
-      const safeName = workspaceName.replace(/[^a-zA-Z0-9_\- ]/g, '').trim() || 'document';
+      const safeName =
+        workspaceName.replace(/[^a-zA-Z0-9_\- ]/g, '').trim() || 'document';
       res.set({
         'Content-Type': 'text/markdown; charset=utf-8',
         'Content-Disposition': `attachment; filename="${safeName}.md"`,

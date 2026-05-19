@@ -1,4 +1,12 @@
-import { IsUUID, IsNumber, IsOptional, IsString, Min, ValidateNested, IsArray } from 'class-validator';
+import {
+  IsUUID,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+  IsArray,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class EvaluationScoreItemDto {

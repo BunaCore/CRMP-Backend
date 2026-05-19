@@ -308,13 +308,18 @@ export class CollaborationGateway
         decoding.readVarUint(dec); // consume outer messageType
         // Remaining payload is an awareness update (binary)
         const update = decoding.readVarUint8Array(dec);
-        awarenessProtocol.applyAwarenessUpdate(entry.awareness, update, client.id);
+        awarenessProtocol.applyAwarenessUpdate(
+          entry.awareness,
+          update,
+          client.id,
+        );
         client.to(room).emit('collab:yjs', buf);
       } else {
         client.emit('collab:error', { message: 'Unknown yjs message' });
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to process yjs message';
+      const msg =
+        err instanceof Error ? err.message : 'Failed to process yjs message';
       client.emit('collab:error', { message: msg });
     } finally {
       this.yjsDocs.release(workspaceId);
@@ -325,7 +330,11 @@ export class CollaborationGateway
   async onUpdate(
     @ConnectedSocket() client: Socket,
     @MessageBody()
-    payload: { workspaceId?: string; content?: unknown; clientUpdateId?: string },
+    payload: {
+      workspaceId?: string;
+      content?: unknown;
+      clientUpdateId?: string;
+    },
   ) {
     const data = client.data as CollabSocketData;
     const workspaceId = payload?.workspaceId;
@@ -481,4 +490,3 @@ export class CollaborationGateway
     return next.length <= this.rateMaxUpdatesPerWindow;
   }
 }
-

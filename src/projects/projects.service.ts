@@ -17,9 +17,12 @@ import {
   combineWithAnd,
 } from './conditions/project.condition';
 import { buildPaginationMeta } from 'src/common/pagination/utils/build-pagination-meta';
-import { sql } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
+import * as schema from 'src/db/schema';
 import { DrizzleService } from 'src/db/db.service';
 import { FilesService } from 'src/common/files/files.service';
+import { MailService } from 'src/mail/mail.service';
+import { EmailType } from 'src/mail/dto/email-type.enum';
 import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
 import {
   AuditAction,
@@ -37,15 +40,34 @@ export class ProjectsService {
   ] as const;
 
   constructor(
-    private readonly repository: ProjectsRepository,
+    readonly repository: ProjectsRepository,
     private readonly abilityFactory: AbilityFactory,
     private readonly drizzle: DrizzleService,
     private readonly filesService: FilesService,
+    private readonly mailService: MailService,
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async getProjectsForUser(userId: string) {
-    return this.repository.findProjectsByUserId(userId);
+    const projects = await this.repository.findProjectsByUserId(userId);
+    if (projects.length === 0) return [];
+
+    // Bulk-fetch all defence schedules for these projects in one query
+    const projectIds = projects.map((p) => p.projectId);
+    const defencesMap =
+      await this.repository.getProjectDefencesByProjectIds(projectIds);
+
+    return projects.map((p) => ({
+      ...p,
+      defenceSchedules: (defencesMap.get(p.projectId) ?? []).map((d) => ({
+        id: d.id,
+        defenceDate: d.defenceDate?.toISOString(),
+        location: d.location,
+        note: d.note ?? null,
+        scheduledBy: d.scheduledBy ?? null,
+        createdAt: d.createdAt?.toISOString() ?? new Date().toISOString(),
+      })),
+    }));
   }
 
   async getProjectById(projectId: string) {
@@ -57,12 +79,23 @@ export class ProjectsService {
       throw new NotFoundException('Project not found');
     }
 
-    const budget = await this.repository.getProjectBudgetByProjectId(projectId);
+    const [budget, defenceSchedules] = await Promise.all([
+      this.repository.getProjectBudgetByProjectId(projectId),
+      this.repository.getProjectDefencesByProjectId(projectId),
+    ]);
 
     return {
       ...project,
       members,
       budget,
+      defenceSchedules: defenceSchedules.map((d) => ({
+        id: d.id,
+        defenceDate: d.defenceDate?.toISOString(),
+        location: d.location,
+        note: d.note ?? null,
+        scheduledBy: d.scheduledBy ?? null,
+        createdAt: d.createdAt?.toISOString() ?? new Date().toISOString(),
+      })),
     };
   }
 
@@ -71,6 +104,28 @@ export class ProjectsService {
     projectId: string,
   ): Promise<boolean> {
     return this.repository.isUserMemberOfProject(userId, projectId);
+  }
+
+  async canReadProject(userId: string, projectId: string): Promise<boolean> {
+    const isMember = await this.isUserMemberOfProject(userId, projectId);
+    if (isMember) return true;
+
+    // Check CASL ability — admin/coordinator/evaluator roles have ADMIN_VIEW
+    // which grants 'access' on 'AdminDashboard'. We use this as a proxy
+    // since PROJECT_READ is not always assigned to admin roles.
+    const ability = await this.abilityFactory.createAbility(userId);
+    const hasAdminAccess = ability.rules.some(
+      (r) =>
+        !r.inverted &&
+        // Explicitly granted project read
+        ((r.action === 'read' &&
+          (r.subject === 'Project' || r.subject === 'all')) ||
+          // Admin dashboard access — coordinators, evaluators, DGC, etc.
+          (r.action === 'access' && r.subject === 'AdminDashboard') ||
+          // Evaluation read — evaluators assigned to the project
+          (r.action === 'read' && r.subject === 'Evaluation')),
+    );
+    return hasAdminAccess;
   }
 
   async getProjectMembers(projectId: string) {
@@ -392,6 +447,72 @@ export class ProjectsService {
     });
 
     return result;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Project Defence Scheduling
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Schedule a defence for a project (project phase).
+   * Multiple defences per project are allowed (rescheduling).
+   */
+  async scheduleProjectDefence(
+    projectId: string,
+    scheduledBy: string,
+    dto: { defenceDate: string; location: string; note?: string },
+  ) {
+    const project = await this.repository.findProjectById(projectId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const defence = await this.repository.createProjectDefence({
+      projectId,
+      scheduledBy,
+      defenceDate: new Date(dto.defenceDate),
+      location: dto.location,
+      note: dto.note,
+    });
+
+    // Automatically update project stage to 'Under Review'
+    await this.drizzle.db
+      .update(schema.projects)
+      .set({ projectStage: 'Under Review' })
+      .where(eq(schema.projects.projectId, projectId));
+
+    // Send email to all project members
+    const members = await this.repository.getProjectMembers(projectId);
+    for (const member of members) {
+      if (member.email) {
+        this.mailService
+          .sendEmail(EmailType.DEFENSE_SCHEDULED, member.email, {
+            recipientName: member.fullName || 'Member',
+            proposalTitle: project.projectTitle, // The template calls it proposalTitle
+            defenseDate: defence.defenceDate.toLocaleDateString(),
+            defenseTime: defence.defenceDate.toLocaleTimeString(),
+          })
+          .catch((err) =>
+            this.logger.error(
+              `Failed to send email to ${member.email}: ${err.message}`,
+            ),
+          );
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Project defence scheduled successfully',
+      defence: {
+        id: defence.id,
+        projectId: defence.projectId,
+        defenceDate: defence.defenceDate?.toISOString(),
+        location: defence.location,
+        note: defence.note ?? null,
+        scheduledBy: defence.scheduledBy ?? null,
+        createdAt: defence.createdAt?.toISOString() ?? new Date().toISOString(),
+      },
+    };
   }
 
   private async logAudit(input: {

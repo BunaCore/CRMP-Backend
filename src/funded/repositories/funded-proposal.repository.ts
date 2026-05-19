@@ -228,7 +228,9 @@ export class FundedProposalRepository {
         const lineItems = await tx
           .select()
           .from(schema.budgetRequestItems)
-          .where(eq(schema.budgetRequestItems.budgetRequestId, budgetReqs[0].id));
+          .where(
+            eq(schema.budgetRequestItems.budgetRequestId, budgetReqs[0].id),
+          );
 
         if (lineItems.length > 0) {
           const seedValues = lineItems.map((item) => ({

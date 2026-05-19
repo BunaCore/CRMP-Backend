@@ -67,7 +67,9 @@ describe('FilesService', () => {
       }),
     );
     expect(result.uploadUrl).toBe('https://signed-upload-url');
-    expect(result.publicUrl).toContain('https://cdn.example.com/public-bucket/');
+    expect(result.publicUrl).toContain(
+      'https://cdn.example.com/public-bucket/',
+    );
   });
 
   it('returns signed get url for private files', async () => {

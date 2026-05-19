@@ -1,6 +1,6 @@
 {
-  "id": "f51754dc-f44d-4199-8463-66de45ce2089",
-  "prevId": "b0a84c77-69df-4b0a-910d-cdfccdfd4562",
+  "id": "9df5ec16-a0b1-4d42-a939-dabbc08b5040",
+  "prevId": "930f4b44-b8d6-421e-841c-9ab264d80edc",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1302,6 +1302,16 @@
           "primaryKey": false,
           "notNull": true
         },
+<<<<<<< HEAD
+        "is_individual": {
+          "name": "is_individual",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+=======
+>>>>>>> origin/main
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1664,12 +1674,15 @@
           "notNull": false,
           "default": false
         },
+<<<<<<< HEAD
+=======
         "supporting_document_file_id": {
           "name": "supporting_document_file_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
+>>>>>>> origin/main
         "account_status": {
           "name": "account_status",
           "type": "account_status",
@@ -3474,6 +3487,93 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+<<<<<<< HEAD
+    "public.project_defences": {
+      "name": "project_defences",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scheduled_by": {
+          "name": "scheduled_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "defence_date": {
+          "name": "defence_date",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "location": {
+          "name": "location",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "project_defences_project_id_projects_project_id_fk": {
+          "name": "project_defences_project_id_projects_project_id_fk",
+          "tableFrom": "project_defences",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "project_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "project_defences_scheduled_by_users_id_fk": {
+          "name": "project_defences_scheduled_by_users_id_fk",
+          "tableFrom": "project_defences",
+          "tableTo": "users",
+          "columnsFrom": [
+            "scheduled_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+=======
+>>>>>>> origin/main
     "public.project_members": {
       "name": "project_members",
       "schema": "",

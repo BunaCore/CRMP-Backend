@@ -7,13 +7,13 @@ import { REQUEST_PROMPTS } from '../prompts/request.prompts';
 export class OutlineHandler {
   buildRequest(dto: AiRequestDto) {
     if (!dto.context || dto.context.trim() === '') {
-      throw new Error("Context is empty");
+      throw new Error('Context is empty');
     }
 
     return {
       systemPrompt: SYSTEM_PROMPTS.STRICT_ACTION,
       prompt: REQUEST_PROMPTS.OUTLINE(dto.context),
-      action: { type: 'none' as const, from: null, to: null }
+      action: { type: 'none' as const, from: null, to: null },
     };
   }
 }

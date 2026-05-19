@@ -6,6 +6,7 @@ import {
   timestamp,
   pgEnum,
   uniqueIndex,
+  boolean,
 } from 'drizzle-orm/pg-core';
 import { proposals } from './proposals';
 import { projects } from './project';
@@ -26,6 +27,7 @@ export const evaluationRubrics = pgTable('evaluation_rubrics', {
   phase: evaluationPhaseEnum('phase').default('PROPOSAL'),
   type: evaluationTypeEnum('type').default('continuous'),
   maxPoints: numeric('max_points', { precision: 5, scale: 2 }).notNull(),
+  isIndividual: boolean('is_individual').default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
@@ -65,8 +67,6 @@ export const evaluationScores = pgTable(
     };
   },
 );
-
-
 
 // Table 1: evaluation_rubrics (Your Rulebook) This table holds your static caps and limits. It separates criteria into PROPOSAL vs PROJECT phases.
 

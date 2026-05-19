@@ -24,6 +24,7 @@ export const disbursementStatusEnum = pgEnum('disbursement_status', [
   'RETURNED',
   'RESUBMITTED',
   'PAID',
+  'REJECTED',
 ]);
 
 // --- Table 1: project_budget_items ---
@@ -55,7 +56,9 @@ export const disbursementRequests = pgTable('disbursement_requests', {
   totalAmount: numeric('total_amount', { precision: 15, scale: 2 }).notNull(),
   status: disbursementStatusEnum('status').default('PENDING').notNull(),
   // Clearance doc (required for sequence > 1)
-  clearanceFileId: uuid('clearance_file_id').references(() => files.id),
+  clearanceFileId: uuid('clearance_file_id').references(() => files.id, {
+    onDelete: 'set null',
+  }),
   // Finance action fields
   bankTransactionId: varchar('bank_transaction_id', { length: 100 }),
   financeApprovedBy: uuid('finance_approved_by').references(() => users.id),

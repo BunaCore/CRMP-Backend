@@ -7,7 +7,7 @@ import { REQUEST_PROMPTS } from '../prompts/request.prompts';
 export class InsertHandler {
   buildRequest(dto: AiRequestDto) {
     if (!dto.context || dto.context.trim() === '') {
-      throw new Error("Context is empty");
+      throw new Error('Context is empty');
     }
 
     return {
@@ -17,7 +17,7 @@ export class InsertHandler {
         type: 'insert' as const,
         from: dto.from ?? null,
         to: dto.to ?? null,
-      }
+      },
     };
   }
 }

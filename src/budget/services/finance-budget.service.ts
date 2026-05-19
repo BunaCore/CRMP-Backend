@@ -25,7 +25,9 @@ export class FinanceBudgetService {
 
     for (const req of requests) {
       if (req.clearanceFileId) {
-        const fileAccess = await this.filesService.getFileById(req.clearanceFileId);
+        const fileAccess = await this.filesService.getFileById(
+          req.clearanceFileId,
+        );
         req.clearanceDocumentUrl = fileAccess?.url ?? null;
       }
       // Remove internal field from response
@@ -43,7 +45,9 @@ export class FinanceBudgetService {
     const detail = await this.repo.getDisbursementRequestDetail(requestId);
 
     if (detail.clearanceFileId) {
-      const fileAccess = await this.filesService.getFileById(detail.clearanceFileId);
+      const fileAccess = await this.filesService.getFileById(
+        detail.clearanceFileId,
+      );
       detail.clearanceDocumentUrl = fileAccess?.url ?? null;
     }
     delete detail.clearanceFileId;
@@ -88,11 +92,39 @@ export class FinanceBudgetService {
     feedback: string,
   ) {
     await this.repo.validateForFinanceAction(requestId);
-    await this.repo.returnDisbursementRequest(requestId, financeUserId, feedback);
+    await this.repo.returnDisbursementRequest(
+      requestId,
+      financeUserId,
+      feedback,
+    );
     return {
       requestId,
       status: 'RETURNED',
       message: 'Request returned to PI for correction.',
+    };
+  }
+
+  /**
+   * Permanently rejects a disbursement request.
+   * 1. Validates the request is actionable.
+   * 2. Transactionally updates request to REJECTED + reverts budget items to AVAILABLE.
+   * 3. Returns confirmation shape.
+   */
+  async rejectRequest(
+    requestId: string,
+    financeUserId: string,
+    feedback: string,
+  ) {
+    await this.repo.validateForFinanceAction(requestId);
+    await this.repo.rejectDisbursementRequest(
+      requestId,
+      financeUserId,
+      feedback,
+    );
+    return {
+      requestId,
+      status: 'REJECTED',
+      message: 'Request permanently rejected. Budget items released.',
     };
   }
 }

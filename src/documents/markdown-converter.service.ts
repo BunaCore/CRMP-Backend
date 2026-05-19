@@ -62,7 +62,10 @@ export class MarkdownConverter {
       // ── Multi-line blockquotes ──────────────────────────────────
       if (line.startsWith('> ') || line === '>') {
         const quoteLines: string[] = [];
-        while (i < lines.length && (lines[i].startsWith('> ') || lines[i] === '>')) {
+        while (
+          i < lines.length &&
+          (lines[i].startsWith('> ') || lines[i] === '>')
+        ) {
           quoteLines.push(lines[i].startsWith('> ') ? lines[i].slice(2) : '');
           i++;
         }
@@ -90,9 +93,10 @@ export class MarkdownConverter {
         }
         content.push({
           type: 'blockquote',
-          content: innerParagraphs.length > 0 ? innerParagraphs : [
-            { type: 'paragraph', content: [{ type: 'text', text: '' }] },
-          ],
+          content:
+            innerParagraphs.length > 0
+              ? innerParagraphs
+              : [{ type: 'paragraph', content: [{ type: 'text', text: '' }] }],
         });
         continue;
       }
@@ -127,7 +131,11 @@ export class MarkdownConverter {
       // ── GFM pipe table ──────────────────────────────────────────
       // A table starts with a header row (cells separated by |) immediately
       // followed by an alignment/separator row (|---|---|).
-      if (this.isTableLine(line) && i + 1 < lines.length && this.isTableSeparator(lines[i + 1])) {
+      if (
+        this.isTableLine(line) &&
+        i + 1 < lines.length &&
+        this.isTableSeparator(lines[i + 1])
+      ) {
         const tableResult = this.parseMarkdownTable(lines, i);
         content.push(tableResult.node);
         i = tableResult.nextIndex;
@@ -150,9 +158,10 @@ export class MarkdownConverter {
 
     return {
       type: 'doc',
-      content: content.length > 0
-        ? content
-        : [{ type: 'paragraph', content: [{ type: 'text', text: '' }] }],
+      content:
+        content.length > 0
+          ? content
+          : [{ type: 'paragraph', content: [{ type: 'text', text: '' }] }],
     };
   }
 
@@ -185,8 +194,8 @@ export class MarkdownConverter {
   private splitTableRow(line: string): string[] {
     return line
       .trim()
-      .replace(/^\|/, '')   // remove optional leading pipe
-      .replace(/\|$/, '')   // remove optional trailing pipe
+      .replace(/^\|/, '') // remove optional leading pipe
+      .replace(/\|$/, '') // remove optional trailing pipe
       .split('|')
       .map((cell) => cell.trim());
   }
@@ -355,20 +364,40 @@ export class MarkdownConverter {
     switch (earliestPattern.type) {
       case 'link': {
         const href = earliestMatch[2];
-        nodes.push({ type: 'text', text: innerText, marks: [{ type: 'link', attrs: { href } }] });
+        nodes.push({
+          type: 'text',
+          text: innerText,
+          marks: [{ type: 'link', attrs: { href } }],
+        });
         break;
       }
       case 'code':
-        nodes.push({ type: 'text', text: innerText, marks: [{ type: 'code' }] });
+        nodes.push({
+          type: 'text',
+          text: innerText,
+          marks: [{ type: 'code' }],
+        });
         break;
       case 'bold':
-        nodes.push(...this.applyMarkToLeafText(this.parseInlineMarkdown(innerText), { type: 'bold' }));
+        nodes.push(
+          ...this.applyMarkToLeafText(this.parseInlineMarkdown(innerText), {
+            type: 'bold',
+          }),
+        );
         break;
       case 'italic':
-        nodes.push(...this.applyMarkToLeafText(this.parseInlineMarkdown(innerText), { type: 'italic' }));
+        nodes.push(
+          ...this.applyMarkToLeafText(this.parseInlineMarkdown(innerText), {
+            type: 'italic',
+          }),
+        );
         break;
       case 'strike':
-        nodes.push(...this.applyMarkToLeafText(this.parseInlineMarkdown(innerText), { type: 'strike' }));
+        nodes.push(
+          ...this.applyMarkToLeafText(this.parseInlineMarkdown(innerText), {
+            type: 'strike',
+          }),
+        );
         break;
     }
 
@@ -376,13 +405,19 @@ export class MarkdownConverter {
     return nodes;
   }
 
-  private applyMarkToLeafText(nodes: TiptapNode[], mark: TiptapMark): TiptapNode[] {
+  private applyMarkToLeafText(
+    nodes: TiptapNode[],
+    mark: TiptapMark,
+  ): TiptapNode[] {
     return nodes.map((node) => {
       if (node.type === 'text') {
         return { ...node, marks: [...(node.marks || []), mark] };
       }
       if (node.content) {
-        return { ...node, content: this.applyMarkToLeafText(node.content, mark) };
+        return {
+          ...node,
+          content: this.applyMarkToLeafText(node.content, mark),
+        };
       }
       return node;
     });
@@ -393,14 +428,20 @@ export class MarkdownConverter {
   private serializeNode(node: TiptapNode, depth: number): string {
     switch (node.type) {
       case 'doc':
-        return (node.content || []).map((c) => this.serializeNode(c, depth)).join('\n\n');
+        return (node.content || [])
+          .map((c) => this.serializeNode(c, depth))
+          .join('\n\n');
 
       case 'paragraph':
-        return (node.content || []).map((c) => this.serializeInline(c)).join('');
+        return (node.content || [])
+          .map((c) => this.serializeInline(c))
+          .join('');
 
       case 'heading': {
         const lvl = node.attrs?.level || 1;
-        const text = (node.content || []).map((c) => this.serializeInline(c)).join('');
+        const text = (node.content || [])
+          .map((c) => this.serializeInline(c))
+          .join('');
         return '#'.repeat(lvl) + ' ' + text;
       }
 
@@ -408,7 +449,9 @@ export class MarkdownConverter {
         return this.serializeInline(node);
 
       case 'blockquote': {
-        const inner = (node.content || []).map((c) => this.serializeNode(c, depth)).join('\n');
+        const inner = (node.content || [])
+          .map((c) => this.serializeNode(c, depth))
+          .join('\n');
         return inner
           .split('\n')
           .map((l) => '> ' + l)
@@ -422,11 +465,15 @@ export class MarkdownConverter {
 
       case 'orderedList':
         return (node.content || [])
-          .map((item, idx) => this.serializeListItem(item, depth, `${idx + 1}. `))
+          .map((item, idx) =>
+            this.serializeListItem(item, depth, `${idx + 1}. `),
+          )
           .join('\n');
 
       case 'listItem':
-        return (node.content || []).map((c) => this.serializeNode(c, depth)).join('');
+        return (node.content || [])
+          .map((c) => this.serializeNode(c, depth))
+          .join('');
 
       case 'codeBlock': {
         const lang = node.attrs?.language || '';
@@ -488,14 +535,20 @@ export class MarkdownConverter {
           .join('');
 
       default:
-        return (node.content || []).map((c) => this.serializeNode(c, depth)).join('');
+        return (node.content || [])
+          .map((c) => this.serializeNode(c, depth))
+          .join('');
     }
   }
 
   /**
    * Serialize a listItem, properly indenting nested sub-lists.
    */
-  private serializeListItem(item: TiptapNode, depth: number, prefix: string): string {
+  private serializeListItem(
+    item: TiptapNode,
+    depth: number,
+    prefix: string,
+  ): string {
     const indent = '  '.repeat(depth);
     const parts: string[] = [];
 

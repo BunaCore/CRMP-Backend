@@ -87,7 +87,10 @@ export class CollaborationPersistenceService implements OnModuleDestroy {
 
       // If access was revoked (or workspace/project no longer exists),
       // do NOT keep retrying indefinitely.
-      if (err instanceof NotFoundException || err instanceof ForbiddenException) {
+      if (
+        err instanceof NotFoundException ||
+        err instanceof ForbiddenException
+      ) {
         return;
       }
 
@@ -109,4 +112,3 @@ export class CollaborationPersistenceService implements OnModuleDestroy {
     }
   }
 }
-

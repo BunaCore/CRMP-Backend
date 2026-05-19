@@ -27,15 +27,28 @@ export class AiService {
 
   async handleRequest(dto: AiRequestDto): Promise<AiResponseDto> {
     let handler;
-    
+
     switch (dto.requestType) {
-      case 'CHAT_QUESTION': handler = this.chatHandler; break;
-      case 'SUMMARIZE_SELECTION': handler = this.summarizeHandler; break;
-      case 'GRAMMAR_FIX': handler = this.grammarHandler; break;
-      case 'EXPLAIN_SELECTION': handler = this.explainHandler; break;
-      case 'OUTLINE_SUGGESTION': handler = this.outlineHandler; break;
-      case 'INSERT_SUGGESTION': handler = this.insertHandler; break;
-      default: handler = this.chatHandler;
+      case 'CHAT_QUESTION':
+        handler = this.chatHandler;
+        break;
+      case 'SUMMARIZE_SELECTION':
+        handler = this.summarizeHandler;
+        break;
+      case 'GRAMMAR_FIX':
+        handler = this.grammarHandler;
+        break;
+      case 'EXPLAIN_SELECTION':
+        handler = this.explainHandler;
+        break;
+      case 'OUTLINE_SUGGESTION':
+        handler = this.outlineHandler;
+        break;
+      case 'INSERT_SUGGESTION':
+        handler = this.insertHandler;
+        break;
+      default:
+        handler = this.chatHandler;
     }
 
     let requestConfig;
@@ -46,17 +59,32 @@ export class AiService {
     }
 
     // Ignore history for strict action modes
-    const isStrictMode = ['SUMMARIZE_SELECTION', 'GRAMMAR_FIX', 'EXPLAIN_SELECTION', 'OUTLINE_SUGGESTION', 'INSERT_SUGGESTION'].includes(dto.requestType);
+    const isStrictMode = [
+      'SUMMARIZE_SELECTION',
+      'GRAMMAR_FIX',
+      'EXPLAIN_SELECTION',
+      'OUTLINE_SUGGESTION',
+      'INSERT_SUGGESTION',
+    ].includes(dto.requestType);
     const historyToUse = isStrictMode ? [] : dto.history;
 
     let generatedText = '';
     const providerName = dto.aiMode === 'cloud' ? 'gemini' : 'ollama';
-    const modelName = dto.aiMode === 'cloud' ? 'gemini-flash-latest' : 'llama3.2:1b';
+    const modelName =
+      dto.aiMode === 'cloud' ? 'gemini-flash-latest' : 'llama3.2:1b';
 
     if (dto.aiMode === 'cloud') {
-      generatedText = await this.geminiService.generate(requestConfig.prompt, requestConfig.systemPrompt, historyToUse);
+      generatedText = await this.geminiService.generate(
+        requestConfig.prompt,
+        requestConfig.systemPrompt,
+        historyToUse,
+      );
     } else if (dto.aiMode === 'local') {
-      generatedText = await this.ollamaService.generate(requestConfig.prompt, requestConfig.systemPrompt, historyToUse);
+      generatedText = await this.ollamaService.generate(
+        requestConfig.prompt,
+        requestConfig.systemPrompt,
+        historyToUse,
+      );
     } else {
       throw new BadRequestException(`Unsupported aiMode: ${dto.aiMode}`);
     }
@@ -69,10 +97,13 @@ export class AiService {
       type: requestConfig.action.type,
       from: dto.from ?? null,
       to: dto.to ?? null,
-      content: null
+      content: null,
     };
 
-    if (dto.requestType === 'GRAMMAR_FIX' || dto.requestType === 'INSERT_SUGGESTION') {
+    if (
+      dto.requestType === 'GRAMMAR_FIX' ||
+      dto.requestType === 'INSERT_SUGGESTION'
+    ) {
       result.replacement = cleanedText;
       actionPayload.content = cleanedText;
     } else if (dto.requestType === 'SUMMARIZE_SELECTION') {
@@ -89,11 +120,14 @@ export class AiService {
         provider: providerName,
         model: modelName,
         aiMode: dto.aiMode,
-      }
+      },
     };
   }
 
-  private buildErrorResponse(dto: AiRequestDto, message: string): AiResponseDto {
+  private buildErrorResponse(
+    dto: AiRequestDto,
+    message: string,
+  ): AiResponseDto {
     return {
       requestType: dto.requestType,
       result: { reply: `[Error]: ${message}` },
@@ -102,7 +136,7 @@ export class AiService {
         provider: dto.aiMode === 'cloud' ? 'gemini' : 'ollama',
         model: dto.aiMode === 'cloud' ? 'gemini-flash-latest' : 'llama3.2:1b',
         aiMode: dto.aiMode as any,
-      }
+      },
     };
   }
 }

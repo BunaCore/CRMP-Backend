@@ -48,4 +48,3 @@ export class CollaborationService {
     return { projectId };
   }
 }
-

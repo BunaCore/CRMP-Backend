@@ -25,6 +25,7 @@ import { PublishProjectDto } from './dto';
 import { GetProjectsQueryDto } from './dto/get-projects-query.dto';
 import { UpdateProjectVisibilityDto } from './dto/update-project-visibility.dto';
 import { UpdateProjectAssetsDto } from './dto/update-project-assets.dto';
+import { CreateDefenceDto } from 'src/proposals/dto/create-defence.dto';
 
 @Controller('projects')
 @UseGuards(JwtAuthGuard)
@@ -140,6 +141,56 @@ export class ProjectsController {
     },
   ) {
     return this.projectsService.uploadPublicFile(projectId, user.id, file);
+  }
+
+  /**
+   * POST /projects/:projectId/defence
+   * Schedule a defence session for a project (project phase).
+   *
+   * Receives:
+   *   { defenceDate: ISO string, location: string, note?: string }
+   *
+   * Returns:
+   *   { success, message, defence: { id, projectId, defenceDate, location, note, scheduledBy, createdAt } }
+   *
+   * Scheduling rules:
+   *   - Caller must be a member of the project.
+   *   - Multiple defences are allowed (initial + rescheduled).
+   *
+   * The scheduled defence is embedded in GET /projects (getProjectsForUser)
+   * under each project’s `defenceSchedules[]` array, which the
+   * dashboard uses to render upcoming project-phase defence alerts.
+   */
+  @Post(':projectId/defence')
+  @HttpCode(HttpStatus.CREATED)
+  async scheduleDefence(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateDefenceDto,
+  ) {
+    return this.projectsService.scheduleProjectDefence(projectId, user.id, dto);
+  }
+
+  /**
+   * GET /projects/:projectId/defences
+   * Fetch all defence schedules for a specific project.
+   * Returns them sorted by defenceDate ASC.
+   */
+  @Get(':projectId/defences')
+  async getProjectDefences(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const isMember = await this.projectsService.isUserMemberOfProject(
+      user.id,
+      projectId,
+    );
+    if (!isMember) {
+      throw new NotFoundException('Project not found');
+    }
+    return this.projectsService.repository.getProjectDefencesByProjectId(
+      projectId,
+    );
   }
 }
 
