@@ -27,7 +27,10 @@ export class CollaborationYjsDocService implements OnModuleDestroy {
   private readonly persistDebounceMs = 2000;
 
   constructor(private readonly repo: CollaborationYjsRepository) {
-    this.evictionTimer = setInterval(() => this.evictIdle(), this.evictionIntervalMs);
+    this.evictionTimer = setInterval(
+      () => this.evictIdle(),
+      this.evictionIntervalMs,
+    );
   }
 
   async acquire(workspaceId: string): Promise<DocEntry> {
@@ -128,4 +131,3 @@ export class CollaborationYjsDocService implements OnModuleDestroy {
 }
 
 export type { DocEntry };
-

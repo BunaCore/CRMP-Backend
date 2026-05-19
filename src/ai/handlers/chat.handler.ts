@@ -13,7 +13,7 @@ export class ChatHandler {
     return {
       systemPrompt: SYSTEM_PROMPTS.CHAT,
       prompt: prompt,
-      action: { type: 'none' as const, from: null, to: null }
+      action: { type: 'none' as const, from: null, to: null },
     };
   }
 }

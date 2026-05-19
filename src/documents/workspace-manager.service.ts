@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ProjectsService } from 'src/projects/projects.service';
 import { DocumentsRepository } from './documents.repository';
 import { TiptapValidator } from './tiptap-validator.service';
@@ -20,13 +24,19 @@ export class WorkspaceManagerService {
   ) {}
 
   async getWorkspacesForProject(projectId: string, userId: string) {
-    const isMember = await this.projectsService.isUserMemberOfProject(userId, projectId);
-    if (!isMember) throw new NotFoundException('Project not found');
+    const canRead = await this.projectsService.canReadProject(
+      userId,
+      projectId,
+    );
+    if (!canRead) throw new NotFoundException('Project not found');
     return this.repository.findWorkspacesByProject(projectId);
   }
 
   async createWorkspace(projectId: string, name: string, userId: string) {
-    const isMember = await this.projectsService.isUserMemberOfProject(userId, projectId);
+    const isMember = await this.projectsService.isUserMemberOfProject(
+      userId,
+      projectId,
+    );
     if (!isMember) throw new NotFoundException('Project not found');
 
     const existing = await this.repository.findWorkspacesByProject(projectId);
@@ -37,7 +47,11 @@ export class WorkspaceManagerService {
     }
 
     return this.drizzle.transaction(async () => {
-      const workspace = await this.repository.createWorkspace(projectId, name, userId);
+      const workspace = await this.repository.createWorkspace(
+        projectId,
+        name,
+        userId,
+      );
 
       const initialContent = {
         type: 'doc',
@@ -51,8 +65,12 @@ export class WorkspaceManagerService {
         ],
       };
 
-      const validatedContent = this.tiptapValidator.validateDocument(initialContent);
-      const document = await this.repository.createDocument(workspace.id, validatedContent);
+      const validatedContent =
+        this.tiptapValidator.validateDocument(initialContent);
+      const document = await this.repository.createDocument(
+        workspace.id,
+        validatedContent,
+      );
 
       const contentHash = createHash('sha256')
         .update(JSON.stringify(validatedContent))
@@ -67,9 +85,12 @@ export class WorkspaceManagerService {
         contentHash,
       );
 
-      await this.repository.updateDocument(document.id, validatedContent, version.id);
+      await this.repository.updateDocument(
+        document.id,
+        validatedContent,
+        version.id,
+      );
       return workspace;
     });
   }
 }
-

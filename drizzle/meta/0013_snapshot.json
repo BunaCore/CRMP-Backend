@@ -1,6 +1,6 @@
 {
-  "id": "44a73ce7-cb35-47bd-bf60-bb2610d0a498",
-  "prevId": "f51754dc-f44d-4199-8463-66de45ce2089",
+  "id": "e165d334-aa92-49c5-8861-d288138f1962",
+  "prevId": "44a73ce7-cb35-47bd-bf60-bb2610d0a498",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -952,7 +952,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "disbursement_requests_finance_approved_by_users_id_fk": {
@@ -1301,6 +1301,13 @@
           "type": "numeric(5, 2)",
           "primaryKey": false,
           "notNull": true
+        },
+        "is_individual": {
+          "name": "is_individual",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -2167,7 +2174,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -2283,7 +2290,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "proposal_comments_author_id_users_id_fk": {
@@ -2746,7 +2753,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -3465,6 +3472,90 @@
             "id"
           ],
           "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.project_defences": {
+      "name": "project_defences",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scheduled_by": {
+          "name": "scheduled_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "defence_date": {
+          "name": "defence_date",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "location": {
+          "name": "location",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "project_defences_project_id_projects_project_id_fk": {
+          "name": "project_defences_project_id_projects_project_id_fk",
+          "tableFrom": "project_defences",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "project_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "project_defences_scheduled_by_users_id_fk": {
+          "name": "project_defences_scheduled_by_users_id_fk",
+          "tableFrom": "project_defences",
+          "tableTo": "users",
+          "columnsFrom": [
+            "scheduled_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -4339,7 +4430,8 @@
         "PENDING",
         "RETURNED",
         "RESUBMITTED",
-        "PAID"
+        "PAID",
+        "REJECTED"
       ]
     },
     "public.source_action": {

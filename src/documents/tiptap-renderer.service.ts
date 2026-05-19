@@ -60,7 +60,9 @@ export class TiptapRenderer {
         TiptapRenderer.launchPromise = null;
         // If Chrome crashes, clear the reference so the next request re-launches
         b.on('disconnected', () => {
-          this.logger.warn('Puppeteer browser disconnected — will re-launch on next request');
+          this.logger.warn(
+            'Puppeteer browser disconnected — will re-launch on next request',
+          );
           TiptapRenderer.browser = null;
           TiptapRenderer.launchPromise = null;
         });
@@ -103,7 +105,7 @@ export class TiptapRenderer {
     const allTypes = this.collectNodeTypes(doc);
     this.logger.debug(
       `PDF render start — ${totalLen} chars, ${imgCount} <img> tag(s). ` +
-      `Node types: [${allTypes.join(', ')}]`,
+        `Node types: [${allTypes.join(', ')}]`,
     );
     if (bodyHtml.includes('<table')) {
       this.logger.debug('Table detected in HTML, checking structure...');
@@ -114,15 +116,19 @@ export class TiptapRenderer {
         tableMatches.forEach((t, i) => {
           const rows = (t.match(/<tr/g) || []).length;
           const cells = (t.match(/<td|<th/g) || []).length;
-          const emptyTd = (t.match(/<td[^>]*>\s*(&nbsp;)?\s*<\/td>/g) || []).length;
-          const emptyTh = (t.match(/<th[^>]*>\s*(&nbsp;)?\s*<\/th>/g) || []).length;
+          const emptyTd = (t.match(/<td[^>]*>\s*(&nbsp;)?\s*<\/td>/g) || [])
+            .length;
+          const emptyTh = (t.match(/<th[^>]*>\s*(&nbsp;)?\s*<\/th>/g) || [])
+            .length;
           this.logger.debug(
             `Table ${i + 1}: ${rows} row(s), ${cells} cell(s) ` +
-            `(${emptyTd + emptyTh} empty/nbsp-only)`,
+              `(${emptyTd + emptyTh} empty/nbsp-only)`,
           );
         });
       } else {
-        this.logger.warn('Table tag detected but no complete table structure found in HTML');
+        this.logger.warn(
+          'Table tag detected but no complete table structure found in HTML',
+        );
       }
     }
     const fullHtml = this.buildPdfHtmlDocument(bodyHtml, title);
@@ -164,36 +170,42 @@ export class TiptapRenderer {
 
           // Gather real computed dimensions from the browser for debugging
           const tableDiagnostics = await page.evaluate(() => {
-            return Array.from(document.querySelectorAll('table')).map((tbl, i) => {
-              const rect = tbl.getBoundingClientRect();
-              const rows = tbl.querySelectorAll('tr').length;
-              const cells = tbl.querySelectorAll('td, th').length;
-              const style = window.getComputedStyle(tbl);
-              return {
-                index: i + 1,
-                width: Math.round(rect.width),
-                height: Math.round(rect.height),
-                rows,
-                cells,
-                tableLayout: style.tableLayout,
-                borderCollapse: style.borderCollapse,
-                display: style.display,
-              };
-            });
+            return Array.from(document.querySelectorAll('table')).map(
+              (tbl, i) => {
+                const rect = tbl.getBoundingClientRect();
+                const rows = tbl.querySelectorAll('tr').length;
+                const cells = tbl.querySelectorAll('td, th').length;
+                const style = window.getComputedStyle(tbl);
+                return {
+                  index: i + 1,
+                  width: Math.round(rect.width),
+                  height: Math.round(rect.height),
+                  rows,
+                  cells,
+                  tableLayout: style.tableLayout,
+                  borderCollapse: style.borderCollapse,
+                  display: style.display,
+                };
+              },
+            );
           });
 
           tableDiagnostics.forEach((d) => {
             this.logger.debug(
               `Table ${d.index} render: ${d.width}×${d.height}px, ` +
-              `${d.rows} rows, ${d.cells} cells — ` +
-              `tableLayout=${d.tableLayout}, borderCollapse=${d.borderCollapse}, display=${d.display}`,
+                `${d.rows} rows, ${d.cells} cells — ` +
+                `tableLayout=${d.tableLayout}, borderCollapse=${d.borderCollapse}, display=${d.display}`,
             );
             if (d.width === 0 || d.height === 0) {
-              this.logger.warn(`Table ${d.index} has zero dimension — it may not appear in the PDF!`);
+              this.logger.warn(
+                `Table ${d.index} has zero dimension — it may not appear in the PDF!`,
+              );
             }
           });
         } catch (e) {
-          this.logger.warn(`Table wait/diagnostics failed: ${(e as Error).message}`);
+          this.logger.warn(
+            `Table wait/diagnostics failed: ${(e as Error).message}`,
+          );
         }
       }
 
@@ -252,14 +264,18 @@ export class TiptapRenderer {
         return (node.content || []).map((c) => this.renderNode(c)).join('');
 
       case 'paragraph': {
-        const inner = (node.content || []).map((c) => this.renderNode(c)).join('');
+        const inner = (node.content || [])
+          .map((c) => this.renderNode(c))
+          .join('');
         const style = this.buildBlockStyle(node.attrs);
         return `<p${style}>${inner}</p>`;
       }
 
       case 'heading': {
         const level = node.attrs?.level || 1;
-        const inner = (node.content || []).map((c) => this.renderNode(c)).join('');
+        const inner = (node.content || [])
+          .map((c) => this.renderNode(c))
+          .join('');
         const style = this.buildBlockStyle(node.attrs);
         return `<h${level}${style}>${inner}</h${level}>`;
       }
@@ -270,7 +286,9 @@ export class TiptapRenderer {
           : this.escapeHtml(node.text || '');
 
       case 'blockquote': {
-        const inner = (node.content || []).map((c) => this.renderNode(c)).join('');
+        const inner = (node.content || [])
+          .map((c) => this.renderNode(c))
+          .join('');
         return `<blockquote>${inner}</blockquote>`;
       }
 
@@ -288,7 +306,9 @@ export class TiptapRenderer {
         // through renderNode to avoid double-wrapping.
         const raw = (node.content || []).map((c) => c.text || '').join('');
         const lang = node.attrs?.language;
-        const cls = lang ? ` class="language-${this.escapeAttribute(lang)}"` : '';
+        const cls = lang
+          ? ` class="language-${this.escapeAttribute(lang)}"`
+          : '';
         return `<pre><code${cls}>${this.escapeHtml(raw)}</code></pre>`;
       }
 
@@ -307,18 +327,30 @@ export class TiptapRenderer {
         return `<tr>${(node.content || []).map((c) => this.renderNode(c)).join('')}</tr>`;
 
       case 'tableHeader': {
-        const colspan = node.attrs?.colspan ? ` colspan="${node.attrs.colspan}"` : '';
-        const rowspan = node.attrs?.rowspan ? ` rowspan="${node.attrs.rowspan}"` : '';
+        const colspan = node.attrs?.colspan
+          ? ` colspan="${node.attrs.colspan}"`
+          : '';
+        const rowspan = node.attrs?.rowspan
+          ? ` rowspan="${node.attrs.rowspan}"`
+          : '';
         const style = this.buildCellStyle(node.attrs);
-        const inner = (node.content || []).map((c) => this.renderNode(c)).join('');
+        const inner = (node.content || [])
+          .map((c) => this.renderNode(c))
+          .join('');
         return `<th${colspan}${rowspan}${style}>${inner || '&nbsp;'}</th>`;
       }
 
       case 'tableCell': {
-        const colspan = node.attrs?.colspan ? ` colspan="${node.attrs.colspan}"` : '';
-        const rowspan = node.attrs?.rowspan ? ` rowspan="${node.attrs.rowspan}"` : '';
+        const colspan = node.attrs?.colspan
+          ? ` colspan="${node.attrs.colspan}"`
+          : '';
+        const rowspan = node.attrs?.rowspan
+          ? ` rowspan="${node.attrs.rowspan}"`
+          : '';
         const style = this.buildCellStyle(node.attrs);
-        const inner = (node.content || []).map((c) => this.renderNode(c)).join('');
+        const inner = (node.content || [])
+          .map((c) => this.renderNode(c))
+          .join('');
         return `<td${colspan}${rowspan}${style}>${inner || '&nbsp;'}</td>`;
       }
 
@@ -327,20 +359,30 @@ export class TiptapRenderer {
       case 'imageResize': {
         const src = this.escapeAttribute(node.attrs?.src || '');
         const alt = this.escapeAttribute(node.attrs?.alt || '');
-        const title = node.attrs?.title ? ` title="${this.escapeAttribute(node.attrs.title)}"` : '';
+        const title = node.attrs?.title
+          ? ` title="${this.escapeAttribute(node.attrs.title)}"`
+          : '';
 
         // Preserve user-set dimensions (from resizable image extension)
-        const styleparts: string[] = ['max-width: 100%', 'height: auto', 'display: block'];
+        const styleparts: string[] = [
+          'max-width: 100%',
+          'height: auto',
+          'display: block',
+        ];
         if (node.attrs?.width) {
           // width can be a number (px) or a string like '50%'
           const w = String(node.attrs.width);
           styleparts[0] = `max-width: 100%`; // keep the guard
-          styleparts.push(`width: ${w.includes('%') || w.includes('px') ? w : w + 'px'}`);
+          styleparts.push(
+            `width: ${w.includes('%') || w.includes('px') ? w : w + 'px'}`,
+          );
           styleparts.push(`height: auto`);
         }
         if (node.attrs?.height && node.attrs.height !== 'auto') {
           const h = String(node.attrs.height);
-          styleparts.push(`height: ${h.includes('%') || h.includes('px') ? h : h + 'px'}`);
+          styleparts.push(
+            `height: ${h.includes('%') || h.includes('px') ? h : h + 'px'}`,
+          );
         }
         const style = styleparts.join('; ');
 
@@ -483,13 +525,18 @@ export class TiptapRenderer {
   private extractText(node: TiptapNode): string {
     if (node.type === 'text') return node.text || '';
     if (node.type === 'hardBreak') return '\n';
-    if (node.content) return node.content.map((c) => this.extractText(c)).join('');
+    if (node.content)
+      return node.content.map((c) => this.extractText(c)).join('');
     return '';
   }
 
-  private collectNodeTypes(node: TiptapNode, types = new Set<string>()): string[] {
+  private collectNodeTypes(
+    node: TiptapNode,
+    types = new Set<string>(),
+  ): string[] {
     types.add(node.type);
-    if (node.content) node.content.forEach((c) => this.collectNodeTypes(c, types));
+    if (node.content)
+      node.content.forEach((c) => this.collectNodeTypes(c, types));
     return Array.from(types);
   }
 

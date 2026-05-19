@@ -7,22 +7,29 @@ export class OllamaService {
   private readonly ollamaUrl: string;
 
   constructor(private configService: ConfigService) {
-    this.ollamaUrl = this.configService.get<string>('OLLAMA_URL', 'http://localhost:11434');
+    this.ollamaUrl = this.configService.get<string>(
+      'OLLAMA_URL',
+      'http://localhost:11434',
+    );
   }
 
-  async generate(prompt: string, systemPrompt?: string, history?: any[]): Promise<string> {
+  async generate(
+    prompt: string,
+    systemPrompt?: string,
+    history?: any[],
+  ): Promise<string> {
     try {
       const messages: any[] = [];
-      
+
       if (systemPrompt) {
         messages.push({ role: 'system', content: systemPrompt });
       }
 
       if (history && history.length > 0) {
-        history.forEach(msg => {
+        history.forEach((msg) => {
           messages.push({
             role: msg.role === 'user' ? 'user' : 'assistant',
-            content: msg.content
+            content: msg.content,
           });
         });
       }
@@ -38,7 +45,7 @@ export class OllamaService {
           stream: false,
           options: {
             temperature: 0.1, // Keep outputs strict and predictable
-          }
+          },
         }),
       });
 
@@ -49,7 +56,10 @@ export class OllamaService {
       const data = await response.json();
       return data.message?.content || '';
     } catch (error) {
-      this.logger.error(`Ollama Local Generation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Ollama Local Generation failed: ${error.message}`,
+        error.stack,
+      );
       return '[Error]: Local AI service is not running or encountered an issue. Ensure Ollama is started.';
     }
   }

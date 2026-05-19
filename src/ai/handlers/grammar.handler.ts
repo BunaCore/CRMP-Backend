@@ -7,7 +7,7 @@ import { REQUEST_PROMPTS } from '../prompts/request.prompts';
 export class GrammarHandler {
   buildRequest(dto: AiRequestDto) {
     if (!dto.context || dto.context.trim() === '') {
-      throw new Error("Context is empty");
+      throw new Error('Context is empty');
     }
 
     return {
@@ -17,7 +17,7 @@ export class GrammarHandler {
         type: 'replace' as const,
         from: dto.from ?? null,
         to: dto.to ?? null,
-      }
+      },
     };
   }
 }

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DrizzleService } from 'src/db/db.service';
 import * as schema from 'src/db/schema';
-import { eq, and, SQL } from 'drizzle-orm';
+import { eq, and, SQL, asc, inArray } from 'drizzle-orm';
 
 @Injectable()
 export class ProjectsRepository {
@@ -355,5 +355,86 @@ export class ProjectsRepository {
       .update(schema.projects)
       .set(updateData)
       .where(eq(schema.projects.projectId, projectId));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Project Defence Methods
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Insert a new defence schedule row for a project (project phase).
+   * Multiple rows per project are allowed (rescheduling).
+   */
+  async createProjectDefence(data: {
+    projectId: string;
+    scheduledBy: string;
+    defenceDate: Date;
+    location: string;
+    note?: string;
+  }) {
+    const [defence] = await this.drizzle.db
+      .insert(schema.projectDefences)
+      .values({
+        projectId: data.projectId,
+        scheduledBy: data.scheduledBy,
+        defenceDate: data.defenceDate,
+        location: data.location,
+        note: data.note ?? null,
+      })
+      .returning();
+
+    return defence;
+  }
+
+  /**
+   * Get all defence schedules for a project, ordered by defenceDate ASC.
+   * Multiple schedules allowed (rescheduling).
+   */
+  async getProjectDefencesByProjectId(projectId: string) {
+    return this.drizzle.db
+      .select({
+        id: schema.projectDefences.id,
+        projectId: schema.projectDefences.projectId,
+        scheduledBy: schema.projectDefences.scheduledBy,
+        defenceDate: schema.projectDefences.defenceDate,
+        location: schema.projectDefences.location,
+        note: schema.projectDefences.note,
+        createdAt: schema.projectDefences.createdAt,
+      })
+      .from(schema.projectDefences)
+      .where(eq(schema.projectDefences.projectId, projectId))
+      .orderBy(asc(schema.projectDefences.defenceDate));
+  }
+
+  /**
+   * Bulk-fetch defence schedules for many projects at once.
+   * Returns a map: projectId → DefenceRow[]
+   */
+  async getProjectDefencesByProjectIds(
+    projectIds: string[],
+  ): Promise<Map<string, any[]>> {
+    if (projectIds.length === 0) return new Map();
+
+    const rows = await this.drizzle.db
+      .select({
+        id: schema.projectDefences.id,
+        projectId: schema.projectDefences.projectId,
+        scheduledBy: schema.projectDefences.scheduledBy,
+        defenceDate: schema.projectDefences.defenceDate,
+        location: schema.projectDefences.location,
+        note: schema.projectDefences.note,
+        createdAt: schema.projectDefences.createdAt,
+      })
+      .from(schema.projectDefences)
+      .where(inArray(schema.projectDefences.projectId, projectIds))
+      .orderBy(asc(schema.projectDefences.defenceDate));
+
+    // Group by projectId for O(1) access in the service
+    const map = new Map<string, any[]>();
+    for (const row of rows) {
+      if (!map.has(row.projectId)) map.set(row.projectId, []);
+      map.get(row.projectId)!.push(row);
+    }
+    return map;
   }
 }

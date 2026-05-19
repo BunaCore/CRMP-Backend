@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { WorkspacesRepository } from './workspaces.repository';
 import { ProjectsService } from 'src/projects/projects.service';
 import { TiptapValidator } from 'src/documents/tiptap-validator.service';
@@ -21,7 +25,10 @@ export class WorkspacesService {
     const workspace = await this.repository.findWorkspaceById(id);
     if (!workspace) throw new NotFoundException('Workspace not found');
 
-    const isMember = await this.projectsService.isUserMemberOfProject(userId, workspace.projectId);
+    const isMember = await this.projectsService.isUserMemberOfProject(
+      userId,
+      workspace.projectId,
+    );
     if (!isMember) throw new NotFoundException('Project not found');
 
     return this.repository.updateWorkspaceName(id, name);

@@ -11,7 +11,7 @@ export class PiBudgetService {
   constructor(
     private readonly budgetRepo: BudgetRepository,
     private readonly filesService: FilesService,
-  ) {}
+  ) { }
 
   /**
    * Returns the formatted list of projects for the project selector UI.
@@ -211,16 +211,12 @@ export class PiBudgetService {
     resourceId: string | null,
   ) {
     // Use initiateUpload to create the record, then manually upload to storage
-    // Since we have the file buffer directly (Multer memory storage), we
-    // go through the repository directly to create the file record and
-    // use the storage service.
-    const fileRecord = await this.filesService.initiateUpload(
-      {
-        originalName: file.originalname,
-        mimeType: file.mimetype,
-        size: file.size,
-        resourceType: 'DISBURSEMENT_REQUEST',
-      },
+    const fileRecord = await this.filesService.uploadTempFile(
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+      file.size,
+      'DISBURSEMENT_REQUEST',
       userId,
     );
 

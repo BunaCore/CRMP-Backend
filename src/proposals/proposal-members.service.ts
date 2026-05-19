@@ -79,7 +79,7 @@ export class ProposalMembersService {
     if (missingIds.length > 0) {
       if (duplicateErrors.length > 0) {
         throw new BadRequestException(
-          `Cannot add members. Issues: ${[...duplicateErrors, ...missingIds.map(id => `User ${id} not found`)].join(', ')}`,
+          `Cannot add members. Issues: ${[...duplicateErrors, ...missingIds.map((id) => `User ${id} not found`)].join(', ')}`,
         );
       }
       throw new NotFoundException(`Users not found: ${missingIds.join(', ')}`);
@@ -337,9 +337,7 @@ export class ProposalMembersService {
    * @param proposalId Proposal ID
    * @returns Object with members grouped by role: { [role]: Member[] }
    */
-  async getAllMembersGrouped(
-    proposalId: string,
-  ): Promise<any[]> {
+  async getAllMembersGrouped(proposalId: string): Promise<any[]> {
     // Verify proposal exists
     const proposal = await this.repository.findById(proposalId);
     if (!proposal) {

@@ -55,10 +55,7 @@ const ywsUtils = require('y-websocket/bin/utils') as {
  * Builds the Postgres-backed persistence adapter for y-websocket.
  * Called once and registered via setPersistence before any client connects.
  */
-function buildPersistence(
-  repo: CollaborationYjsRepository,
-  logger: Logger,
-) {
+function buildPersistence(repo: CollaborationYjsRepository, logger: Logger) {
   return {
     /**
      * Called by y-websocket when a new doc is first opened (first client joins).
@@ -167,7 +164,9 @@ export function attachCollabWsServer(
         );
 
         if (!workspaceId) {
-          logger.warn('[collab-ws] Rejected upgrade: missing workspaceId in path');
+          logger.warn(
+            '[collab-ws] Rejected upgrade: missing workspaceId in path',
+          );
           socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
           socket.destroy();
           return;

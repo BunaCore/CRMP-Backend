@@ -88,7 +88,7 @@ export const proposalVersions = pgTable('proposal_versions', {
   createdBy: uuid('created_by').references(() => users.id),
   versionNumber: integer('version_number').default(1).notNull(),
   isCurrent: boolean('is_current').default(false),
-  fileId: uuid('file_id').references(() => files.id),
+  fileId: uuid('file_id').references(() => files.id, { onDelete: 'set null' }),
   contentJson: jsonb('content_json'),
   changeSummary: text('change_summary'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
@@ -141,7 +141,9 @@ export const proposalApprovals = pgTable('proposal_approvals', {
 
   notifiedAt: timestamp('notified_at', { withTimezone: true }),
   versionId: uuid('version_id').references(() => proposalVersions.id),
-  attachmentFileId: uuid('attachment_file_id').references(() => files.id),
+  attachmentFileId: uuid('attachment_file_id').references(() => files.id, {
+    onDelete: 'set null',
+  }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
@@ -163,7 +165,7 @@ export const proposalComments = pgTable('proposal_comments', {
     .notNull()
     .references(() => proposals.id, { onDelete: 'cascade' }),
   versionId: uuid('version_id').references(() => proposalVersions.id),
-  fileId: uuid('file_id').references(() => files.id),
+  fileId: uuid('file_id').references(() => files.id, { onDelete: 'set null' }),
   authorId: uuid('author_id')
     .notNull()
     .references(() => users.id),

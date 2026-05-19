@@ -98,7 +98,9 @@ export class BudgetRepository {
     const disbursedMap = new Map(
       disbursedRows.map((r) => [r.projectId, r.totalDisbursed]),
     );
-    const activeMap = new Map(activeRequests.map((r) => [r.projectId, r.status]));
+    const activeMap = new Map(
+      activeRequests.map((r) => [r.projectId, r.status]),
+    );
 
     return piProjects.map((p) => ({
       projectId: p.projectId,
@@ -183,10 +185,7 @@ export class BudgetRepository {
             ),
           )
           .where(
-            eq(
-              schema.disbursementRequestItems.disbursementRequestId,
-              req.id,
-            ),
+            eq(schema.disbursementRequestItems.disbursementRequestId, req.id),
           );
 
         let clearanceFile: {
@@ -363,9 +362,7 @@ export class BudgetRepository {
       throw new NotFoundException('Disbursement request not found.');
     }
     if (request.requestedBy !== userId) {
-      throw new ForbiddenException(
-        'You are not the owner of this request.',
-      );
+      throw new ForbiddenException('You are not the owner of this request.');
     }
     if (request.status !== 'RETURNED') {
       throw new BadRequestException(
@@ -451,6 +448,7 @@ export class BudgetRepository {
               | 'RETURNED'
               | 'RESUBMITTED'
               | 'PAID'
+              | 'REJECTED'
             )[],
           )
         : undefined;
@@ -521,7 +519,7 @@ export class BudgetRepository {
           paidAt: row.paidAt,
           clearanceRequired: row.requestSequence > 1,
           clearanceFileId: row.clearanceFileId, // service enriches URL
-          clearanceDocumentUrl: null,            // populated by service
+          clearanceDocumentUrl: null, // populated by service
           bankTransactionId: row.bankTransactionId,
           financeFeedback: row.financeFeedback,
           items,
@@ -642,15 +640,15 @@ export class BudgetRepository {
       piName: row.piName,
       piEmail: row.piEmail,
       piPhone: row.piPhone,
-      piBankName: null,            // future: user_bank_details table
-      piBankAccountNumber: null,   // future: user_bank_details table
+      piBankName: null, // future: user_bank_details table
+      piBankAccountNumber: null, // future: user_bank_details table
       requestSequence: row.requestSequence,
       totalAmount: Number(row.totalAmount),
       status: row.status,
       submittedAt: row.submittedAt,
       clearanceRequired: row.requestSequence > 1,
       clearanceFileId: row.clearanceFileId, // service enriches URL
-      clearanceDocumentUrl: null,            // populated by service
+      clearanceDocumentUrl: null, // populated by service
       clearanceDocumentName,
       items,
       projectBudgetSummary: {
@@ -681,7 +679,8 @@ export class BudgetRepository {
       .where(eq(schema.disbursementRequests.id, requestId))
       .limit(1);
 
-    if (!request) throw new NotFoundException('Disbursement request not found.');
+    if (!request)
+      throw new NotFoundException('Disbursement request not found.');
 
     if (!['PENDING', 'RESUBMITTED'].includes(request.status)) {
       throw new BadRequestException(
@@ -786,6 +785,49 @@ export class BudgetRepository {
   }
 
   /**
+   * Transactionally marks a request as REJECTED and reverts linked budget items to AVAILABLE.
+   */
+  async rejectDisbursementRequest(
+    requestId: string,
+    financeUserId: string,
+    feedback: string,
+  ) {
+    return await this.db.transaction(async (tx) => {
+      // Get linked budget item IDs
+      const junctionItems = await tx
+        .select()
+        .from(schema.disbursementRequestItems)
+        .where(
+          eq(schema.disbursementRequestItems.disbursementRequestId, requestId),
+        );
+      const itemIds = junctionItems.map((j) => j.budgetItemId);
+
+      // Update request to REJECTED
+      const [updated] = await tx
+        .update(schema.disbursementRequests)
+        .set({
+          status: 'REJECTED',
+          financeFeedback: feedback,
+          returnedBy: financeUserId,
+          returnedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.disbursementRequests.id, requestId))
+        .returning();
+
+      // Revert items to AVAILABLE
+      if (itemIds.length > 0) {
+        await tx
+          .update(schema.projectBudgetItems)
+          .set({ status: 'AVAILABLE' })
+          .where(inArray(schema.projectBudgetItems.id, itemIds));
+      }
+
+      return updated;
+    });
+  }
+
+  /**
    * Returns all disbursement requests formatted for a ledger export (CSV).
    */
   async getLedgerData() {
@@ -813,5 +855,3 @@ export class BudgetRepository {
       .orderBy(schema.disbursementRequests.submittedAt);
   }
 }
-
-

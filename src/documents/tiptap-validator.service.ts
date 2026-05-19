@@ -34,7 +34,7 @@ export class TiptapValidator {
     'horizontalRule',
     'image',
     'imageResize',
-    'resizableImage',   // alias used by some TipTap image-resize extensions
+    'resizableImage', // alias used by some TipTap image-resize extensions
     'table',
     'tableRow',
     'tableHeader',
@@ -56,99 +56,123 @@ export class TiptapValidator {
     'textStyle',
   ]);
 
-  private readonly nodeSchemas: Record<string, (node: TiptapNode) => boolean> = {
-    doc: (node) => {
-      return Array.isArray(node.content) && node.content.length > 0;
-    },
-    paragraph: (node) => {
-      return node.content === undefined || Array.isArray(node.content);
-    },
-    heading: (node) => {
-      const level = node.attrs?.level;
-      return typeof level === 'number' && level >= 1 && level <= 6 &&
-             (node.content === undefined || Array.isArray(node.content));
-    },
-    text: (node) => {
-      return typeof node.text === 'string' && node.text.length >= 0;
-    },
-    blockquote: (node) => {
-      return Array.isArray(node.content);
-    },
-    bulletList: (node) => {
-      return Array.isArray(node.content);
-    },
-    orderedList: (node) => {
-      return Array.isArray(node.content);
-    },
-    listItem: (node) => {
-      return Array.isArray(node.content);
-    },
-    codeBlock: (node) => {
-      return node.content === undefined || Array.isArray(node.content);
-    },
-    hardBreak: (node) => {
-      return true; // No content
-    },
-    horizontalRule: (node) => {
-      return true; // No content
-    },
-    image: (node) => {
-      return typeof node.attrs?.src === 'string' &&
-             (typeof node.attrs?.alt === 'string' || node.attrs?.alt === undefined);
-    },
-    imageResize: (node) => {
-      return typeof node.attrs?.src === 'string'; // Support base64 or URL and custom widths
-    },
-    table: (node) => {
-      if (!Array.isArray(node.content)) return false;
-      // Ensure table has at least one row
-      return node.content.length > 0 && node.content.every(row => row.type === 'tableRow');
-    },
-    tableRow: (node) => {
-      if (!Array.isArray(node.content)) return false;
-      // Ensure row has cells
-      return node.content.length > 0 && node.content.every(cell => cell.type === 'tableHeader' || cell.type === 'tableCell');
-    },
-    tableHeader: (node) => {
-      // Allow optional colspan/rowspan attrs; content may be empty (zero-content cells)
-      const validColspan = node.attrs?.colspan === undefined ||
-        (typeof node.attrs.colspan === 'number' && node.attrs.colspan >= 1);
-      const validRowspan = node.attrs?.rowspan === undefined ||
-        (typeof node.attrs.rowspan === 'number' && node.attrs.rowspan >= 1);
-      const validContent = node.content === undefined ||
-        (Array.isArray(node.content) && node.content.every(child => typeof child === 'object'));
-      return validColspan && validRowspan && validContent;
-    },
-    tableCell: (node) => {
-      // Allow optional colspan/rowspan attrs; content may be empty (zero-content cells)
-      const validColspan = node.attrs?.colspan === undefined ||
-        (typeof node.attrs.colspan === 'number' && node.attrs.colspan >= 1);
-      const validRowspan = node.attrs?.rowspan === undefined ||
-        (typeof node.attrs.rowspan === 'number' && node.attrs.rowspan >= 1);
-      const validContent = node.content === undefined ||
-        (Array.isArray(node.content) && node.content.every(child => typeof child === 'object'));
-      return validColspan && validRowspan && validContent;
-    },
-    taskList: (node) => Array.isArray(node.content),
-    taskItem: (node) => Array.isArray(node.content),
-  };
+  private readonly nodeSchemas: Record<string, (node: TiptapNode) => boolean> =
+    {
+      doc: (node) => {
+        return Array.isArray(node.content) && node.content.length > 0;
+      },
+      paragraph: (node) => {
+        return node.content === undefined || Array.isArray(node.content);
+      },
+      heading: (node) => {
+        const level = node.attrs?.level;
+        return (
+          typeof level === 'number' &&
+          level >= 1 &&
+          level <= 6 &&
+          (node.content === undefined || Array.isArray(node.content))
+        );
+      },
+      text: (node) => {
+        return typeof node.text === 'string' && node.text.length >= 0;
+      },
+      blockquote: (node) => {
+        return Array.isArray(node.content);
+      },
+      bulletList: (node) => {
+        return Array.isArray(node.content);
+      },
+      orderedList: (node) => {
+        return Array.isArray(node.content);
+      },
+      listItem: (node) => {
+        return Array.isArray(node.content);
+      },
+      codeBlock: (node) => {
+        return node.content === undefined || Array.isArray(node.content);
+      },
+      hardBreak: (node) => {
+        return true; // No content
+      },
+      horizontalRule: (node) => {
+        return true; // No content
+      },
+      image: (node) => {
+        return (
+          typeof node.attrs?.src === 'string' &&
+          (typeof node.attrs?.alt === 'string' || node.attrs?.alt === undefined)
+        );
+      },
+      imageResize: (node) => {
+        return typeof node.attrs?.src === 'string'; // Support base64 or URL and custom widths
+      },
+      table: (node) => {
+        if (!Array.isArray(node.content)) return false;
+        // Ensure table has at least one row
+        return (
+          node.content.length > 0 &&
+          node.content.every((row) => row.type === 'tableRow')
+        );
+      },
+      tableRow: (node) => {
+        if (!Array.isArray(node.content)) return false;
+        // Ensure row has cells
+        return (
+          node.content.length > 0 &&
+          node.content.every(
+            (cell) => cell.type === 'tableHeader' || cell.type === 'tableCell',
+          )
+        );
+      },
+      tableHeader: (node) => {
+        // Allow optional colspan/rowspan attrs; content may be empty (zero-content cells)
+        const validColspan =
+          node.attrs?.colspan === undefined ||
+          (typeof node.attrs.colspan === 'number' && node.attrs.colspan >= 1);
+        const validRowspan =
+          node.attrs?.rowspan === undefined ||
+          (typeof node.attrs.rowspan === 'number' && node.attrs.rowspan >= 1);
+        const validContent =
+          node.content === undefined ||
+          (Array.isArray(node.content) &&
+            node.content.every((child) => typeof child === 'object'));
+        return validColspan && validRowspan && validContent;
+      },
+      tableCell: (node) => {
+        // Allow optional colspan/rowspan attrs; content may be empty (zero-content cells)
+        const validColspan =
+          node.attrs?.colspan === undefined ||
+          (typeof node.attrs.colspan === 'number' && node.attrs.colspan >= 1);
+        const validRowspan =
+          node.attrs?.rowspan === undefined ||
+          (typeof node.attrs.rowspan === 'number' && node.attrs.rowspan >= 1);
+        const validContent =
+          node.content === undefined ||
+          (Array.isArray(node.content) &&
+            node.content.every((child) => typeof child === 'object'));
+        return validColspan && validRowspan && validContent;
+      },
+      taskList: (node) => Array.isArray(node.content),
+      taskItem: (node) => Array.isArray(node.content),
+    };
 
-  private readonly markSchemas: Record<string, (mark: TiptapMark) => boolean> = {
-    bold: () => true,
-    italic: () => true,
-    strike: () => true,
-    code: () => true,
-    link: (mark) => {
-      return typeof mark.attrs?.href === 'string';
-    },
-    highlight: (mark) => {
-      return true; // color is optional
-    },
-    underline: () => true,
-    subscript: () => true,
-    superscript: () => true,
-    textStyle: () => true, // supports font family
-  };
+  private readonly markSchemas: Record<string, (mark: TiptapMark) => boolean> =
+    {
+      bold: () => true,
+      italic: () => true,
+      strike: () => true,
+      code: () => true,
+      link: (mark) => {
+        return typeof mark.attrs?.href === 'string';
+      },
+      highlight: (mark) => {
+        return true; // color is optional
+      },
+      underline: () => true,
+      subscript: () => true,
+      superscript: () => true,
+      textStyle: () => true, // supports font family
+    };
 
   validateDocument(content: any): TiptapDoc {
     if (!content || typeof content !== 'object') {
@@ -175,7 +199,9 @@ export class TiptapValidator {
     // Validate node-specific schema
     const schemaValidator = this.nodeSchemas[node.type];
     if (schemaValidator && !schemaValidator(node)) {
-      throw new BadRequestException(`Invalid structure for node type: ${node.type}`);
+      throw new BadRequestException(
+        `Invalid structure for node type: ${node.type}`,
+      );
     }
 
     // Validate marks on text nodes
@@ -216,7 +242,9 @@ export class TiptapValidator {
 
       const schemaValidator = this.markSchemas[mark.type];
       if (schemaValidator && !schemaValidator(mark)) {
-        throw new BadRequestException(`Invalid structure for mark type: ${mark.type}`);
+        throw new BadRequestException(
+          `Invalid structure for mark type: ${mark.type}`,
+        );
       }
     }
   }

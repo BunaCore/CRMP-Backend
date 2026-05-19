@@ -24,6 +24,7 @@ import { CollaborationModule } from './collaboration/collaboration.module';
 import { AiModule } from './ai/ai.module';
 import { TasksModule } from './tasks/tasks.module';
 import { BudgetModule } from './budget/budget.module';
+import { EvaluationsModule } from './evaluations/evaluations.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
 import { MlModule } from './ml/ml.module';
@@ -53,6 +54,7 @@ import { MlModule } from './ml/ml.module';
     AiModule,
     TasksModule,
     BudgetModule,
+    EvaluationsModule,
     AuditLogsModule,
     MlModule,
   ],

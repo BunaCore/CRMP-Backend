@@ -30,4 +30,3 @@ import { CollaborationYjsDocService } from './yjs/collaboration-yjs-doc.service'
   exports: [CollaborationService],
 })
 export class CollaborationModule {}
-

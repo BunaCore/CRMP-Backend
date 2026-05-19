@@ -9,4 +9,3 @@ export interface CollabSocketData {
 }
 
 export type CollabRoomName = `collab:project:${string}`;
-

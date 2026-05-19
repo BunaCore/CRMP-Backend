@@ -459,7 +459,7 @@ async function seed() {
         currentStatus: 'Draft' as const,
         createdBy: studentUser?.id || adminUser.id,
         projectId: null,
-        promoteToProject: false,
+        promoteToProject: true,
         abstract:
           'This is a test undergraduate proposal for development and testing purposes.',
         submittedAt: new Date('2024-03-15'),
@@ -958,40 +958,51 @@ async function seed() {
     console.log('Seeding evaluation rubrics...');
     await tx.insert(schema.evaluationRubrics).values([
       {
+        id: '2897fb5d-dfd5-49e9-bfb0-11b2757199a6',
         name: 'Advisor',
         phase: 'PROPOSAL',
         type: 'continuous',
         maxPoints: '20.00',
+        isIndividual: false,
       },
       {
+        id: '52946fb0-b278-43e6-b9cb-8fe7706ecdde',
         name: 'Proposal Defence',
         phase: 'PROPOSAL',
         type: 'continuous',
         maxPoints: '15.00',
+        isIndividual: false,
       },
       {
+        id: '82c53578-0210-4133-9b25-f627f6ae2252',
         name: 'Advisor',
         phase: 'PROJECT',
         type: 'continuous',
         maxPoints: '20.00',
+        isIndividual: false,
       },
       {
         name: 'Documentation',
         phase: 'PROJECT',
         type: 'continuous',
         maxPoints: '20.00',
+        isIndividual: false,
       },
       {
+        id: '399e0be9-2279-4d1c-a79e-169bc0334c04',
         name: 'Defence Individual',
         phase: 'PROJECT',
         type: 'continuous',
         maxPoints: '15.00',
+        isIndividual: true,
       },
       {
+        id: '32619a47-d652-404b-b98f-e4398a1186e8',
         name: 'Defence Group',
         phase: 'PROJECT',
         type: 'final',
         maxPoints: '30.00',
+        isIndividual: false,
       },
     ]);
 
@@ -1005,7 +1016,11 @@ async function seed() {
     // Dedicated demo users (separate from the main USERS list above)
     const demoPgUsers = [
       { name: 'PG Advisor (Demo)', email: 'seed-pg-advisor@crmp.edu' },
-      { name: 'PG Student (Demo)', email: 'seed-pg-student@crmp.edu' },
+      {
+        name: 'PG Student (Demo)',
+        email: 'seed-pg-student@crmp.edu',
+        userProgram: 'PG' as const,
+      },
       { name: 'PG DGC Member (Demo)', email: 'seed-pg-dgc@crmp.edu' },
       { name: 'PG ADRPM (Demo)', email: 'seed-pg-adrpm@crmp.edu' },
       { name: 'PG Office (Demo)', email: 'seed-pg-office@crmp.edu' },
@@ -1020,6 +1035,7 @@ async function seed() {
           email: u.email,
           passwordHash: hash(UNIVERSAL_PASSWORD),
           accountStatus: 'active',
+          userProgram: 'userProgram' in u ? u.userProgram : undefined,
         })
         .returning();
       demoPgMap.set(u.email, demoUser);

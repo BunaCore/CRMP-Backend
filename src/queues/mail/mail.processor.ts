@@ -133,7 +133,8 @@ export class MailProcessor {
    */
   @Process('invitation-email')
   async handleInvitationEmail(job: Job<InvitationEmailJobData>) {
-    const { email, invitationLink, roleName, invitedByName, expiresAt } = job.data;
+    const { email, invitationLink, roleName, invitedByName, expiresAt } =
+      job.data;
 
     this.logger.log(`Processing invitation email for ${email}`);
 
