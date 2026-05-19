@@ -1302,7 +1302,6 @@
           "primaryKey": false,
           "notNull": true
         },
-<<<<<<< HEAD
         "is_individual": {
           "name": "is_individual",
           "type": "boolean",
@@ -1310,8 +1309,6 @@
           "notNull": false,
           "default": false
         },
-=======
->>>>>>> origin/main
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1674,15 +1671,12 @@
           "notNull": false,
           "default": false
         },
-<<<<<<< HEAD
-=======
         "supporting_document_file_id": {
           "name": "supporting_document_file_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
->>>>>>> origin/main
         "account_status": {
           "name": "account_status",
           "type": "account_status",
@@ -3487,7 +3481,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-<<<<<<< HEAD
     "public.project_defences": {
       "name": "project_defences",
       "schema": "",
@@ -3572,8 +3565,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-=======
->>>>>>> origin/main
     "public.project_members": {
       "name": "project_members",
       "schema": "",
